@@ -67,10 +67,8 @@ describe("parsePluginSource", () => {
     });
 
     it("keeps the ref and the sha through a round trip", () => {
-      // `resolvePluginSourceFromMarketplace` builds this shape with the marketplace's own
-      // ref, and `InstalledPlugin.create` serializes then re-parses it in memory — never
-      // through JSON. A guard that stops copying `ref` here unpins the plugin silently:
-      // the default branch is installed where a version was asked for.
+      // `InstalledPlugin.create` serializes then re-parses this in memory, never through
+      // JSON, and dropping `ref` unpins the plugin: the default branch, not the version asked for.
       const raw = {
         kind: "git-subdir",
         url: "https://github.com/org/repo.git",
@@ -224,11 +222,8 @@ describe("parsePluginSource", () => {
 });
 
 /**
- * The spellings `aidd plugin add <source>` accepts.
- *
- * Grouped by what a user types rather than by the function that parses it: choosing the
- * wrong kind sends the plugin to the wrong fetch adapter, and dropping a ref installs the
- * default branch where a pinned version was asked for — both silently.
+ * Grouped by what a user types, not by the parsing function: the wrong kind sends the plugin
+ * to the wrong fetch adapter, and a dropped ref installs the default branch — both silently.
  */
 describe("the source spellings a user types", () => {
   describe("a bare owner/repo", () => {
@@ -257,9 +252,8 @@ describe("the source spellings a user types", () => {
     });
 
     it("splits on the last @, so a ref containing one is refused rather than mangled", () => {
-      // The repo half would be "owner/repo@release", which is not owner/repo, so the
-      // spelling falls through to the JSON branch and is rejected. Better than installing
-      // a repo whose name silently carries an @.
+      // The repo half would be "owner/repo@release", not owner/repo, so the spelling falls
+      // through to the JSON branch and is rejected rather than installing a mangled name.
       expect(() => parsePluginSourceShorthand("owner/repo@release@2")).toThrow(
         InvalidPluginSourceError
       );
@@ -344,9 +338,8 @@ describe("the source spellings a user types", () => {
     });
 
     it("reports the JSON's own complaint when the object is a bad source", () => {
-      // Not just the error class: both branches throw InvalidPluginSourceError, so
-      // asserting the class alone would pass even if the parser's own message were
-      // swallowed and replaced by the generic "unrecognized source format".
+      // Both branches throw InvalidPluginSourceError, so asserting the class alone would
+      // pass even with the parser's own message swallowed by the generic one.
       expect(() => parsePluginSourceShorthand('{"kind":"github"}')).toThrow(
         /"repo" must be a non-empty string/
       );
@@ -360,10 +353,7 @@ describe("the source spellings a user types", () => {
   });
 });
 
-/**
- * What `status` and `doctor` print back for a recorded source. A wrong line here tells the
- * user their project points somewhere it does not.
- */
+/** A wrong line here tells the user their project points somewhere it does not. */
 describe("the source shown back to a user", () => {
   it("shows a github source as its full URL", () => {
     expect(describePluginSource({ kind: "github", repo: "owner/repo" })).toBe(

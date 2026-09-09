@@ -1,30 +1,15 @@
 #!/usr/bin/env node
 /**
- * check-referenced-paths.js - Fails when this repository's own prose names a path that
- * does not exist.
+ * Fails when this repository's own prose names a path that does not exist. The link checker
+ * resolves markdown links; nothing resolved a path written in backticks.
  *
- * The link checker resolves markdown links. Nothing resolved a path written in backticks,
- * which is how the memory bank and the docs came to name `aidd kanban`, `cli knip:production`
- * and a handful of workflow files under names nobody had typed in months.
+ * A reference is anchored on a real top-level entry rather than on "looks like a path":
+ * widening it to any `a/b` token reports MIME types, context-relative fragments and shell
+ * fragments, and a gate nobody trusts is a gate nobody reads.
  *
- * The regex is deliberately anchored on a real top-level entry rather than on "looks like a
- * path". Widening it to any `a/b` token is what produces 39 findings that are MIME types
- * (`application/json`), context-relative fragments (`domain/ports`) and shell fragments -
- * a gate nobody trusts is a gate nobody reads.
- *
- * Scope is this repository's prose: the root markdown, `docs/`, and `aidd_docs/memory/`.
+ * Always whole-tree — the hook's glob decides only whether this runs, never what it reads —
+ * because a path dies when the file it names is deleted, in a commit that touches no page.
  * `cli/` carries its own ratchet (cli/tests/architecture/referenced-paths.arch.test.ts).
- *
- * Whole-tree, always: the hook's glob decides only whether this runs, never what it reads.
- * Staging one page re-scans every page, because a path dies when the file it names is
- * deleted - in a commit that touches no page at all.
- *
- * Files, not directories: a token with no extension is skipped, so `plugins/` and
- * `scripts/__tests__/` are outside the reach. Directories drift far less than the files in
- * them, and a bare directory in prose is usually a shape rather than a location.
- *
- * Usage:
- *   node scripts/check-referenced-paths.js
  */
 
 const fs = require("node:fs");
@@ -32,19 +17,17 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
 
-/** Scanned areas. Everything here is prose this repository owns and can keep true. */
+/** Prose this repository owns and can keep true. */
 const SCANNED = ["docs", "aidd_docs/memory"];
 
-/** A reference must start with one of these, so that only a token naming something real at
- * the top level is ever considered. Read from disk: a new directory joins the check by
- * existing, and a deleted one stops being an anchor rather than becoming a false positive. */
+/** Read from disk: a new directory joins the check by existing, and a deleted one stops
+ * being an anchor rather than becoming a false positive. */
 function topLevelEntries() {
   return new Set(fs.readdirSync(ROOT).filter((entry) => entry !== ".git"));
 }
 
 const BACKTICKED = /`([^`\n]+)`/gu;
 
-/** Every backticked token in `content` that names a repository path. */
 function referencedPaths(content, entries = topLevelEntries()) {
   const found = [];
   const lines = content.split("\n");
@@ -56,9 +39,8 @@ function referencedPaths(content, entries = topLevelEntries()) {
       if (/[\s<>*$|…]/u.test(token)) continue;
       if (token.startsWith(">") || token.startsWith("=")) continue;
 
-      // Files only. A bare directory is almost always a shape rather than a location -
-      // `.claude/skills/` names what a tool reads in someone else's project, not a
-      // directory here - and directories drift far less than the files inside them.
+      // Files only: a bare directory is usually a shape rather than a location, and
+      // directories drift far less than the files inside them.
       if (!path.extname(token)) continue;
 
       const head = token.split("/")[0];
@@ -71,7 +53,6 @@ function referencedPaths(content, entries = topLevelEntries()) {
   return found;
 }
 
-/** The references in `files` that resolve to nothing on disk. */
 function deadReferences(files) {
   const entries = topLevelEntries();
   const dead = [];

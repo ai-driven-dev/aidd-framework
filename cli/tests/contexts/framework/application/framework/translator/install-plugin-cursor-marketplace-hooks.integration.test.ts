@@ -1,17 +1,5 @@
-/**
- * Phase 7, Task 2 — a marketplace-sourced Cursor install must deliver hooks to the
- * same destination a local-source install does. Phase 6 routed the local-source route
- * (ModeBFlatMaterializationTranslator) into the project's own .cursor/hooks.json;
- * BuiltTreeMaterializationTranslator — the marketplace route, taken when
- * `aidd plugin install <name> --from <marketplace>` resolves a registered marketplace —
- * still copied the built tree's plugin-scoped hooks/hooks.json verbatim into
- * ~/.cursor/plugins/local/<plugin>/hooks/hooks.json, the directory three probes showed
- * Cursor never reads (see measurements.md, Phase 4). Both routes now delegate to the
- * one ProjectHooksMaterializer, decided by cursor.ts's own hooksDestination declaration.
- *
- * The last test asserts the two translators agree on destination directly — the disagreement
- * test the phase instruction asked for, not just "both happen to look right today".
- */
+/** A marketplace-sourced Cursor install must deliver hooks where a local-source one does:
+ * a built tree's plugin-scoped `hooks/hooks.json` lands in a directory Cursor never reads. */
 import "../../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -182,10 +170,8 @@ describe("Cursor's two install routes agree on hooks destination (Phase 7, Task 
     return fs;
   }
 
-  // The destination this test pins to is read from cursor.ts's own declaration, not
-  // hard-coded — so it fails if either translator drifts from what the tool itself names,
-  // not merely if the two translators drift from each other (both regressing to plugin
-  // scope together would still pass a route-vs-route-only comparison).
+  // Read from cursor.ts's own declaration, never hard-coded: both translators regressing to
+  // plugin scope together would still pass a route-against-route comparison.
   function declaredHooksDestination(toolId: AiToolId): "plugin" | "project" {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) throw new Error(`${toolId} is not an AI tool`);

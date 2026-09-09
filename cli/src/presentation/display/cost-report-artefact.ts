@@ -19,18 +19,9 @@ import {
   TASK_UNATTRIBUTED_LABELS,
 } from "./cost-report-display.js";
 
-/**
- * One axis of a report, rendered as something a person pastes elsewhere.
- *
- * Distinct from `cost-report-display.ts`, which prints every axis at once for a terminal.
- * This prints one axis, as a markdown table, and drops the share and attribution columns
- * the inline reading adds: a table meant to leave the session that made it carries the
- * figures, not a computed percentage of them.
- *
- * It reads the envelope rather than the domain report, because the envelope is what a
- * consumer already parses, and because that is the shape the plugin script this replaces
- * rendered from — which is how the two were pinned byte-for-byte before the script went.
- */
+/** One axis, as a markdown table a person pastes elsewhere: it drops the share column the
+ * terminal rendering adds, since a table leaving the session that made it carries figures and
+ * not a percentage of them. It reads the envelope, the shape a consumer already parses. */
 export const ARTEFACT_AXES = [
   "total",
   "day",
@@ -57,14 +48,11 @@ const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
 // Not "no agent": the main thread is where a session starts, not an absence.
 const MAIN_THREAD = "the main thread";
-// A tool that never names an agent has said nothing about which one ran. Labelling that row
-// "the main thread" would state a fact nothing observed - the reading this axis used to give
-// every Codex, Copilot and OpenCode record.
+// A tool that names no agent has said nothing about which one ran, so calling that row "the
+// main thread" would state a fact nothing observed.
 const AGENT_NOT_STATED = "the tool names no agent";
-// Distinct on purpose, per the contract's own three-way shape: an unresolved row names an
-// identity that is real but unplaced, and repeats once per such identity since each is its
-// own row; the no-identity row is singular and says nobody opted in at all. Neither label
-// may be swapped for the other, and neither reads as a shared bucket.
+// Distinct on purpose: an unresolved row names a real but unplaced identity and repeats once
+// per identity, while the no-identity row is singular. Neither is a shared bucket.
 const NO_PERSON_IDENTIFIER = "no identity — nobody opted in";
 function unresolvedPersonLabel(identity: string): string {
   return `unresolved — not mapped to anyone (${identity})`;
@@ -113,14 +101,10 @@ function filtersSuffix(filters: CostReportFilters | undefined): string {
   return parts.length === 0 ? "" : `, filters: ${parts.join(", ")}`;
 }
 
-/** States the period, the selection and the axis on every artefact, for the same reason a
- * chart names its own axes: a figure copied out of the session that made it has to stay
- * placeable without the command that produced it. */
-// Carried on every axis's own header, never only on the terminal rendering: a table meant
-// to leave the session that made it must say this on its own, the same reason the
-// attribution column exists beside it. See cost-report-display.ts's printHeader for why
-// the wording never says "measurement is off" bare — the sink below is scoped to this
-// person, not to this project, so an off switch never contradicts a real figure beside it.
+/** Carried on every axis's own header, so a figure copied out of the session that made it
+ * stays placeable without the command that produced it. Never worded "measurement is off"
+ * bare: the sink is scoped to this person, not this project, so an off switch contradicts no
+ * figure beside it. */
 function measurementSuffix(envelope: CostReportEnvelope): string {
   return envelope.measurement_enabled
     ? ""
@@ -152,14 +136,9 @@ function emptySelectionMessage({
   return `${filter} '${value}' matched nothing in this selection — known, but no work here`;
 }
 
-/** What the read could not do travels with what it did, on the artefact as on the terminal:
- * a total assembled from a partial read is indistinguishable from a complete one without it.
- *
- * `identity_unusable === "absent"` is the exception: it is every user's ordinary default
- * state, not a degraded read, so it is never printed as a caveat here. Only the person axis
- * (`personArtefact`, via `includeAbsentIdentityCaveat: true`) says it, because that is the
- * one place the reader is already looking at identity resolution and the fact is relevant.
- * `"unreadable"` is real damage on every axis and always prints. */
+/** What the read could not do travels with what it did: a total assembled from a partial read
+ * is otherwise indistinguishable from a complete one. `identity_unusable === "absent"` is the
+ * ordinary default rather than damage, so only the person axis states it. */
 function caveats(
   envelope: CostReportEnvelope,
   { includeAbsentIdentityCaveat = false }: { includeAbsentIdentityCaveat?: boolean } = {}
@@ -212,9 +191,8 @@ function totalArtefact(envelope: CostReportEnvelope): string {
   ].join("\n");
 }
 
-/** Every day the period spans, gap included, and never capped the way the terminal rendering
- * caps a long series: a file is where a long series belongs, and dropping rows there would be
- * the same false continuity the cap exists to prevent in a terminal. */
+/** Every day the period spans, gaps included and never capped the way a terminal caps a long
+ * series: dropping rows in a file is the false continuity the cap exists to prevent. */
 function dayArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -224,13 +202,9 @@ function dayArtefact(envelope: CostReportEnvelope): string {
   );
 }
 
-/** Two rows can share one step name — the same skill reached once from the tool's own
- * statement and once from a journal interval is two different claims about the same step,
- * never one the report is free to merge (`by_step` is keyed on `step` and `attribution`
- * together; see `cost-report-contract.md`). Dropping the attribution column here would
- * paste a table where two such rows are indistinguishable from one step double-counted -
- * so unlike every other axis below, this one carries a third column rather than the
- * generic `table()` helper's two. */
+/** Two rows can share one step name — the same skill reached from a tool's own statement and
+ * from a journal interval is two claims, never one — so this axis carries a third column:
+ * without it the pair is indistinguishable from one step double-counted. */
 function stepArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_step.map((row) => {
     const step = row.step ?? "unattributed";
@@ -246,10 +220,9 @@ function stepArtefact(envelope: CostReportEnvelope): string {
   ].join("\n");
 }
 
-/** A third column beside the generic `table()` helper's two, for the same reason
- * `stepArtefact` carries one: the row for a named task rests on a closed interval, and a
- * pasted table says so on its own rather than only in a document elsewhere. Each row for
- * what fell in no declared interval carries no attribution to show, only its own reason. */
+/** A third column for the same reason `stepArtefact` carries one: a named task's row rests on
+ * a closed interval and the table must say so. A row for what fell in no declared interval
+ * carries no attribution, only its reason. */
 function taskArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_task.map((row) => {
     const task = row.task ?? (row.reason === undefined ? "" : TASK_UNATTRIBUTED_LABELS[row.reason]);
@@ -266,9 +239,8 @@ function taskArtefact(envelope: CostReportEnvelope): string {
   ].join("\n");
 }
 
-/** No third column, unlike `taskArtefact`: a backlog row carries no attribution to show —
- * every named row rests on the same single route (reading the declaration), so there is no
- * second strength to distinguish the way a task's closed interval has. */
+/** No third column, unlike `taskArtefact`: every named backlog row rests on the same single
+ * route, so there is no second strength to distinguish. */
 function backlogArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_backlog.map((row) => {
     const name =
@@ -285,15 +257,9 @@ function backlogArtefact(envelope: CostReportEnvelope): string {
 
 const OUTSIDE_EVERY_FLOW_LABEL = "outside any flow";
 
-/** What this axis cannot tell apart, printed with the figures rather than left in a doc
- * comment no reader of a report ever opens. Every line here is a standing property of how a
- * flow is read, never a damaged read the way `caveats()`'s own lines are - which is why they
- * are assembled here and not there.
- *
- * Each set is gated on a row it actually describes being present. A limit is a statement
- * about a mechanism that ran: printing the journal's own two for a period whose only flow
- * came from a record's own tool would name a reading nothing here performed, and a report
- * that lists what could have gone wrong with an answer it did not give is noise. */
+/** Standing properties of how a flow is read, never a damaged read the way `caveats()`'s lines
+ * are, which is why they are assembled apart. Each set is gated on a row it describes: a limit
+ * about a mechanism that never ran is noise. */
 function flowLimits(envelope: CostReportEnvelope): readonly string[] {
   return [...journalFlowLimits(envelope), ...toolStatedFlowLimits(envelope)];
 }
@@ -311,9 +277,8 @@ function journalFlowLimits(envelope: CostReportEnvelope): readonly string[] {
   ];
 }
 
-/** The one property of a flow no interval bounded: it is a name, and a name cannot say how
- * many runs it stands for. Stated wherever such a row is printed, because a reader who takes
- * it for a single run reads its total as one orchestration's cost. */
+/** A flow no interval bounded is a name, and a name cannot say how many runs it stands for:
+ * a reader taking it for one run reads its total as one orchestration's cost. */
 function toolStatedFlowLimits(envelope: CostReportEnvelope): readonly string[] {
   if (!envelope.by_flow.some((row) => row.attribution === "tool-stated")) return [];
   return [
@@ -323,22 +288,16 @@ function toolStatedFlowLimits(envelope: CostReportEnvelope): readonly string[] {
   ];
 }
 
-/** `a`, `a or b`, `a, b or c` - the names read as a sentence rather than as a list a program
- * printed. Takes however many `bareOrchestratingSkillNames` holds, so the sentence stays
- * grammatical when a project adds a fourth orchestrator to the set. */
+/** `a`, `a or b`, `a, b or c`: however many names there are, the sentence stays grammatical. */
 function orAny(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
-/** Two columns beside the generic `table()` helper's two, for the same reason
- * `stepArtefact` carries one: two rows can share a `flow` name - the same orchestrating
- * skill run twice in one session, or a run the journal witnessed beside one only the tool
- * named - and this table must never let them read as one flow double-counted. `Attribution`
- * and `Opened at` are what tell them apart; a `tool-stated` row is a bucket drawn from
- * however many runs the tool named, so it has no single opening moment and prints an em
- * dash there, as does the row for work outside every flow - the same way `taskArtefact`
- * does for a reason-only row's own missing attribution. */
+/** Two extra columns, for the same reason `stepArtefact` carries one: two rows can share a
+ * `flow` name, and `Attribution` plus `Opened at` are what keep them from reading as one flow
+ * double-counted. A `tool-stated` row is a bucket with no single opening moment, so it prints
+ * an em dash there, as does work outside every flow. */
 function flowArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_flow.map((row) => {
     const flow = row.flow ?? OUTSIDE_EVERY_FLOW_LABEL;
@@ -369,9 +328,8 @@ function agentArtefact(envelope: CostReportEnvelope): string {
   );
 }
 
-/** An id and the moment its turn began: the id alone is opaque, and the moment is what a
- * person greps for in their own transcript. `—` where a row carries none, which is the row
- * for records that named no prompt - never a moment borrowed from another turn. */
+/** The id alone is opaque; the moment its turn began is what a person greps for in their own
+ * transcript. `—` where a row carries none, never a moment borrowed from another turn. */
 function promptArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_prompt.map(
     (row) =>
@@ -404,17 +362,12 @@ function mappedPersonLabel(row: CostReportEnvelopePersonRow): string {
   return row.display_name ?? row.person ?? "";
 }
 
-/** One label per resolution, exhaustively - a `Record` rather than an if-chain with a
- * fallback, so a value added to `PersonResolution` fails to compile here instead of
- * reaching a reader as "nobody opted in". That is not hypothetical: `this-machine` was
- * added on 2026-09-04 and the fallback swallowed it silently, printing rows a declared
- * identity claims as rows nobody claimed. Same mechanism `TASK_UNATTRIBUTED_LABELS` uses
- * one axis over. */
+/** A `Record` rather than an if-chain with a fallback, so a value added to `PersonResolution`
+ * fails to compile here instead of reaching a reader as "nobody opted in". */
 const PERSON_LABELS: Record<PersonResolution, (row: CostReportEnvelopePersonRow) => string> = {
   mapped: mappedPersonLabel,
-  // This machine's own person, reached because the record named nobody. The same label a
-  // mapped row gets: it is the same person, and the row's `resolution` already carries how
-  // it was reached for a reader who needs that.
+  // The same label a mapped row gets: it is the same person, and `resolution` already carries
+  // how it was reached.
   "this-machine": mappedPersonLabel,
   unresolved: (row) => unresolvedPersonLabel(row.identities[0] ?? ""),
   none: () => NO_PERSON_IDENTIFIER,
@@ -424,8 +377,8 @@ function personLabel(row: CostReportEnvelopePersonRow): string {
   return PERSON_LABELS[row.resolution](row);
 }
 
-/** A third column beside every other axis's two, because a person line the contract can
- * audit has to carry its own evidence: the raw identities behind it, not only its label. */
+/** A third column, because an auditable person line carries its own evidence: the raw
+ * identities behind it, not only its label. */
 function personArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_person.map((row) => {
     const identities = row.identities.length > 0 ? row.identities.join(", ") : "—";
@@ -452,10 +405,8 @@ function projectArtefact(envelope: CostReportEnvelope): string {
   );
 }
 
-/** A tool that cannot be read at all is never a zero: its row says so instead of printing a
- * figure nothing measured. A tool carrying only a session total prints that rather than
- * "nothing in this period" — present because it was measured, absent from `totals` because it
- * is not a sum of requests. */
+/** A tool that cannot be read is never a zero. One carrying only a session total prints that
+ * rather than "nothing in this period": measured, but not a sum of requests. */
 function toolArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_tool.map((row) => {
     const because = row.reason ? ` — ${row.reason}` : "";
@@ -491,8 +442,7 @@ export function isArtefactAxis(value: string): value is ArtefactAxis {
   return (ARTEFACT_AXES as readonly string[]).includes(value);
 }
 
-/** An axis name in, the artefact that answers it out. An axis this does not know is refused
- * by name, with the ones it does — never guessed at. */
+/** An unknown axis is refused by name, with the ones this knows, never guessed at. */
 export function buildCostReportArtefact(envelope: CostReportEnvelope, axis: string): string {
   if (!isArtefactAxis(axis)) {
     throw new Error(`Unknown axis '${axis}'. Expected one of: ${ARTEFACT_AXES.join(", ")}.`);

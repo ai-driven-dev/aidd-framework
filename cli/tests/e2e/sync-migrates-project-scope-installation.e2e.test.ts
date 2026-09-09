@@ -16,13 +16,8 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /**
- * Rewrites a freshly `setup` project back into the shape a project installed *before*
- * the shared source existed: `.aidd/marketplaces.json` carries the framework at
- * `scope: "project"`, its own build sits at `.aidd/cache/built/aidd-framework/`, and
- * the machine's own shared registry knows nothing about it at all — exactly what a
- * pre-lot-1 `aidd setup` produced, and what nobody but a hand-seeded fixture can
- * reproduce, since every code path left in this CLI now writes the migrated shape
- * from the very first run.
+ * The pre-migration shape, which no code path still writes: a project-scope registry entry,
+ * its build under `.aidd/cache/built/`, and a shared registry that knows nothing of it.
  */
 async function seedPreMigrationState(projectDir: string, fakeHome: string): Promise<void> {
   const userConfigDir = join(fakeHome, ".config", "aidd");
@@ -93,9 +88,6 @@ describe("E2E: sync migrates a project installed before the shared source", () =
 
       const userConfigDir = join(env.fakeHome, ".config", "aidd");
       const projectCacheDir = join(env.projectDir, ".aidd", "cache", "built", "aidd-framework");
-      // The seed actually reproduces the pre-migration state it claims to: a
-      // project-scope registry entry, this project's own built tree on disk, and
-      // nothing shared registered yet.
       expect(
         (
           (await readJson(join(env.fakeHome, ".config", "aidd", "marketplaces.json")))
@@ -126,10 +118,8 @@ describe("E2E: sync migrates a project installed before the shared source", () =
         )
       ).toBe(false);
 
-      // claude's own binary never ran this sync (sandboxed `PATH`), so its host
-      // registration — if it still names this project's pre-migration cache — never
-      // got a chance to move off it. Purging the cache regardless would leave that
-      // registration with nothing left to resolve (S1).
+      // claude's binary never ran in this sandbox, so a host registration still naming
+      // this cache never moved off it: purging it would leave nothing to resolve.
       expect(await exists(projectCacheDir)).toBe(true);
       expect(syncResult.stderr).toContain("pre-migration framework cache kept");
 

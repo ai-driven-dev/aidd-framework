@@ -2,13 +2,9 @@ import { AI_TOOL_IDS, type AiToolId, type ToolId } from "../../../kernel/tool.js
 import type { ToolConfig } from "../../tools/domain/registry.js";
 import { getAllRegisteredTools, isAiTool } from "../../tools/domain/registry.js";
 
-/**
- * The tool whose layout a plugin distribution follows.
- *
- * An alias rather than its own union: a format is a tool's way of laying out a plugin,
- * so a sixth tool is a sixth format by construction. Writing the members again would
- * only create a second list to keep in step.
- */
+/** The tool whose layout a plugin distribution follows. An alias rather than its own union: a
+ * format is a tool's way of laying out a plugin, so a sixth tool is a sixth format by
+ * construction. */
 export type PluginFormat = AiToolId;
 
 export interface DistributionProbe {
@@ -17,14 +13,10 @@ export interface DistributionProbe {
 }
 
 /**
- * Probes ordered most specific first — deepest path wins, ties broken by tool order.
- *
- * Takes the profiles explicitly so the rule can be probed with synthetic tools.
- *
- * The order is behaviour, not presentation: the reader takes the first probe that
- * resolves, and copilot declares a bare `plugin.json` at the root, which any directory
- * can satisfy. Sorting by depth keeps `.claude-plugin/plugin.json` ahead of it, which
- * is exactly what the hand-written list used to encode without saying so.
+ * Probes ordered most specific first — deepest path wins, ties broken by tool order. The order
+ * is behaviour, not presentation: the reader takes the first probe that resolves, and copilot
+ * declares a bare `plugin.json` at the root that any directory can satisfy. Takes the profiles
+ * explicitly so the rule can be probed with synthetic tools.
  */
 export function distributionProbesOf(
   tools: ReadonlyMap<ToolId, ToolConfig>,

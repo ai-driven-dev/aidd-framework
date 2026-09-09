@@ -11,12 +11,8 @@ const HOST_MATCHERS: readonly HostMatcher[] = [
   { host: "dev.azure.com", authPrefix: ":" },
 ];
 
-/**
- * The host a URL actually addresses, or `null` when the string is not a parseable URL.
- * Substring-matching the whole URL text answered a different question — `https://
- * evil.example/github.com/x` and `https://notgithub.com/x` both contain `github.com`,
- * and both would have been handed a GitHub-shaped credential.
- */
+/** The host a URL addresses, never its text: `evil.example/github.com/x` and
+ * `notgithub.com/x` both contain `github.com` and must get no GitHub credential. */
 function hostnameOf(url: string): string | null {
   try {
     return new URL(url).hostname.toLowerCase();
@@ -38,15 +34,8 @@ export function injectTokenIntoUrl(url: string, token: string | undefined): stri
   return url.replace("https://", `https://${authPrefix}${token}@`);
 }
 
-/**
- * The same URL with any userinfo removed.
- *
- * A user may type their own credential into a source URL
- * (`https://user:token@host/repo.git`). That string then travels two ways it should not: into
- * the error a failed clone prints, and into the cache directory's name, where the secret is
- * written to disk and stays there. Strip it before either use; the clone still receives the
- * URL with its credential.
- */
+/** A credential typed into a source URL otherwise travels into the error a failed clone
+ * prints and into the cache directory's name, where it is written to disk and stays. */
 export function withoutCredentials(url: string): string {
   return url.replace(/^(https?:\/\/)[^/@]*@/, "$1");
 }

@@ -39,9 +39,8 @@ describe("status", () => {
     manifest.addTool("claude", "test", []);
     await deps.manifestRepo.save(manifest);
 
-    // Written by the CLI on purpose and never tracked. The exclusion has to match the
-    // path the profile declares, not a prefix the tool's directory happens to share:
-    // reading it off `machineLocalFilesOf` is what keeps the two in step.
+    // Written by the CLI on purpose and never tracked. Reading the exclusion off
+    // `machineLocalFilesOf` is what keeps it matching the path the profile declares.
     for (const relativePath of machineLocalFilesOf("claude")) {
       await deps.fs.writeFile(`${PROJECT_ROOT}/${relativePath}`, "{}");
     }

@@ -53,17 +53,9 @@ export interface TelemetryDeps {
   forgetTelemetryUseCase: ForgetTelemetryUseCase;
 }
 
-/**
- * Telemetry's adapters and use cases.
- *
- * One wiring module per context, like its three siblings. Tool identifiers appear here for
- * the same reason they appear in those: registration is the composition root's job, and a
- * profile cannot name the adapter that reads it without putting infrastructure in the
- * domain — which the layer rule refuses, correctly.
- *
- * `resolveHomeDir()` rather than a bare `homedir()`: on Windows the bare call ignores a
- * `HOME` a person set or a test sandboxed this process under.
- */
+/** Tool identifiers appear here because a profile cannot name the adapter that reads it
+ * without putting infrastructure in the domain. `resolveHomeDir()` rather than a bare
+ * `homedir()`: on Windows the bare call ignores a `HOME` a person or a test sandbox set. */
 export function wireTelemetry(shared: TelemetryWiringShared): TelemetryDeps {
   const { fs, logger, git, projectRoot, gitignoreUseCase, currentVersionProvider, manifestRepo } =
     shared;

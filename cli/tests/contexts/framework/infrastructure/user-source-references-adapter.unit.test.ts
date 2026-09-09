@@ -10,9 +10,8 @@ function adapter(fs: InMemoryFileAdapter = new InMemoryFileAdapter()): UserSourc
   return new UserSourceReferencesAdapter(fs, () => USER_CONFIG_DIR);
 }
 
-/** Marks `root` as an existing project directory, the same way a real one always has at
- * least `.aidd/manifest.json` under it — `fileExists` on a bare path with no children
- * would otherwise read as "gone" for every project this suite seeds. */
+/** Marks `root` as an existing project directory, the way a real one always has at least
+ * `.aidd/manifest.json`; a bare path with no children reads as "gone" to `fileExists`. */
 function markExisting(fs: InMemoryFileAdapter, root: string): void {
   fs.setFile(`${root}/marker`, "");
 }
@@ -69,9 +68,8 @@ describe("the shared source's own project references", () => {
     expect(await refs.listAllReferencingProjects()).toEqual([]);
   });
 
-  // A help, not an authority, all the way to the file itself: a vanished project's own
-  // entry is ignored at read (above), but until it is also purged at the next write the
-  // file never shrinks, so every read keeps `stat`-ing a path nobody will ever revive.
+  // A help, not an authority, all the way to the file: a vanished project's entry is ignored at
+  // read but survives until the next write, so every read keeps `stat`-ing a dead path.
   it("purges a vanished project's own entry from the file at the next write", async () => {
     const fs = new InMemoryFileAdapter();
     markExisting(fs, "/project-a");
@@ -90,10 +88,8 @@ describe("the shared source's own project references", () => {
     expect(written["1.0.0"]).toEqual(["/project-a", "/project-c"]);
   });
 
-  // A CLI self-update between the `sync` that wrote the reference and this read must
-  // never matter: nothing here asks which version is "current", only where the project
-  // itself is recorded — so a stale build number can never strand a reference nobody
-  // ever asks about again.
+  // Nothing here asks which version is "current", only where the project is recorded, so a CLI
+  // self-update between the `sync` that wrote the reference and this read cannot strand it.
   it("adding the same project under a new version drops its claim on the old one", async () => {
     const fs = new InMemoryFileAdapter();
     markExisting(fs, "/project-a");

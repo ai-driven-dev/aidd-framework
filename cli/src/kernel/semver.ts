@@ -1,6 +1,4 @@
-/** A version's own three numeric components plus its pre-release identifiers, if any —
- * build metadata is parsed and then discarded, since semver gives it no bearing on
- * precedence. */
+/** Build metadata is parsed and then discarded: semver gives it no bearing on precedence. */
 interface ParsedSemver {
   readonly major: number;
   readonly minor: number;
@@ -24,16 +22,15 @@ function parseSemver(v: string): ParsedSemver | undefined {
   };
 }
 
-/** Anchored end to end: a version carrying anything past its own three numeric
- * components (or an optional pre-release/build suffix) is not valid semver, not a
- * loosely-matched prefix of one. */
+/** Anchored end to end: anything past the three numeric components and an optional
+ * pre-release/build suffix is not semver, not a loosely-matched prefix of one. */
 export function isSemver(s: string): boolean {
   return parseSemver(s) !== undefined;
 }
 
 export function compareSemver(a: string, b: string): -1 | 0 | 1 {
-  // Two strings neither side can parse compare equal rather than throwing — a caller
-  // gating a decision on `<= 0` must see "no drift decided here", never a crash.
+  // Two unparseable strings compare equal rather than throwing: a caller gating on `<= 0`
+  // must see "no drift decided here", never a crash.
   const zero: ParsedSemver = { major: 0, minor: 0, patch: 0, prerelease: [] };
   const pa = parseSemver(a) ?? zero;
   const pb = parseSemver(b) ?? zero;

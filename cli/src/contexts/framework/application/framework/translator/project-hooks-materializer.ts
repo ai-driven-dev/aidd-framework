@@ -19,12 +19,10 @@ import type {
 const HOOKS_MANIFEST_PATH = "hooks/hooks.json";
 
 /**
- * Delivers a plugin's hooks to the destination a `hooksDestination: "project"`
- * capability names — merged into the project's own hooks file, scripts copied
- * beside it — rather than into the plugin's own directory. The single place both
- * materialization routes (Mode B flat, and the marketplace-sourced built-tree copy)
- * call, so where a tool's hooks land is decided by its own declaration, never by
- * which translator happened to run — see measurements.md, Phase 7, Task 2.
+ * Delivers a plugin's hooks to the destination a `hooksDestination: "project"` capability names —
+ * merged into the project's own hooks file, scripts copied beside it — rather than into the
+ * plugin's own directory. Both materialization routes call it, so where a tool's hooks land is
+ * decided by its own declaration, never by which translator happened to run.
  */
 export class ProjectHooksMaterializer {
   constructor(private readonly fs: FileWriter & FileReader) {}
@@ -95,10 +93,9 @@ export class ProjectHooksMaterializer {
   }
 }
 
-/** A copy of `dist` with every `hooks/` file dropped, both from `files` (what the
- * generic native translator walks) and from `components.hooks` (what a hooks-trust
- * notice reads) — for a capability declaring `hooksDestination: "project"`, so none
- * of its hooks are written under the plugin's own directory, only via `materialize`. */
+/** A copy of `dist` with every `hooks/` file dropped, from `files` and from `components.hooks`
+ * alike — for a capability declaring `hooksDestination: "project"`, so none of its hooks are
+ * written under the plugin's own directory, only through `materialize`. */
 export function withoutHooks(dist: PluginDistribution): PluginDistribution {
   return new PluginDistribution({
     manifest: dist.manifest,

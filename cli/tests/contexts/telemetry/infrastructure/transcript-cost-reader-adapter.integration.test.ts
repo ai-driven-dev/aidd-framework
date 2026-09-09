@@ -6,9 +6,8 @@ import { TranscriptCostReaderAdapter } from "../../../../src/contexts/telemetry/
 import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "../../../../src/contexts/tools/domain/profiles/claude/claude-transcript-location.js";
 import { CODEX_ROLLOUT_LOCATION } from "../../../../src/contexts/tools/domain/profiles/codex/codex-transcript-location.js";
 
-// The fixtures tree under tests/fixtures/local-cost mirrors a real $HOME: `.claude/projects`
-// and `.codex/sessions` sit exactly where each tool would write them, so pointing `homeDir`
-// at this directory exercises the same directory walk and file naming a real machine would.
+// The fixtures tree mirrors a real $HOME, each tool's directory exactly where it would
+// write it, so `homeDir` here exercises the same walk and file naming a real machine does.
 const HOME_DIR = fileURLToPath(new URL("../../../fixtures/local-cost", import.meta.url)).replace(
   /\/$/,
   ""

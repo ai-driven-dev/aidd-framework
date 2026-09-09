@@ -18,13 +18,8 @@ export function parseGlobalOptions(program: Command): GlobalOptions {
   };
 }
 
-/**
- * Validates a raw `--scope` flag, shared by `setup`, `doctor` and `sync` — the three
- * commands `--scope user` reaches. Returns the value as given (including `undefined`
- * for an absent flag); each caller applies its own default (`SetupFlow` defaults to
- * `"project"` internally, `doctor`/`sync` default at the call site), rather than this
- * function guessing one default for callers that may one day want a different one.
- */
+/** Returns the flag as given, `undefined` included: each caller applies its own default
+ * rather than this validation guessing one for all of them. */
 export function parseScopeFlag(
   raw: string | undefined,
   output: CLIOutput

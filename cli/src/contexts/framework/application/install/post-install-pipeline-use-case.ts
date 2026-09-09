@@ -17,10 +17,9 @@ export class PostInstallPipelineUseCase {
   async execute(options: PostInstallPipelineOptions): Promise<void> {
     const { projectRoot, manifest } = options;
     await this.manifestRepo.save(manifest);
-    // One call for everything this CLI's own writes require ignored: the plugin cache,
-    // the run journal (who worked on what, for how long, and every file a session
-    // wrote — it belongs to the repository it describes, never to a commit), and each
-    // installed tool's machine-local file.
+    // One call for everything this CLI's own writes require ignored: the plugin cache, the run
+    // journal (which belongs to the repository it describes, never to a commit), and each installed
+    // tool's machine-local file.
     await this.gitignoreUseCase.execute(projectRoot, aiddGitignoreEntries(manifest));
   }
 }

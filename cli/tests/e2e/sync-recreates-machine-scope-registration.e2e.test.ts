@@ -6,10 +6,8 @@ import { createTestEnv, runCli } from "./helpers.js";
 const FRAMEWORK_REAL_PATH = resolve(process.cwd(), "tests/fixtures/framework-real");
 
 /**
- * A clone never carries what its own `.gitignore` excludes — `.aidd/cache/` chief among
- * them (`manifest-gitignore-entries.ts`). Stripping it here is what makes `projectDir` a
- * faithful stand-in for a fresh `git clone`, not merely a copy of a directory that still
- * happens to hold a build from the machine that ran `setup` first.
+ * A clone never carries what its own `.gitignore` excludes — `.aidd/cache/` chief among them
+ * — so stripping it is what makes `projectDir` a faithful stand-in for a fresh `git clone`.
  */
 async function cloneProjectWithoutCache(sourceDir: string, destDir: string): Promise<void> {
   await cp(sourceDir, destDir, { recursive: true });
@@ -45,18 +43,15 @@ describe("E2E: sync recreates a machine-scope registration a fresh clone never c
       );
       expect(setupResult.exitCode).toBe(0);
 
-      // A second machine, checking out the same project for the first time: its own
-      // user config dir has never run `setup`, so `userConfigDir()/marketplaces.json`
-      // does not exist there at all.
+      // A second machine checking out the same project for the first time: its own user
+      // config dir has never run `setup`, so `marketplaces.json` does not exist there.
       await cloneProjectWithoutCache(origin.projectDir, clone.projectDir);
 
       const syncResult = await runCli(["sync"], clone.projectDir, clone.fakeHome);
 
       expect(syncResult.exitCode).toBe(0);
-      // The case this fix proves: native activation genuinely could not run in this
-      // sandbox (no drivable tool binary on PATH), so the marketplace got registered
-      // and the reference got written, but the plugin will not load until the real
-      // claude CLI has.
+      // Native activation genuinely could not run in this sandbox (no drivable tool binary
+      // on PATH), so the marketplace is registered but the plugin will not load yet.
       expect(syncResult.stderr).toContain(
         "claude: the plugin will not load until the claude CLI has run."
       );
@@ -81,10 +76,8 @@ describe("E2E: sync recreates a machine-scope registration a fresh clone never c
     const first = await createTestEnv("machine-scope-shared-home-first");
     const second = await createTestEnv("machine-scope-shared-home-second");
     try {
-      // Both projects share one machine — one `fakeHome`, never `second.fakeHome` — so
-      // the second project's own `setup` finds the shared source already registered by
-      // the first, the case a fresh `references.json` reference count must still see as
-      // two, not as one project silently replacing the other's claim.
+      // Both projects share one machine — one `fakeHome`, never `second.fakeHome` — so the
+      // second `setup` finds the source registered, and must count two claims, not replace one.
       const firstSetup = await runCli(
         [
           "setup",

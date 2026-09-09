@@ -1,9 +1,7 @@
 /**
- * Cursor's ToolBuildContract: marketplace (native plugin tree) and flat
- * (direct workspace materialization) modes.
- *
- * Content transforms, path computations, and merge helpers are pure functions reused
- * from domain/formats/. The contracts themselves are thin wiring.
+ * Cursor's build contracts: marketplace (a native plugin tree) and flat (direct workspace
+ * materialization). The transforms, path computations and merges are pure functions reused from
+ * `domain/formats/`; the contracts themselves are thin wiring.
  */
 
 import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
@@ -41,7 +39,6 @@ function transformCursorAgent(content: string, _plugin: string, outName: string)
 export function buildCursorContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CURSOR_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CURSOR_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
   return {
     pluginRootToken: CURSOR_PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
@@ -88,8 +85,6 @@ export function buildCursorContract(): ToolBuildContract {
       buildClaudeStyleEntry(name, outDir, srcEntry, manifestRelative, fs),
   };
 }
-
-// ── Cursor flat contract ───────────────────────────────────────────────────────
 
 function cursorFlatAgentPath(plugin: string, rel: string): string {
   return genericFlatAgentPath(".cursor/agents/", plugin, rel.replace(/^agents\//, ""), ".md");

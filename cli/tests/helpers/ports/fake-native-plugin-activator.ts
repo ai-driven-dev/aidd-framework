@@ -2,26 +2,8 @@ import type { NativePluginActivator } from "../../../src/contexts/tools/domain/p
 import { NativePluginCliError } from "../../../src/kernel/errors.js";
 import type { MarketplaceScope } from "../../../src/kernel/scope.js";
 
-/**
- * Records native plugin CLI activation calls instead of shelling out.
- * Defaults to unavailable so unit deps skip activation unless a test opts in.
- * `failOnPlugins` makes `enablePlugin` throw for the listed refs (simulates a
- * plugin missing from the marketplace snapshot).
- * `conflictOnAdd` makes `addMarketplace` throw until `removeMarketplace` is called
- * once (simulates the CLI rejecting `add` when the name exists from a different source).
- * `throwOnRemove` makes `removeMarketplace` throw (simulates removing an absent name,
- * i.e. an `add` that failed for a reason other than a different-source conflict).
- * `failOnUninstall` makes `uninstallPlugin` throw for the listed refs (simulates the
- * plugin already being absent from the tool's own registry).
- * `installedAtScope` makes `uninstallPlugin` throw for a ref whose recorded scope
- * disagrees with the one the call carries — a real `claude` binary refuses a
- * mismatched-scope uninstall outright (measured; see `native-plugin-activator.ts`),
- * rather than silently missing an entry it wrote at a different scope.
- * `crashOnAddMarketplace` makes `addMarketplace` throw a plain `Error` rather than a
- * `NativePluginCliError` — the one failure shape a real adapter never produces (every
- * throw in `AbstractNativePluginCliAdapter.run` is that class), used to simulate a bug
- * in the activator itself, which activation must not swallow as best-effort.
- */
+/** Records native plugin CLI calls instead of shelling out. Two measured shapes: a real
+ * `claude` refuses a mismatched-scope uninstall, and a plain `Error` no adapter produces. */
 export class FakeNativePluginActivator implements NativePluginActivator {
   available: boolean;
   readonly addedMarketplaces: string[] = [];
@@ -29,9 +11,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   readonly forcedRemovals: boolean[] = [];
   readonly enabledPlugins: string[] = [];
   readonly uninstalledPlugins: string[] = [];
-  /** The scope each `enablePlugin`/`uninstallPlugin` call actually carried, in call
-   * order — for a test that cares which scope was requested, never guessed from the
-   * ref alone. */
+  /** The scope each call actually carried, in call order, never guessed from the ref. */
   readonly enabledPluginScopes: MarketplaceScope[] = [];
   readonly uninstalledPluginScopes: MarketplaceScope[] = [];
   upgradeCount = 0;

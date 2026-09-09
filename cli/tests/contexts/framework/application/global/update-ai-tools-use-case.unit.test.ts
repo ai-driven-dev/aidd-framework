@@ -120,7 +120,6 @@ describe("UpdateAiToolsUseCase", () => {
         updateOneTool
       );
 
-      // Modify the first tracked file of each tool to trigger conflict
       const loadedManifest = await deps.manifestRepo.load();
       if (!loadedManifest) throw new Error("Manifest not found");
       for (const toolId of ["claude", "cursor"] as const) {
@@ -132,7 +131,6 @@ describe("UpdateAiToolsUseCase", () => {
 
       await useCase.execute({ projectRoot: PROJECT_ROOT, userForce: false, interactive: true });
 
-      // Bulk prompt called exactly once — second tool reuses the bulk state
       expect(resolveConflictBulkMock).toHaveBeenCalledTimes(1);
     });
   });

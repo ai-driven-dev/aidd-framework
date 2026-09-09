@@ -16,13 +16,9 @@ const DEFAULT_TIMEOUT_MS = 10000;
 // "no such session" (nothing to read, not an error) from any other command failure.
 const SESSION_NOT_FOUND = /session not found/i;
 
-/**
- * Reads one OpenCode session's counters by shelling out to `opencode export --sanitize`
- * rather than opening its SQLite database — a native dependency would need a prebuild per
- * platform and ABI, breaking `npm i -g` for every user to serve the fraction who use
- * OpenCode. The only part of this reader that spawns anything; parsing the answer is
- * `mapOpencodeExportToSinkRecords`'s job.
- */
+/** Shells out to `opencode export --sanitize` rather than opening OpenCode's SQLite
+ * database: a native dependency would need a prebuild per platform and ABI, breaking
+ * `npm i -g` for every user to serve the fraction who use OpenCode. */
 export class OpencodeCostReaderAdapter implements SessionCostReader {
   constructor(private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS) {}
 
@@ -50,9 +46,8 @@ export class OpencodeCostReaderAdapter implements SessionCostReader {
     };
   }
 
-  /** Filesystem check, not a `--version` probe — matches
-   * `AbstractNativePluginCliAdapter.isAvailable`, since spawning just to test presence is
-   * flake-prone under load. */
+  /** A filesystem check, not a `--version` probe: spawning to test presence is flake-prone
+   * under load. */
   private isAvailable(): boolean {
     const dirs = (process.env.PATH ?? "").split(delimiter).filter((dir) => dir !== "");
     return dirs.some((dir) => {

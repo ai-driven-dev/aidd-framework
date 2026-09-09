@@ -22,11 +22,8 @@ import {
 } from "./shared-source-reference-support.js";
 
 /**
- * Resolves a flow's marketplace source and registers it — the one sequence
- * `SetupUseCase` (project scope) and `SetupMachineScopeUseCase` (user scope) both run,
- * in the same order, gated the same way: resolve, guard remote auth, register, refresh.
- * Extracted so that sequence lives once rather than as two copies two use cases would
- * otherwise have to keep in sync by hand.
+ * The one sequence project-scope and machine-scope setup both run, in the same order and gated the
+ * same way: resolve, guard remote auth, register, refresh.
  */
 export class SetupMarketplaceRegistrationUseCase {
   constructor(
@@ -38,15 +35,13 @@ export class SetupMarketplaceRegistrationUseCase {
     private readonly logger: Logger,
     private readonly tokenProvider?: TokenProvider,
     private readonly releaseResolver?: LatestReleaseResolver,
-    /** The registry of projects referencing the shared machine-scope source — absent
-     * for every caller that predates it, which skips recording a reference rather than
-     * guessing one. */
+    /** The registry of projects referencing the shared machine-scope source. Absent skips
+     * recording a reference rather than guessing one. */
     private readonly userSourceReferences?: UserSourceReferences
   ) {}
 
-  /** Resolves `flow`'s source, when it asks for one at all — a no-op for
-   * `--no-default-marketplace`. Called before a caller's own manifest is initialized: a
-   * non-interactive run with no `--source` must reject before it ever writes anything. */
+  /** Resolves `flow`'s source, when it asks for one at all. Called before a caller's own manifest
+   * is initialized: a non-interactive run with no `--source` must reject before writing anything. */
   async resolveSourceIfNeeded(flow: SetupFlow): Promise<MarketplaceSourceMode | null> {
     if (!flow.registerDefaultMarketplace) return null;
     return this.setupMarketplaceSourceUseCase.execute({
@@ -84,23 +79,19 @@ export class SetupMarketplaceRegistrationUseCase {
   private async registerMarketplace(flow: SetupFlow, source: MarketplaceSourceMode): Promise<void> {
     const opts = this.buildRegisterOptions(flow, source);
     const result = await this.marketplaceRegisterFrameworkUseCase.execute(opts);
-    // `--scope user` has no project-scope manifest for a later `clean` to ever
-    // decrement this claim from — see `SetupMachineScopeUseCase`'s own doc comment for
-    // why absence, not a recorded reference, is the honest state there.
+    // `--scope user` has no project-scope manifest for a later `clean` to ever decrement this
+    // claim from, so absence, not a recorded reference, is the honest state there.
     if (flow.scope === "user") return;
     // The same name-and-scope predicate `sync` and `clean` apply before touching
-    // `references.json` — `MarketplaceRegisterFrameworkUseCase` only ever registers
-    // the framework marketplace, so this is always true today, but a future change to
-    // that use case must not silently start writing a reference for a registration
-    // that is no longer the shared one.
+    // `references.json`: always true today, but a future change must not silently start writing a
+    // reference for a registration that is no longer the shared one.
     if (frameworkSourceIsShared(FRAMEWORK_MARKETPLACE_NAME, result.scope)) {
       await this.recordSharedSourceReference(flow.projectRoot);
     }
   }
 
-  // Written every time this runs, not only the first: another project on this machine
-  // may have registered the shared source before this one ever did, in which case this
-  // project's own reference is still missing until now.
+  // Written every time this runs, not only the first: another project on this machine may have
+  // registered the shared source before this one did, leaving this project's reference missing.
   private async recordSharedSourceReference(projectRoot: string): Promise<void> {
     if (this.userSourceReferences === undefined) return;
     const userSourceReferences = this.userSourceReferences;

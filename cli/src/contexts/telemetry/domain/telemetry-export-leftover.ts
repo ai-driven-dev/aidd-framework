@@ -1,13 +1,8 @@
 import { asPlainObject } from "../../../kernel/reading/plain-object.js";
 
-/**
- * The exact `env` keys `aidd telemetry endpoint` used to write into a Claude Code settings
- * file, back when that command — and its targeted undo, `endpoint clear` — still existed.
- * Detection only: nothing here builds this shape or writes it anywhere, and nothing in this
- * system can any more (see "one route, and every sentence about it true", which deleted the
- * writer on purpose). A settings file that still carries any of these keeps exporting
- * whatever it always did; naming them is the only remedy left.
- */
+/** The `env` keys a since-removed `telemetry endpoint` command wrote into a Claude Code
+ * settings file. Detection only: nothing in this system writes them any more, and a settings
+ * file still carrying them keeps exporting, so naming them is the only remedy left. */
 export const CLAUDE_TELEMETRY_EXPORT_ENV_KEYS = [
   "CLAUDE_CODE_ENABLE_TELEMETRY",
   "OTEL_METRICS_EXPORTER",
@@ -18,19 +13,15 @@ export const CLAUDE_TELEMETRY_EXPORT_ENV_KEYS = [
   "OTEL_RESOURCE_ATTRIBUTES",
 ] as const;
 
-/** One settings file that still carries at least one of the keys above, and which of them —
- * so a person reading this is told what is set, in which file, and can remove exactly those
- * keys rather than guessing at the whole `env` block. */
+/** One settings file and which of the keys it carries, so exactly those can be removed rather
+ * than the whole `env` block. */
 export interface TelemetryExportLeftover {
   readonly path: string;
   readonly keys: readonly string[];
 }
 
-/** Which of the known export keys sit in a settings file's `env` block, given its raw
- * content — `null` for a file that does not exist, the same "absent reads as nothing found"
- * rule every other reader in this layer follows. Never throws: an unreadable or malformed
- * file has no keys this can find in it, which is not the same claim as "definitely clean"
- * but is the only one this function is in a position to make. */
+/** Never throws: an absent or malformed file has no keys this can find, which is not the same
+ * claim as "clean" but is the only one available here. */
 export function findLeftoverExportKeys(content: string | null): readonly string[] {
   if (content === null) return [];
   let parsed: unknown;

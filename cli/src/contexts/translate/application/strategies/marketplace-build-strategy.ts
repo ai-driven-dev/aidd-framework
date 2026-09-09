@@ -25,9 +25,9 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
   ) {}
 
   /**
-   * Never wipes outDir: a build only ever writes the canonical paths it produces, so
-   * anything else already there survives. A non-empty outDir is refused unless --force,
-   * naming the directory so the message tells the caller exactly what to pass --force at.
+   * Never wipes outDir: a build only ever writes the canonical paths it produces, so anything
+   * else already there survives. A non-empty outDir is refused unless --force, naming the
+   * directory so the message says exactly what to pass --force at.
    */
   async preBuild(outDir: string): Promise<void> {
     if (await this.fs.fileExists(outDir)) {
@@ -72,10 +72,8 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
       const content = await this.fs.readFile(absPath);
       const agentBaseName = basename(absPath);
       assertNoToolsPlaceholder(content, pluginName, relative(agentsSrc, absPath));
-      // path() returns the destination path relative to pluginOut (e.g. "agents/foo.md")
       const destRelPath = artifact.path(pluginName, `agents/${agentBaseName}`);
       const destPath = join(outDir, "plugins", pluginName, destRelPath);
-      // transform() receives raw content and returns the final file content
       const outContent = artifact.transform
         ? artifact.transform(content, pluginName, agentBaseName)
         : content;
@@ -150,8 +148,6 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
     await this.fs.writeFile(join(outDir, destRelPath), `${JSON.stringify(catalog, null, 2)}\n`);
     return 1;
   }
-
-  // ── Private helpers ──────────────────────────────────────────────────────────
 
   private applyPluginRootToken(content: string): string {
     if (!this.contract.pluginRootToken) return content;

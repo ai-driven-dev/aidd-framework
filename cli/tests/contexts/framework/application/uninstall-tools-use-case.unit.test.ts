@@ -20,8 +20,7 @@ class RecordingFileAdapter extends InMemoryFileAdapter {
   }
 }
 
-// Cursor Mode B: file key is base-relative (no absolute prefix, relative to the
-// resolved user plugins dir) — same shape as status-plugin-user-scope.unit.test.ts.
+// Cursor Mode B: the file key is base-relative, resolved against the user plugins dir.
 const PLUGIN_KEY = "aidd-context/commands/hello.md";
 
 describe("UninstallToolsUseCase — cursor plugin file (user-scope)", () => {

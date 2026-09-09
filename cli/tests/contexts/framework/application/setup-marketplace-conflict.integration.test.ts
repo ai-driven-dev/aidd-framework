@@ -44,15 +44,8 @@ function makeNoOpPluginInstallFromMarketplace(): PluginInstallFromMarketplace {
   return { execute: vi.fn() };
 }
 
-/**
- * `setup` at the end of its own flow drives the same native activation `sync` does
- * (`syncSettings`), but until this lot only ever threw the result away: a marketplace
- * source-conflict guard refusing there used to leave `aidd setup` exiting 0 with the
- * marketplace never actually registered on the host, and nobody told. This wires a
- * REAL `MarketplaceSyncSettingsUseCase` (not the no-op double `setup-use-case.unit.test.ts`
- * substitutes it with) behind a host registry that already holds a genuinely different
- * catalog under the marketplace's own name, so `execute()` reaches a real conflict.
- */
+/** A REAL `MarketplaceSyncSettingsUseCase`, not the no-op double the other setup suites
+ * substitute, behind a host registry already holding a different catalog under that name. */
 async function buildUseCaseWithConflict() {
   const deps = await buildUnitDeps(PROJECT_ROOT);
   const prompter = new OverwritePrompter();
@@ -72,9 +65,8 @@ async function buildUseCaseWithConflict() {
     { execute: vi.fn() }
   );
 
-  // The marketplace this project already knows, and the built catalog a real sync
-  // would read back — same wiring `flows/marketplace-source-conflict.integration.test.ts`
-  // uses directly against `MarketplaceSyncSettingsUseCase`, driven here through `setup`.
+  // The marketplace this project already knows, and the built catalog a real sync would
+  // read back, driven here through `setup` rather than against the use case directly.
   await deps.marketplaceRegistry.save(
     PROJECT_ROOT,
     Marketplace.create({

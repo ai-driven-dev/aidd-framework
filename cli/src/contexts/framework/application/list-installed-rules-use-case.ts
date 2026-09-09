@@ -32,14 +32,8 @@ function projectRelative(projectRoot: string, absolutePath: string): string {
 }
 
 /**
- * Every rule installed in a project, across every tool that installs any.
- *
- * Replaces `list-rules.mjs`, which the explore skill shipped and ran directly. That script
- * carried its own table of tool directories and extensions, and its own frontmatter parser;
- * both already existed here, and the table had drifted — it knew four tools and stated that
- * Codex supports no rules, while `content-translator.ts` installs a plugin's `rules/`
- * into every tool whose capability accepts them. Asking each tool where it installs is what
- * makes a fifth tool, or a moved directory, impossible to miss.
+ * Every rule installed in a project, across every tool that installs any. Asking each tool where it
+ * installs is what makes a fifth tool, or a moved directory, impossible to miss.
  */
 export class ListInstalledRulesUseCase {
   constructor(private readonly files: FileReader) {}

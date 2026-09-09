@@ -1,14 +1,7 @@
 /**
- * Every source file is either mutated or excluded on purpose.
- *
- * `stryker.conf.json` used to name seventeen kernel files one by one. A file added to the
- * kernel escaped mutation in silence: the score did not drop, because the mutants that
- * would have died were never generated. The same shape — a scope that quietly stops
- * covering anything — has already produced two false greens in this repo.
- *
- * `mutation-scopes.json` now declares the globs and, beside them, what is left out and
- * why. This reads both halves, so a new directory belonging to neither is a failure that
- * names it rather than a number that stays flat.
+ * A file escaping mutation is silent: the score does not drop, because the mutants that would
+ * have died were never generated. `mutation-scopes.json` declares the globs and what is left
+ * out, so a directory belonging to neither fails by name rather than as a flat number.
  */
 import { describe, expect, it } from "vitest";
 import { matchesGlob, read, sourceFiles } from "./helpers.js";
@@ -58,9 +51,8 @@ describe("mutation covers every source file", () => {
   });
 
   it("package.json runs every scope, and nothing it does not", () => {
-    // The globs are declared once; the scope names were not, and a name copied into a
-    // script is a second list. Adding a scope with no way to run it, or leaving a script
-    // behind for a scope that is gone, both fail here.
+    // A scope name copied into a script is a second list: a scope with no way to run it, and
+    // a script for a scope that is gone, both fail here.
     const { scripts } = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
     const scripted = Object.keys(scripts)
       .filter((name) => name.startsWith("test:mutation:"))
@@ -70,11 +62,8 @@ describe("mutation covers every source file", () => {
   });
 
   it("no other file lists what mutation covers", () => {
-    // The declaration is the single source; stryker.conf.json carrying its own `mutate`
-    // is exactly the drift this replaces. Read through `read()`, resolved against the cli
-    // package root: a bare relative `readFileSync("stryker.conf.json")` only found the file
-    // because every other gate in this suite happens to run with `cli/` as the cwd — a
-    // repository-root invocation threw ENOENT on this line alone.
+    // Read through `read()`, resolved against the cli package root: a bare relative
+    // `readFileSync` only finds the file when the cwd happens to be `cli/`.
     const stryker = JSON.parse(read("stryker.conf.json")) as Record<string, unknown>;
     expect("mutate" in stryker, "stryker.conf.json declares its own mutate again").toBe(false);
   });

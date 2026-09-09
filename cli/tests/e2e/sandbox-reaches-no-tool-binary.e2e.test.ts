@@ -6,25 +6,10 @@ import { createTestEnv, sandboxedEnv } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 
-/**
- * What a spawned `aidd` can reach decides what a test measures.
- *
- * The OpenCode reader shells out to an `opencode` binary and waits up to ten seconds for it.
- * While `sandboxedEnv` inherited the runner's own `PATH`, a machine with that tool installed
- * paid a cost a machine without it did not — and `records stored before opting in stay
- * unnamed` swung between 14 seconds and a 60-second timeout across three runs with no code
- * change at all. Pinning the sandbox's `PATH` took that file from 13.9s to a steady 5.1s.
- *
- * This is the guard on that, rather than on the symptom: a test's result must not depend on
- * which AI tools the person running it happens to have installed.
- */
-/**
- * AI tools only. `gh` deliberately absent: it is not a tool whose files anything here reads,
- * it is the CLI's own auth dependency (`gh-cli-adapter.ts` spawns `gh auth token`), the same
- * standing as `git` and `node` below. Listing it made this guard fail on any runner that
- * ships GitHub CLI at `/usr/bin/gh` — measured on `cli / Test`, where a machine having `gh`
- * is the normal case, not the deviation this test exists to catch.
- */
+/** A test's result must not depend on which AI tools the runner happens to have installed —
+ * the OpenCode reader shells out to a binary and waits ten seconds for it. */
+// AI tools only: `gh` is the CLI's own auth dependency, the same standing as `git` and `node`
+// below, and a runner shipping it is the normal case, not a deviation.
 const TOOL_BINARIES = ["opencode", "claude", "codex", "copilot", "cursor-agent"] as const;
 
 async function whichUnderSandbox(binary: string, cwd: string, env: NodeJS.ProcessEnv) {

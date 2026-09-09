@@ -9,14 +9,8 @@ import {
 } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceRegistryAdapter } from "../../../../src/contexts/distribution/infrastructure/marketplace-registry-adapter.js";
 
-/**
- * The framework entry is machine-scope, so two projects on the same machine must
- * share one registration rather than each writing their own — measured against the
- * real `MarketplaceRegistryAdapter`, not the in-memory fake, because the fake's user
- * store is keyed per `projectRoot` and would hide exactly the sharing this proves.
- * `smoke-tools.sh`'s own shared-`$HOME`, per-project pattern is what this reproduces
- * at unit-test speed.
- */
+// Measured against the real `MarketplaceRegistryAdapter`, not the in-memory fake: the fake's
+// user store is keyed per `projectRoot` and would hide the machine-wide sharing this proves.
 describe("MarketplaceRegisterFrameworkUseCase — machine-scope registration", () => {
   let projectA: string;
   let projectB: string;
@@ -68,12 +62,8 @@ describe("MarketplaceRegisterFrameworkUseCase — machine-scope registration", (
     expect(listFromB[0]?.scope).toBe("user");
   });
 
-  // Bloquant 1: a project that already ran `setup` before the machine-scope move
-  // holds a project-scope registry entry. `list()` puts a project entry first and
-  // filters a user one of the same name out, so writing the migrated user-scope
-  // entry alongside the stale project one — rather than retiring it — would leave
-  // `list()` forever answering the pre-migration entry: the migration this lot exists
-  // for would have no effect on the population it targets.
+  // `list()` puts a project entry first and filters a user one of the same name out, so writing
+  // the migrated entry beside a stale project one would leave `list()` answering the old one.
   it("migrates a pre-existing project-scope entry to the shared user-scope one on the next run, leaving a single entry", async () => {
     const registry = new MarketplaceRegistryAdapter();
     await registry.save(

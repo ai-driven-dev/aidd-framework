@@ -4,25 +4,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./helpers.js";
 
 /**
- * The guarantees #661 exists to prove, now resolved against the one identity file rather
- * than a separate declaration - see spec.md and phase-3.md's own Test Scope: one human
- * counted once across tools and machines, every unplaced identity visible and counted on
- * its own, and the rows always reconciling to the period total. The two-machines journey,
- * the never-merge assertion and the reconciliation assertion are unchanged from the
- * previous delivery - they are the point this rework must not disturb.
- *
- * Declaring who this machine's user is now goes through `identity use`/`identity link`,
- * never by writing a separate file directly - the file this suite used to seed by hand
- * (`person-mapping.json`) no longer exists as its own shape at all.
- *
- * Every seed here writes straight into the sink and, where a raw file is unavoidable
- * (a damaged or repository-supplied identity file), the identity file itself - the same
- * way `telemetry-report.e2e.test.ts` and `telemetry-identity.e2e.test.ts` do: this file's
- * subject is resolution, not any one tool's reader, and going through a real reader would
- * make it depend on whether the machine running it happens to have that tool installed.
- * `runCli` already sandboxes `PATH` down to node, git and the OS's own essentials — no AI
- * tool binary is ever reachable from here, which is what proves every claim below holds
- * with none present.
+ * Every seed writes straight into the sink: the subject here is resolution, not any one
+ * tool's reader, and `runCli` sandboxes `PATH` so no AI tool binary is reachable at all.
  */
 const FROM_DAY = "2026-08-17";
 const TO_DAY = "2026-08-21";
@@ -41,10 +24,8 @@ function record(overrides: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-/** `sinkDir` is where records actually land - `sinkDirIn(fakeHome)` for the default
- * profile-resolved sink, or `join(someOtherConfigDir, "telemetry")` for a sink relocated by
- * `AIDD_USER_CONFIG_DIR`, since that variable moves the sink the same way it moves nothing
- * else covered by this suite's guarantees. */
+/** Where records actually land: `sinkDirIn(fakeHome)` for the profile-resolved sink, or
+ * `join(configDir, "telemetry")` for one relocated by `AIDD_USER_CONFIG_DIR`. */
 async function seedSink(
   sinkDir: string,
   records: readonly Record<string, unknown>[]
@@ -105,9 +86,8 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     cleanup = undefined;
   });
 
-  // Expected to already hold: the identity is machine-scoped, minted once per profile and
-  // shared by every tool that reads locally on it — never tool-scoped. This test exists to
-  // catch a change that would make it tool-scoped again, not to build the guarantee.
+  // The identity is machine-scoped, minted once per profile and shared by every tool that
+  // reads locally on it — never tool-scoped.
   it("two tools under one identifier print one person row", async () => {
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-two-tools");
     cleanup = c;
@@ -296,10 +276,8 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
       )}\n`,
       "utf8"
     );
-    // AIDD_USER_CONFIG_DIR also relocates the sink (telemetry-sink-adapter.ts), so the
-    // records this test needs to survive the override have to be seeded under the decoy
-    // directory too - seeding them under the real profile instead would make the report
-    // read empty and let both assertions below pass on nothing.
+    // AIDD_USER_CONFIG_DIR also relocates the sink, so records seeded under the real
+    // profile instead would make the report read empty and pass both assertions on nothing.
     await seedSink(join(decoyDir, "telemetry"), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
       record({ tool: "claude", vendor_id: "s-2", turn_id: "t-2", person_id: "machine-b-id" }),
@@ -310,10 +288,8 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     });
 
     expect(envelope.totals.requests).toBe(2);
-    // The real profile's own identity ("person-a") still resolves its own row, proving
-    // resolution ran at all - what the decoy must have no effect on is the *claim inside
-    // it*: `machine-b-id` is only listed under the decoy's `also_me`, never the real
-    // profile's, so it must stay unresolved rather than merge into person-a's row.
+    // `machine-b-id` is listed under the decoy's `also_me`, never the real profile's, so it
+    // must stay unresolved rather than merge into person-a's row.
     const mapped = envelope.by_person.find((row) => row.resolution === "mapped");
     expect(mapped?.identities).not.toContain("machine-b-id");
     const unresolved = envelope.by_person.find((row) => row.identities.includes("machine-b-id"));

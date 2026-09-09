@@ -16,9 +16,8 @@ describe("isSemver()", () => {
     expect(isSemver("1.0.0-rc.1+build.5")).toBe(true);
   });
 
-  // Bloquant 6/14: unanchored, `isSemver` matched a version string carrying trailing
-  // garbage after the three numeric components — a hand-edited or corrupted version
-  // field would have been silently accepted as valid semver.
+  // Unanchored, `isSemver` matches trailing garbage after the three components, so a
+  // hand-edited or corrupted version field reads as valid semver.
   it("rejects trailing garbage after the three numeric components", () => {
     expect(isSemver("1.2.3abc")).toBe(false);
     expect(isSemver("1.2.3.4")).toBe(false);
@@ -40,11 +39,8 @@ describe("compareSemver()", () => {
     expect(compareSemver("5.3.0", "5.3.0")).toBe(0);
   });
 
-  // Bloquant 6/14: a pre-release must order below its own release — semver.org's own
-  // precedence rule. Before this, `parseSemver` dropped the pre-release entirely, so
-  // `5.3.0-rc.1` and `5.3.0` compared equal: a host on the final release and a run on
-  // its own release candidate would be told "no drift", the rollback refusal's own
-  // equality gate then letting a would-be rollback through as a no-op.
+  // Compared equal, a host on the final release and a run on its own release candidate are
+  // told "no drift", and the rollback refusal's equality gate lets a rollback through.
   it("orders a pre-release version below its own release", () => {
     expect(compareSemver("5.3.0-rc.1", "5.3.0")).toBe(-1);
     expect(compareSemver("5.3.0", "5.3.0-rc.1")).toBe(1);

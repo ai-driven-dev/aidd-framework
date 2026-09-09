@@ -9,23 +9,9 @@ import {
 } from "../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
 import { journalTrailerRepair } from "../helpers/telemetry-journal-hook.js";
 
-/**
- * The one literal this feature spells twice, held to itself across the language boundary.
- *
- * `aidd telemetry on` writes the call site from TypeScript; the hook restores it from
- * zero-dependency CommonJS shipped into a person's repository, and cannot import the CLI's
- * own function — the CLI may not be installed when the hook runs, which is the whole point
- * of the hook needing nothing. So the line exists in two places.
- *
- * This is what stops them drifting, and it is the shape this plugin's other cross-language
- * literal already uses: the real hook module is loaded and asked, and its answer is compared
- * against the real CLI function's — never against a third copy typed into a fixture, which
- * would only prove that the fixture agrees with whoever wrote it last.
- *
- * If they ever diverge, `aidd telemetry on` installs one line and the hook restores a
- * different one, so a repaired repository silently stops trailering while both sides pass
- * their own tests.
- */
+/** The one literal this feature spells twice, held to itself across the language boundary: the
+ * CLI writes the call site, the hook restores it from CommonJS that cannot import the CLI.
+ * Diverged, a repaired repository stops trailering while both sides pass their own tests. */
 describe("the hook and the CLI spell the call site identically", () => {
   it.each([
     ["a POSIX path", "/home/dev/repo/.git/hooks"],
@@ -48,26 +34,17 @@ describe("the hook and the CLI spell the call site identically", () => {
     expect(journalTrailerRepair.HOOK_FILE).toBe("prepare-commit-msg");
   });
 
-  /**
-   * The header a hook written from scratch starts with, and — read back — the one line that
-   * does not count as somebody else's content. If the two sides ever disagreed, a hook the
-   * hook created would report through `check` as "somebody else's too", about a file this
-   * project wrote itself.
-   */
+  /** The header a hook written from scratch starts with, and the one line that does not count as
+   * somebody else's content when read back. Disagreeing, `check` calls this project's own hook
+   * somebody else's. */
   it("agrees on the header a hook written from scratch starts with", () => {
     expect(journalTrailerRepair.HOOK_HEADER).toBe(SESSION_TRAILER_HOOK_HEADER);
   });
 });
 
-/**
- * The words the repair answers with, exercised through the module rather than a spawned
- * hook: this side is where the distinction matters, since a caller has to tell a directory
- * the repair declined from one that simply had nothing to do.
- *
- * The delegate is really written, because without it every call returns `"no-delegate"` from
- * the existence check and never reaches the guard the case is named for — which is how an
- * earlier version of this block passed with that guard deleted.
- */
+/** The words the repair answers with, exercised through the module: a caller has to tell a
+ * directory the repair declined from one that had nothing to do. The delegate is really
+ * written, since without it every call returns `"no-delegate"` and never reaches that guard. */
 describe("what the repair reports about a directory it will not write to", () => {
   let root: string;
 

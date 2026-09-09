@@ -11,14 +11,12 @@ import { DeterministicHasher } from "../../../../../helpers/ports/deterministic-
 
 const _DOCS_DIR = "aidd_docs";
 
-// Skills section without entryFile filter (flat mode)
 const skillsSectionFlat: ContentSection = {
   name: "skills",
   directory: "skills",
   entryFile: null,
 };
 
-// Skills section with entryFile: "SKILL.md" (plugin/subdirectory mode)
 const skillsSectionWithEntry: ContentSection = {
   name: "skills",
   directory: "skills",
@@ -146,7 +144,6 @@ describe("InstallSkillsUseCase", () => {
         contentFiles,
       });
 
-      // Only SKILL.md passes the entryFile filter
       expect(files).toHaveLength(1);
       expect(files[0].frameworkPath).toBe("skills/my-skill/SKILL.md");
     });

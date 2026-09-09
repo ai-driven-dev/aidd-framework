@@ -6,37 +6,23 @@ const path = require("node:path");
 /**
  * Puts back the one line that makes a commit carry its session, when something removed it.
  *
- * `aidd telemetry on` installs a delegate script, which is ours outright and which nobody
- * regenerates. It installs a line calling it into `prepare-commit-msg` **only where no hook
- * manager owns that file**: where lefthook or husky owns it, the CLI writes no line at all
- * and prints the manager's own job instead, because a generated file is rewritten. That line
- * is the fragile half, and it is the half this puts back — so this declines wherever the CLI
- * would have declined, or the delegate gains a second caller per commit, the manager's job
- * and a direct call nobody installed. Measured on the repository this was built in: lefthook
- * rewrote three hooks on 2026-09-02 and spared `prepare-commit-msg` then only because its
- * config declared no job for that event; it has since gained one.
+ * The delegate script is ours outright and nobody regenerates it; the line calling it from
+ * `prepare-commit-msg` is the fragile half. This declines wherever the CLI itself would have
+ * declined — where a hook manager owns that file — or the delegate gains a second caller per
+ * commit, the manager's job and a direct call nobody installed.
  *
- * So this does not defend the call site, it re-establishes it. **It never asks why the line
- * is gone**, and that is what lets one path cover every cause — a regenerated hook, an
- * overwrite by hand, a `core.hooksPath` that moved, a hook that never existed. The two
- * managers are named in one place only, as root marker filenames (`HOOK_MANAGER_MARKERS`),
- * so nothing here rots when either changes the format of what it generates.
+ * It never asks why the line is gone, which is what lets one path cover every cause. The
+ * managers are named in one place only, as root marker filenames, so nothing here rots when
+ * either changes the format of what it generates.
  *
- * The opt-out is the one a person already knows. `aidd telemetry off` deletes the delegate,
- * and this only ever runs when the delegate is present, so nothing is ever resurrected after
- * `off`. Removing the line by hand while keeping the file is not an opt-out and was never
- * documented as one; `aidd telemetry check` reports what is in place either way.
+ * `aidd telemetry off` deletes the delegate and this only runs while the delegate is present,
+ * so nothing is ever resurrected after `off`.
  */
 
-/** The delegate's filename and the line that calls it. Both are the CLI's
- * (`cli/src/contexts/telemetry/domain/formats/commit-session-trailer.ts`), and both are
- * spelled again here because this file is zero-dependency CommonJS shipped into a person's
- * repository and cannot import from a TypeScript program that may not be installed.
- *
- * The duplication is real and it is guarded the way this plugin's other cross-language
- * literal is: a test spawns this hook, reads the file it repaired, and compares it against
- * what the CLI's own function produces — never against a second copy of the string typed
- * into a fixture. Two sides that each assert their own spelling agree with themselves. */
+/** Both are also the CLI's, spelled again here because this file is zero-dependency
+ * CommonJS shipped into a person's repository and cannot import from a TypeScript program
+ * that may not be installed. A test compares what this repairs against what the CLI's own
+ * function produces, never against a second copy typed into a fixture. */
 const DELEGATE_FILE = "aidd-session-trailer.sh";
 const HOOK_FILE = "prepare-commit-msg";
 const HOOK_HEADER = "#!/bin/sh";
@@ -49,12 +35,9 @@ function hookLine(delegatePath) {
 }
 
 /**
- * Root marker names that mean a hook manager owns `prepare-commit-msg` here: every spelling
- * lefthook accepts for its own config, in the order it looks for them, then husky's
- * directory. Mirrors `LEFTHOOK_MARKER_NAMES` and `HUSKY_MARKER_NAME` in
- * `cli/src/contexts/telemetry/domain/telemetry-setup.ts`, which `detectHookManager` decides
- * by — spelled again here for the reason `DELEGATE_FILE` is, and pinned to that file's own
- * reading by `scripts/__tests__/aidd-telemetry-trailer-repair.test.js`.
+ * Every spelling lefthook accepts for its own config, in the order it looks for them, then
+ * husky's directory. Mirrors the CLI's own list, spelled again for the reason `DELEGATE_FILE`
+ * is, and pinned to that list by scripts/__tests__/aidd-telemetry-trailer-repair.test.js.
  */
 const HOOK_MANAGER_MARKERS = Object.freeze([
   "lefthook.yml",
@@ -65,13 +48,10 @@ const HOOK_MANAGER_MARKERS = Object.freeze([
 ]);
 
 /**
- * Decided from the repository root's marker files alone, never from the hook's contents: a
- * manager regenerates that file from its own config, so by the time anything reads it the
- * append is already gone and the marker is all that is left to read. The root is the
- * worktree's own (`git rev-parse --show-toplevel`, carried by `resolveWriteTarget`), not the
- * git directory — in a linked worktree those are not the same place, and only the first is
- * where a manager's config sits. A caller that supplies no root gets the pre-manager
- * behaviour, which is what the module-level tests exercise.
+ * From the root's marker files alone, never from the hook's contents: a manager regenerates
+ * that file, so by the time anything reads it the append is gone and the marker is all that
+ * is left. The root is the worktree's own, not the git directory — in a linked worktree only
+ * the first is where a manager's config sits.
  */
 function hookManagerOwns(repoRoot) {
   if (typeof repoRoot !== "string" || repoRoot === "") return false;
@@ -79,10 +59,8 @@ function hookManagerOwns(repoRoot) {
 }
 
 /**
- * Answers what it did, in a word. Nothing in the hook reads it — a session start has no
- * business reporting on a repair — and it exists for the tests, which are the only reader
- * that needs to tell "declined" from "nothing to do" without inspecting the filesystem
- * twice:
+ * Answers what it did, in a word, for the tests: they are the only reader that needs to tell
+ * "declined" from "nothing to do" without inspecting the filesystem twice.
  *
  *   `"no-delegate"`   nothing to call, so nothing to repair — the state `off` leaves
  *   `"manager-owned"` a hook manager owns the file and already reaches the delegate itself
@@ -100,11 +78,9 @@ function repairCommitTrailerHook(hooksDir, gitDir, repoRoot) {
   if (!fs.existsSync(path.join(hooksDir, DELEGATE_FILE))) return "no-delegate";
 
   if (hookManagerOwns(repoRoot)) return "manager-owned";
-  // The physical directory, and everything below is built from it: the guard compares
-  // realpaths, so a line built from the unresolved spelling would name a path the guard
-  // never approved. On macOS, where `/tmp` is a link to `/private/tmp`, that put two call
-  // sites in one hook — the delegate ran twice per commit, and `check` then called the file
-  // "somebody else's too" about two lines this project wrote.
+  // The physical directory, since the guard compares realpaths: a line built from the
+  // unresolved spelling names a path the guard never approved, which on macOS put two call
+  // sites in one hook and ran the delegate twice per commit.
   const resolved = realPath(hooksDir);
   if (resolved === null || !isOursToWrite(resolved, gitDir)) return "not-ours-to-write";
 
@@ -114,9 +90,8 @@ function repairCommitTrailerHook(hooksDir, gitDir, repoRoot) {
   // which would edit whatever it points at, most usefully a file the team shares.
   if (isSymbolicLink(hookPath)) return "not-ours-to-write";
 
-  // `rename` needs the directory, not the file — so without this a `0444` hook is silently
-  // replaced and left reading `0444`, its content changed while its permissions say it
-  // cannot be. Asked before anything is written, so the answer is "declined", not "done".
+  // `rename` needs the directory, not the file, so without this a `0444` hook is silently
+  // replaced and left reading `0444`. Asked before anything is written.
   if (fs.existsSync(hookPath) && !isWritable(hookPath)) return "unwritable";
 
   const line = hookLine(delegatePath);
@@ -132,42 +107,30 @@ function repairCommitTrailerHook(hooksDir, gitDir, repoRoot) {
 }
 
 /**
- * Beside the target and renamed over it where that is possible, directly where it is not.
+ * Staged beside the target and renamed over it where possible, written directly where not.
+ * Renaming stops a session starting at the same moment from reading a half-written hook, but
+ * staging needs write permission on the directory: a `0555` hooks directory holding a
+ * writable hook takes the direct write and refuses the staged one.
  *
- * Renaming is what stops a session starting at the same moment from reading a half-written
- * hook and appending to the fragment. But staging needs write permission on the *directory*,
- * where a direct write needs it only on the file — measured, a `0555` hooks directory
- * holding a writable hook takes the direct write and refuses the staged one. Repairing that
- * repository mattered before this function existed, so the fallback keeps it.
- *
- * The mode is carried across deliberately: `rename` replaces the inode, so without this a
- * `0700` hook would come back `0755` and a non-executable one would come back executable —
- * widening a third party's file on a path meant to be conservative.
+ * The mode is carried across deliberately: `rename` replaces the inode, so a `0700` hook
+ * would otherwise come back `0755`, widening a third party's file.
  */
 function write(hookPath, content) {
   const mode = modeOf(hookPath);
   const staging = `${hookPath}.aidd-${process.pid}`;
   try {
-    // The mode on this call has no test that can fail for it: `chmod` below sets the same
-    // bits a moment later, so removing it leaves every case green. It stays because it
-    // narrows the window in which the staging file exists wider than the hook it replaces,
-    // and that window is not something a test here can observe.
+    // No test can fail for this mode — `chmod` below sets the same bits — but it narrows the
+    // window in which the staging file is wider than the hook it replaces.
     fs.writeFileSync(staging, content, { mode });
-    // `open(2)` applies the umask to the mode it is given, so a `0770` hook came back
-    // `0750` — narrowed rather than widened, and just as much somebody else's file to have
-    // changed. `chmod` is not filtered, and is what actually carries the mode across.
+    // `open(2)` applies the umask to the mode it is given, so a `0770` hook comes back
+    // `0750`. `chmod` is not filtered, and is what actually carries the mode across.
     fs.chmodSync(staging, mode);
     fs.renameSync(staging, hookPath);
     return "repaired";
   } catch {
     // Never leave the staging file behind: one per session, each under a different pid, in
-    // the directory a person opens when something is wrong.
-    //
-    // Untested, and said rather than dressed up: no input reachable on POSIX gets past the
-    // write and fails the rename. Both files sit in one directory, so there is no cross-device
-    // case; a target that is a directory throws on the read long before here. The case this
-    // exists for is Windows, where renaming over a file another process holds open fails
-    // EPERM — and no test on this branch runs there.
+    // the directory a person opens when something is wrong. Reachable only on Windows, where
+    // renaming over a file another process holds open fails EPERM.
     try {
       fs.unlinkSync(staging);
     } catch {
@@ -182,8 +145,7 @@ function write(hookPath, content) {
   }
 }
 
-/** The hook's own permission bits, or the mode git needs to run one when there is no hook
- * yet. Never widened: a file that was not executable stays that way, and `check` reports it
+/** Never widened: a file that was not executable stays that way, and `check` reports it
  * rather than this quietly fixing it. */
 function modeOf(hookPath) {
   try {
@@ -194,22 +156,15 @@ function modeOf(hookPath) {
 }
 
 /**
- * Only a hooks directory physically inside the repository's own git directory.
+ * Only a hooks directory physically inside the repository's own git directory. `core.hooksPath`
+ * may point into the working tree — a checked-in `.githooks/` shared with a team — where
+ * appending dirties a tracked file with a machine-absolute path on every session start.
  *
- * `core.hooksPath` may point at a directory in the working tree — a checked-in `.githooks/`
- * is a common way to share hooks with a team. Appending there dirties a tracked file, on
- * every session start, with a machine-absolute path that cannot be committed; and a
- * `git checkout` restoring the file brings it straight back.
+ * Physically, through `realpath`, never lexically: `ln -s ../.githooks .git/hooks` is inside
+ * the git directory by string and inside the working tree on disk, and it defeats both a
+ * `resolve` containment test and an `lstat` on the hook reached through the link.
  *
- * **Physically, through `realpath`, not lexically through `resolve`.** An independent check
- * reproduced the difference: `ln -s ../.githooks .git/hooks` makes git answer
- * `<repo>/.git/hooks`, which is inside the git directory by string and inside the working
- * tree on disk. `path.resolve` never resolves a link, so the containment test passed and
- * `lstat` on the hook file — reached through the linked directory — saw a real file rather
- * than a link. Both guards were defeated at once, and a tracked file was modified.
- *
- * A path that cannot be resolved declines: this is the guard that decides whether to write
- * into somebody's repository, and the failure direction it takes is "do not".
+ * A path that cannot be resolved declines: this guard's failure direction is "do not".
  */
 function isOursToWrite(hooksDir, gitDir) {
   if (typeof gitDir !== "string" || gitDir === "") return false;

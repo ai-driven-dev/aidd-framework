@@ -39,11 +39,9 @@ export class AuthStorage {
     await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
     if (process.platform === "win32") {
       try {
-        // An argument list, never a command line: `path` is composed from `AIDD_USER_CONFIG_DIR`,
-        // `USERPROFILE` or a `projectRoot`, and a command line would let any of them close the
-        // quoting and append a second command. The account is read here rather than left as
-        // `%USERNAME%`, which only `cmd.exe` would have expanded — without a shell it would
-        // reach icacls as that literal string and grant nobody anything.
+        // An argument list, never a command line: `path` comes from an environment variable
+        // or a project root, either of which could close the quoting and append a command.
+        // With no shell to expand `%USERNAME%`, the account is read here instead.
         execFileSync("icacls", [path, "/inheritance:r", "/grant:r", `${windowsAccount()}:(R,W)`], {
           stdio: ["ignore", "ignore", "pipe"],
         });

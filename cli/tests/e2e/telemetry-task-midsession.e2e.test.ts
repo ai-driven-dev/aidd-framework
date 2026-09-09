@@ -4,16 +4,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
- * The ordinary state of a session still running - not a crash - and the fault it used to
- * cause: `task-attribution.ts` used to close an unclosed declared interval at its own start,
- * `[t, t)`, whenever nothing had yet named a `turn_end`. A declaration is exactly that kind
- * of unclosed interval for as long as the session it belongs to keeps working, so every
- * record after it was silently lost from `by_task` until this session's own journal
- * happened to record a `turn_end` or another declaration.
- *
- * `RUN_ID`/`ALPHA_VENDOR_ID` never end their journal with a `turn_end`: the session this
- * file's happy path reads from is still running when the report is asked for, exactly the
- * state that used to lose every record after `TASK_DECLARED_AT`.
+ * The journals here never end with a `turn_end`: the session the happy path reads from is
+ * still running when the report is asked for, an unclosed declared interval throughout.
  */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
 const ALPHA_VENDOR_ID = "33333333-3333-4333-8333-333333333333";
@@ -67,10 +59,8 @@ const SILENT_JOURNAL_LINES = [
   },
 ];
 
-/** A third session that declares a task and writes into TWO task folders. Two candidates
- * and no reason to choose, so the written-file route infers nothing here - which is what
- * keeps a record before this session's own declaration reading `precedes-declaration`, and
- * proves the refusal bound end to end rather than only in a unit test. */
+/** A third session that declares a task and writes into TWO task folders: two candidates
+ * and no reason to choose, so the written-file route infers nothing here. */
 const AMBIGUOUS_JOURNAL_LINES = [
   {
     type: "session_start",
@@ -117,8 +107,8 @@ const BEFORE_DECLARATION = record({
   event_timestamp: "2026-02-10T09:05:00Z",
   cost_usd: 1,
 });
-// After the declaration, before the write - the record this bug used to lose. No
-// `turn_end` has been written anywhere in this session's journal at this point.
+// After the declaration, before the write. No `turn_end` has been written anywhere in
+// this session's journal at this point.
 const DURING_ALPHA_NO_TURN_END = record({
   vendor_id: ALPHA_VENDOR_ID,
   turn_id: "during",
@@ -230,8 +220,7 @@ describe("aidd telemetry report — a task declared while the work is still goin
     const envelope = JSON.parse(result.stdout) as Envelope;
 
     // DURING_ALPHA_NO_TURN_END: after the declaration, before the write, no turn_end
-    // anywhere in this session's journal - the exact record the pre-fix `[t, t)` interval
-    // used to lose.
+    // anywhere in this session's journal.
     const alphaRow = taskRowOfCost(envelope, 2);
     expect(alphaRow?.task).toBe(ALPHA_TASK);
 
@@ -250,10 +239,8 @@ describe("aidd telemetry report — a task declared while the work is still goin
     expect(taskRowOfCost(afterClose, 2)?.task).toBe(ALPHA_TASK);
   });
 
-  // The record at 09:05 precedes its session's declaration, but that session wrote into one
-  // task folder and nothing else, and its journal witnessed 09:05 - so the written-file
-  // route names it, marked `inferred`. `precedes-declaration` is proven on the ambiguous
-  // session instead, where two written folders refuse that route.
+  // The 09:05 record precedes its session's declaration, but that session wrote into exactly
+  // one task folder, so the written-file route names it, marked `inferred`.
   it("names each unattributed reason distinctly, never collapsing two into one", async () => {
     const { projectDir, fakeHome } = await seed();
 

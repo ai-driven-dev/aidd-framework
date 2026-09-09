@@ -53,27 +53,22 @@ export class PluginRemoveUseCase {
     private readonly fs: FileWriter & FileReader,
     private readonly manifestRepo: ManifestRepository,
     private readonly logger: Logger,
-    /** Native plugin CLI activators keyed by `NativeActivation.binary`, mirroring the map
-     * `MarketplaceSyncSettingsUseCase` installs through (see runtime/wiring/framework.ts). */
+    /** Native plugin CLI activators keyed by `NativeActivation.binary`. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>,
-    /** Host plugin registry readers keyed by `AiToolId`, the same map `CleanUseCase`
-     * consults before uninstalling a ref — the scope asked for is the one the host
-     * actually registered it at, never a guess. Absent for every caller that predates
-     * this, which falls back to the manifest's own recorded scope. */
+    /** Host plugin registry readers keyed by `AiToolId`, consulted before uninstalling a ref so
+     * the scope asked for is the one the host actually registered it at. Absent falls back to the
+     * manifest's own recorded scope. */
     private readonly hostPluginRegistries: ReadonlyMap<
       AiToolId,
       HostPluginRegistryReader
     > = new Map(),
-    /** The registry of projects referencing the shared machine-scope source — the same
-     * port `CleanUseCase` reads, needed here for the same guard: uninstalling a ref a
-     * host enables machine-wide (codex, copilot) would disable it for another project
-     * on this machine too. Absent for every caller that predates this, which skips the
-     * guard entirely and uninstalls as it always did. */
+    /** The registry of projects referencing the shared machine-scope source, needed for the
+     * guard: uninstalling a ref a host enables machine-wide (codex, copilot) would disable it for
+     * another project on this machine too. Absent skips the guard entirely. */
     private readonly userSourceReferences?: UserSourceReferences,
-    /** Resolves the scope this project's own registry recorded for `plugin.marketplace`
-     * — the one fact `frameworkSourceIsShared` needs (`scope === "user"`) and a plugin
-     * record does not carry on its own. Absent for every caller that predates this,
-     * which treats every marketplace as not shared, same effect as above. */
+    /** Resolves the scope this project's own registry recorded for `plugin.marketplace` — the one
+     * fact `frameworkSourceIsShared` needs and a plugin record does not carry. Absent treats every
+     * marketplace as not shared. */
     private readonly marketplaceRegistry?: MarketplaceRegistry
   ) {}
 
@@ -110,20 +105,14 @@ export class PluginRemoveUseCase {
     return removed;
   }
 
-  // The removal counterpart of MarketplaceSyncSettingsUseCase.activateTool: a tool declared
-  // `nativeActivation` (Claude, Codex, Copilot) only loads a plugin once its own CLI registers
-  // it in a user-global registry that install never wrote to directly — so removal must drive
-  // the same CLI, not edit that registry file itself (see runtime/wiring/framework.ts and
-  // contexts/tools/infrastructure/native-plugin-cli-adapter.ts). A plugin without a recorded
-  // marketplace was never activated this way at install time either (mirrors
-  // MarketplaceSyncSettingsUseCase.pluginRefsToEnable's `marketplace == null` skip), so there
-  // is nothing to undo. Best-effort: a host that can't be reached must warn by name with what
-  // is left behind, never fail the whole removal silently.
+  // A tool declaring `nativeActivation` (Claude, Codex, Copilot) only loads a plugin once its own
+  // CLI registered it in a user-global registry install never wrote to directly, so removal drives
+  // that same CLI rather than editing the registry file. A plugin with no recorded marketplace was
+  // never activated this way either, so there is nothing to undo. Best-effort: a host that cannot
+  // be reached warns by name with what is left behind, never fails the whole removal silently.
   //
-  // Returns `undefined` when there was nothing to undo at all (no native activation, or
-  // never activated this way) — `purgeCachedPlugin` then has nothing to gate on either,
-  // since a plugin this CLI never asked a host to enable left no cache to purge. `true`
-  // or `false` otherwise: whether the host's own CLI confirmed the uninstall.
+  // Returns `undefined` when there was nothing to undo at all, so `purgeCachedPlugin` has nothing
+  // to gate on either; `true` or `false` otherwise, whether the host's own CLI confirmed it.
   private async removeNativeActivation(
     plugin: InstalledPlugin,
     toolId: AiToolId,
@@ -166,16 +155,11 @@ export class PluginRemoveUseCase {
     );
   }
 
-  /** The host's own name for `alias`, found in an already-read `NativeRegistrations` —
-   * the one private lookup `removeNativeActivation` and `purgeCachedPlugin` both need,
-   * written once so a host-facing call and the cache it purges never disagree about
-   * where to find the fact. Takes the registrations already read rather than reading
-   * them itself: `removeNativeActivation` needs that same read a second time, to tell
-   * "no native registrations at all" apart from "registered, but not under this alias"
-   * for its own warn gate, and reading `manifest.getNativeRegistrations(toolId)` twice
-   * for that one decision would say the same thing twice. `alias` is aidd's own key into
-   * this project's marketplace registry, never what a host learns; `undefined` when
-   * `registrations` is absent, or registered but naming no entry for `alias`. */
+  /** The host's own name for `alias`, found in an already-read `NativeRegistrations`. Takes the
+   * registrations rather than reading them itself: `removeNativeActivation` needs that same read to
+   * tell "no native registrations at all" apart from "registered, but not under this alias".
+   * `alias` is aidd's own key into this project's registry, never what a host learns; `undefined`
+   * when `registrations` is absent, or names no entry for `alias`. */
   private hostNameFor(
     registrations: NativeRegistrations | undefined,
     alias: string
@@ -184,28 +168,19 @@ export class PluginRemoveUseCase {
   }
 
   /**
-   * The same guard `CleanUseCase` applies before uninstalling a ref, applied here for
-   * the same reason: a ref enabled through the shared, machine-scope source at a host
-   * that enables a plugin machine-wide (no `scopeArgs` — codex, copilot) must survive
-   * a `plugin remove` run in one project while another project on this machine still
-   * references that source — uninstalling it here would disable it there too.
+   * A ref enabled through the shared, machine-scope source at a host that enables a plugin
+   * machine-wide (no `scopeArgs` — codex, copilot) must survive a `plugin remove` in one project
+   * while another project on this machine still references that source: uninstalling it here would
+   * disable it there too.
    *
-   * `plugin remove` never decrements `references.json` the way `clean` does (it has
-   * no claim of its own to drop), so this project's own root is still in the list
-   * `listAllReferencingProjects` returns and must be subtracted by hand — otherwise a
-   * project holding the *only* reference would read itself back as "another project"
-   * and guard a ref nothing else needs. `undefined` when nothing guards this ref, the
-   * ordinary case that still uninstalls it.
+   * `plugin remove` never decrements `references.json` the way `clean` does, so this project's own
+   * root is still in what `listAllReferencingProjects` returns and is subtracted by hand —
+   * otherwise a project holding the *only* reference would read itself back as "another project".
    *
-   * `ref` here is built as `${plugin.name}@${hostName}`, the host's own name for the
-   * marketplace (read by `removeNativeActivation` through `hostNameFor`, falling back
-   * to the alias only when no registration named one) — never `plugin.marketplace`
-   * alone, which a host never learns. `marketplaceAlias` is still the *key* the project's
-   * own marketplace registry is read by (that registry is keyed by alias, not by what a
-   * host calls it), and `hostName` is what `refAnotherProjectStillNeeds` matches `ref`'s
-   * suffix against: both sides of the guard must move together, or a ref moved to
-   * `hostName` while this parameter still carried the alias would silently stop
-   * guarding anything.
+   * `ref` carries the host's own name for the marketplace, never `plugin.marketplace` alone, which
+   * a host never learns; `marketplaceAlias` stays the key this project's own registry is read by.
+   * Both sides must move together, or a ref moved to `hostName` while this parameter kept the
+   * alias would silently stop guarding anything.
    */
   private async describeGuardedPluginRef(
     binary: string,
@@ -244,12 +219,10 @@ export class PluginRemoveUseCase {
   }
 
   /**
-   * Tries every scope `resolveUninstallScopeOrder` names, in order, stopping at the
-   * first the host's own CLI accepts — a real `claude` binary refuses a
-   * mismatched-scope uninstall outright, so a manifest whose recorded scope disagrees
-   * with what was actually registered (the state a plugin enabled before scope
-   * threading existed is still in) gets a second, corrective attempt rather than
-   * silently leaving the entry behind.
+   * Tries every scope `resolveUninstallScopeOrder` names, in order, stopping at the first the
+   * host's own CLI accepts — a real `claude` binary refuses a mismatched-scope uninstall outright,
+   * so a manifest whose recorded scope disagrees with what was registered gets a corrective
+   * attempt rather than silently leaving the entry behind.
    */
   private async uninstallViaActivator(
     activator: NativePluginActivator,
@@ -284,15 +257,11 @@ export class PluginRemoveUseCase {
   }
 
   /**
-   * `cache/<hostName>/<plugin>/` under the same declared-root-plus-`realpath`-
-   * containment whitelist `clean`'s own marketplace-level purge shares
-   * (`cli/src/contexts/framework/application/shared/purge-declared-cache.ts`) — but never gated on emptiness the way that one is:
-   * this directory holds exactly the content this removal is asking the host to
-   * forget, not a leftover shell another project's install could still hold, so once
-   * `confirmed` says the host's own CLI actually uninstalled the ref, the whole
-   * subtree goes. `hostName` comes from this tool's own `NativeRegistrations`, keyed
-   * by `plugin.marketplace` (this project's own alias) — never the alias itself,
-   * which a host never learns (see `CleanUseCase.undoMarketplaceRegistration`).
+   * `cache/<hostName>/<plugin>/` under the same declared-root-plus-`realpath` containment
+   * whitelist `clean`'s own marketplace-level purge shares, but never gated on emptiness the way
+   * that one is: this directory holds exactly the content the host is being asked to forget, not a
+   * leftover shell another project's install could still hold. `hostName` comes from this tool's
+   * own `NativeRegistrations`, never the alias, which a host never learns.
    */
   private async purgeCachedPlugin(
     manifest: Manifest,

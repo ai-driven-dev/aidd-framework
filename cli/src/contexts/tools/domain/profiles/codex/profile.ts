@@ -51,11 +51,10 @@ export function rewriteCodexContent(content: string): string {
 
 const CONFIG_CODEX_HOOKS = "codex-hooks";
 
-// Measured: four consecutive `codex exec` sessions installed a plugin's
-// hooks, ran clean, and journaled nothing — no warning, no line in the output — until
-// `--dangerously-bypass-hook-trust` made the same install produce all three hooks and its
-// journal. Codex writes one `trusted_hash` per hook under `[hooks.state]` in
-// `~/.codex/config.toml` when a person approves it; a hook with no entry is skipped in
+// Measured: four consecutive `codex exec` sessions installed a plugin's hooks, ran clean and
+// journalled nothing — no warning, no line in the output — until `--dangerously-bypass-hook-trust`
+// made the same install produce all three hooks and its journal. Codex writes one `trusted_hash`
+// per hook under `[hooks.state]` when a person approves it; a hook with no entry is skipped in
 // silence, and nothing prompts for it outside a terminal.
 const CODEX_HOOKS_TRUST_NOTICE =
   "Codex will not run this plugin's hooks until each one is trusted — approve the prompt " +
@@ -187,9 +186,8 @@ export const codex: AiTool<
       pluginManifestRelativePath: "plugin.json",
       acceptsMcp: true,
       translationMode: "marketplace",
-      // Codex only enables plugins from its user-global config (~/.codex/config.toml)
-      // plus its plugin cache (~/.codex/plugins/cache/). A project-local settings file
-      // is inert, so we drive the `codex` CLI directly during marketplace sync instead.
+      // Codex only enables plugins from its user-global config plus its own plugin cache; a
+      // project-local settings file is inert, so the `codex` CLI is driven directly instead.
       acceptsHooks: true,
       hooksTrustNotice: CODEX_HOOKS_TRUST_NOTICE,
       pluginRootToken: PLUGIN_ROOT_TOKEN,
@@ -198,18 +196,15 @@ export const codex: AiTool<
         upgradeVerb: "upgrade",
         enableVerb: "add",
         disableVerb: "remove",
-        // Codex's own `plugin remove` deletes a marketplace's cached content but leaves
-        // the now-empty `cache/<hostName>/` shell behind (measured against the real
-        // binary in a relocated HOME; this is the residue `smoke:real` left in the real
-        // `$HOME` on every run before this field existed). No `marketplaceRegistry` is
-        // declared here — codex refuses a re-add from a different source itself, so
-        // there is no registry to reread — which is why `clean` proves this leftover
-        // safe to remove by its own emptiness instead, never by a registry read.
+        // Codex's own `plugin remove` deletes a marketplace's cached content but leaves the
+        // now-empty `cache/<hostName>/` shell behind. No `marketplaceRegistry` is declared —
+        // codex refuses a re-add from a different source itself, so there is no registry to
+        // reread — which is why `clean` proves this leftover safe to remove by its own
+        // emptiness instead.
         pluginCacheDir: (h) => join(h, ".codex", "plugins", "cache"),
-        // `$CODEX_HOME/config.toml` when set — a real codex binary reads there
-        // regardless of a relocated `HOME` (testing.md's own sandboxing gotcha) —
-        // falling back to `~/.codex/config.toml` otherwise. Never written by aidd;
-        // named here for a diagnostic alone.
+        // `$CODEX_HOME/config.toml` when set — a real codex binary reads there regardless of a
+        // relocated `HOME` — falling back to `~/.codex/config.toml` otherwise. Never written by
+        // aidd; named here for a diagnostic alone.
         userSettingsPath: (h) => join(process.env.CODEX_HOME || join(h, ".codex"), "config.toml"),
       },
     }),

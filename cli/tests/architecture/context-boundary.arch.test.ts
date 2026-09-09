@@ -1,32 +1,19 @@
 /**
- * Nothing imports the interior of a context except through what it declares public.
- *
- * There is deliberately no `index.ts` anywhere — this codebase forbids barrels and
- * re-exports (`no-re-export.arch.test.ts`, base empty), so a context cannot hold its
- * boundary with a re-export file. It holds it here instead: a context is a directory
- * under `src/contexts/`, and an import from outside that directory may only target a
- * module the context lists below. Everything else inside it is internal, whether or
- * not anything currently reaches for it — the list is the fence, not a description of
- * what happens to be used.
- *
- * See `aidd_docs/tasks/2026_08/2026_08_20_refactor-contextes-cli/arborescence.md`,
- * invariant 4.
+ * A codebase that forbids barrels cannot hold a context's boundary with a re-export file, so
+ * it holds it here: an import from outside a context may only target a module listed below.
+ * The list is the fence, not a description of what happens to be used.
  */
 import { describe, expect, it } from "vitest";
 import { expectRatchet, importersByFile, sourceFiles } from "./helpers.js";
 
-/**
- * Each context's declared public surface. Shaped so later phases only add data: one
- * entry per context, growing as `framework` and `distribution` are extracted, without
- * the mechanism below ever needing to change.
- */
+/** Each context's declared public surface, one entry per context. */
 const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
   tools: [
     // the tool contract and lookup surface
     "src/contexts/tools/domain/contracts.ts",
     "src/contexts/tools/domain/registry.ts",
     "src/contexts/tools/domain/build-contract.ts",
-    // co-owned configuration (settings.json, .mcp.json et al.) — phase 10's own mandate
+    // co-owned configuration (settings.json, .mcp.json et al.)
     "src/contexts/tools/domain/capabilities/mcp-capability.ts",
     "src/contexts/tools/domain/mcp-exclusion.ts",
     "src/contexts/tools/domain/capabilities/settings-capability.ts",
@@ -38,37 +25,31 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/tools/domain/ports/native-plugin-activator.ts",
     "src/contexts/tools/domain/ports/schema-validator.ts",
     "src/contexts/tools/domain/ports/host-plugin-registry-reader.ts",
-    // What a host's own plugin registry says about a plugin AIDD installed for it — the
-    // comparison `telemetry`'s diagnostic and `framework`'s `doctor` both need.
+    // What a host's registry says about an installed plugin: telemetry's diagnostic and
+    // `doctor` both need the comparison.
     "src/contexts/tools/domain/host-plugin-registration.ts",
     "src/contexts/tools/domain/ports/host-marketplace-registry-reader.ts",
-    // Whether a marketplace name a host's registry already holds is pointed at a
-    // different source — the sync-time guard and `doctor`'s own conflict check both
-    // need this same comparison.
+    // Whether a name a host's registry holds points at a different source: the sync-time
+    // guard and `doctor`'s conflict check share the comparison.
     "src/contexts/tools/domain/marketplace-source-conflict.ts",
-    // what a tool declares about plugins, read by whoever installs one for it — the
-    // context has no application layer of its own since installing is framework work
+    // what a tool declares about plugins: this context has no application layer, since
+    // installing is framework work
     "src/contexts/tools/domain/capabilities/plugins-capability.ts",
     "src/contexts/tools/domain/marketplace-settings.ts",
     "src/contexts/tools/domain/plugin-translation-mode.ts",
     "src/contexts/tools/domain/hooks-format.ts",
     "src/contexts/tools/domain/models/plugin-install-notice.ts",
-    // The shape of the file a tool's hooks land in, read by whoever writes one for it —
-    // the installer that merges a plugin's hooks in, and the diagnostic that reads them
-    // back out to answer whether the tool will actually run them.
+    // The shape of the file a tool's hooks land in, read by the installer that merges them
+    // and the diagnostic that answers whether the tool will run them.
     "src/contexts/tools/domain/formats/flat-hooks-merge.ts",
     "src/contexts/tools/domain/formats/cursor-hooks-project-merge.ts",
-    // The variable each tool expands to an installed plugin's own directory. A tool
-    // declares which one it speaks; translate substitutes it, and the diagnostic looks for
-    // it in what was installed — three readers of one vocabulary, none of them a twin.
+    // The variable each tool expands to an installed plugin's directory: a tool declares it,
+    // translate substitutes it, the diagnostic looks for it in what was installed.
     "src/contexts/tools/domain/formats/plugin-root-token.ts",
   ],
-  // Telemetry answers questions and something has to ask them: every entry here is reached
-  // by `presentation` (which renders an answer) or by the composition root (which wires an
-  // adapter into a port). Nothing here is an adapter, and no other context appears — what
-  // telemetry needs from elsewhere it declares as its own ports
-  // (`domain/ports/installed-plugins-reader.ts`, `ignore-entries.ts`), satisfied at the
-  // composition root, so measurement reaches into no context and no context reaches into it.
+  // Every entry is reached by `presentation` or by the composition root, and none is an
+  // adapter: what telemetry needs elsewhere it declares as its own port instead, so
+  // measurement reaches into no context and no context reaches into it.
   telemetry: [
     // the six use cases the `telemetry` command drives
     "src/contexts/telemetry/application/telemetry-on-use-case.ts",
@@ -81,7 +62,7 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     // the shapes a rendered answer is made of
     "src/contexts/telemetry/domain/cost-report.ts",
     "src/contexts/telemetry/domain/cost-report-envelope.ts",
-    // How a person id was resolved, which the artefact prints beside each row.
+    // how a person id was resolved, printed beside each row
     "src/contexts/telemetry/domain/person-resolution.ts",
     "src/contexts/telemetry/domain/report-period.ts",
     "src/contexts/telemetry/domain/telemetry-removal.ts",
@@ -108,14 +89,11 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/translate/domain/content-translator.ts",
     // the build use case — `framework build`, one source to N targets
     "src/contexts/translate/application/translate-source.ts",
-    // Four `contexts/tools/...` paths used to sit here, duplicating `tools`' own entries.
-    // They were never consulted: the lookup is keyed by the *imported* file's context, so a
-    // `tools` file is only ever checked against `tools`. A per-consumer allowance is not
-    // something this mechanism can express, and those modules are public to everyone anyway.
+    // A per-consumer allowance is not expressible here: the lookup is keyed by the imported
+    // file's own context, so a `tools` file is only ever checked against `tools`.
   ],
-  // Measured with the composition root excluded: ten modules are reached from outside,
-  // and not one of them is an adapter. The adapters are wired by `runtime/wiring/framework.ts` alone, which
-  // is why they stay internal — a leaf that exposed its own plumbing would not be one.
+  // Measured with the composition root excluded, and not one entry is an adapter: the
+  // adapters are wired from `runtime/wiring/` alone, so they stay internal.
   distribution: [
     // what a marketplace is, and where it can be read from
     "src/contexts/distribution/domain/marketplace.ts",
@@ -131,12 +109,10 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/distribution/application/marketplace-refresh-use-case.ts",
     "src/contexts/distribution/application/marketplace-register-framework-use-case.ts",
   ],
-  // The largest context, and the last to be fenced — this file's own header said the list
-  // would grow "as `framework` and `distribution` are extracted", and only `distribution`
-  // ever was. Until this entry existed the mechanism below skipped every framework file, so
-  // fifteen imports reached its interior unchecked. Measured, composition root excluded.
+  // The largest context: while it had no entry the mechanism below skipped every framework
+  // file, so its interior was reached unchecked. Measured, composition root excluded.
   framework: [
-    // The rule inventory `framework rules` prints, one row per installed rule.
+    // the rule inventory `framework rules` prints, one row per installed rule
     "src/contexts/framework/domain/installed-rule.ts",
     // the installation record, which is what this context owns
     "src/contexts/framework/domain/manifest.ts",
@@ -158,7 +134,6 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** Every directory under `src/contexts/`, which is what a context is. */
 function contextsOnDisk(files: readonly string[]): string[] {
   const names = new Set<string>();
   for (const file of files) {
@@ -168,25 +143,21 @@ function contextsOnDisk(files: readonly string[]): string[] {
   return [...names].sort();
 }
 
-/** The context a file belongs to, or `null` when it is not inside any context yet. */
 function contextOf(file: string): string | null {
   const match = /^src\/contexts\/([^/]+)\//.exec(file);
   return match ? match[1] : null;
 }
 
 /**
- * The composition root wires every context by construction: profiles register
- * themselves through a side-effect import, and a concrete adapter must be named to be
- * instantiated. Exempting it mirrors `earned-sharing.arch.test.ts`'s exemption of the
- * same directory for the same reason — it is not a caller this rule is trying to catch.
- * Phase 16 split the single `runtime/wiring/framework.ts` into one wiring module per
- * context under `runtime/wiring/`, so the exemption follows the whole directory.
+ * The composition root wires every context by construction — a profile registers itself
+ * through a side-effect import, an adapter must be named to be instantiated — so the whole
+ * `runtime/wiring/` directory is exempt rather than a caller this rule tries to catch.
  */
 function isCompositionRoot(file: string): boolean {
   return file.startsWith("src/runtime/wiring/");
 }
 
-/** The rule itself, over an explicit file list and importer map instead of the real tree. */
+/** Over an explicit file list and importer map, so the rule is testable off the real tree. */
 function reachesIntoInterior(
   files: readonly string[],
   importers: ReadonlyMap<string, ReadonlySet<string>>,
@@ -207,23 +178,9 @@ function reachesIntoInterior(
 }
 
 /**
- * Reaches into a context's interior today. This list may only shrink.
- *
- * The five `install-*-use-case.ts` files reach past `tools`' declared capability
- * contract for the capability *class* itself (agents/commands/rules/skills) — narrow
- * 1:1 couplings that predate this phase. `hooks-capability.ts` and
- * `opencode-mcp-merge.ts` are declared public instead of baselined here: measured,
- * their external callers are the same framework-side plugin-materialization files
- * that already reach the public `McpCapability`/`SettingsCapability` — the same
- * co-owned-configuration role phase 10 task 3 puts in `tools`, not a narrow reach.
- * These five entries resolve when `install/` moves into `contexts/tools/application/`,
- * which this phase does not do.
- *
- * `plugins-capability.ts` reaches `translate`'s `cursor-hooks.ts` for
- * `HooksContentFormat` — it declares a tool's hooks format, the same shape of problem
- * task 1 solved for the content capabilities, but `plugins-capability.ts` itself does
- * not move to `tools` in this phase, so the format transform it needs stays out of
- * reach until it does.
+ * Reaches into a context's interior today; the list may only shrink. Each entry is an
+ * `install-*-use-case.ts` reaching past `tools`' declared contract for the capability class
+ * itself, and they resolve together when `install/` moves into `contexts/tools/application/`.
  */
 const BASELINE = [
   "src/contexts/framework/application/install/content/install-agents-use-case.ts -> src/contexts/tools/domain/capabilities/agents-capability.ts",

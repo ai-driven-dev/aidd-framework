@@ -54,91 +54,49 @@ import {
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
-  /** Limits both the settings sync and the native activation to these tools — what
-   * `sync --tool <id>` needs so fixing one tool's registration does not silently
-   * re-drive every other installed tool's CLI too. Every installed tool when absent. */
+  /** Limits both the settings sync and the native activation to these tools; every
+   * installed tool when absent. */
   toolIds?: readonly ToolId[];
-  /** Re-registers the framework marketplace when this run finds none at all — `sync.ts`
-   * alone sets this, never `plugin install | remove | update` or `marketplace add |
-   * remove | refresh`, which drive this same `execute` through `syncNativeActivation`
-   * without it. This flag's own placement must fall strictly between the two checks
-   * around it: `execute` already returned above for no manifest at all, before this is
-   * even read, and below this an empty registry is read exactly as found, never
-   * silently repopulated. `sync` is the one command whose job is repairing a project's
-   * state, not merely reading it back — the rest read a person's own registry as it
-   * is. Absent (the default) keeps that read-only behaviour for everyone but `sync`. */
+  /** Re-registers the framework marketplace when this run finds none at all — `sync` alone
+   * sets it, so every other caller reads an empty registry as found rather than repopulating it. */
   recreateFrameworkIfMissing?: boolean;
   /**
-   * The scope this run activates plugins at — `"project"` (the default) maps claude's
-   * own native calls to `--scope local`, bound to this project; `"user"` to
-   * `--scope user`, machine-wide. Answers a different question than a marketplace's own
-   * `scope` (always `"user"` for the shared framework source): not where the
-   * registration lives, but at what scope *this* run's own plugin enablement happens.
-   * `setup --scope user` and `sync --scope user` are the only callers that ever pass
-   * `"user"`; every other caller keeps today's default.
-   *
-   * `"user"` also skips writing this project's own settings files entirely
-   * (`syncTool`) — a user-scope run's whole point is that nothing lands under
-   * `projectRoot`, so there is nothing here for a project file to mirror.
+   * The scope this run enables plugins at, which is a different question than a marketplace's
+   * own `scope`. `"user"` also writes nothing under `projectRoot`, so `syncTool` is skipped.
    */
   scope?: MarketplaceScope;
   /**
-   * Overrides the manifest this run reads and writes, in place of the one this use
-   * case was constructed with. `setup --scope user`/`sync --scope user` are the only
-   * callers that ever pass one — the manifest they load and save is the user-scope
-   * manifest under `userConfigDir()`, never this project's own `.aidd/manifest.json`,
-   * and this use case is otherwise wired once per project root with a fixed
-   * `ManifestRepository`. A second, constant `ManifestRepository` injected alongside
-   * the first would answer a question this use case never asks at construction time —
-   * which manifest — so a per-call option is the right shape on its own terms, not a
-   * dodge of anything this file's own collaborator count is measured by.
+   * Overrides the manifest this run reads and writes — the user-scope manifest under
+   * `userConfigDir()`, which only `setup --scope user` and `sync --scope user` ever pass.
    */
   manifestRepo?: ManifestRepository;
   /**
-   * Narrows the settings sync and native activation to the marketplaces named here —
-   * what `marketplace add <name>` and `plugin install --from <name>` need so re-driving
-   * activation for the marketplace they just acted on does not also re-drive every
-   * other registered one. Absent (the default) activates every marketplace `sync`,
-   * `setup`, `marketplace remove | refresh` and `plugin remove | update` still need.
-   *
-   * A name matching nothing resolves to zero marketplaces, which the very next check
-   * (`marketplaces.length === 0`) already treats as `EMPTY_RESULT` — never a fallback to
-   * every marketplace, since that would silently re-drive activation for marketplaces
-   * this run was never told about.
+   * Narrows the settings sync and native activation to the marketplaces named here; absent
+   * activates every registered one. A name matching nothing resolves to zero marketplaces,
+   * never a fallback to every one.
    */
   marketplaceNames?: readonly string[];
 }
 
-/** What one tool's own CLI actually registered, once its `activateTool` run finished —
- * the state `nativeRegistrations` records, and `doctor` later compares to the host's
- * real registry. */
 interface ActivationOutcome {
   marketplaces: readonly NativeMarketplaceRegistration[];
   pluginRefs: readonly string[];
-  /** A marketplace whose build failed was warned about and left unregistered this run —
-   * the host's own registration for it is wherever it was before. */
+  /** A marketplace whose build failed was warned about and left unregistered this run — the
+   * host's own registration for it is wherever it was before. */
   buildFailed: boolean;
 }
 
-/** What activation did, per tool — the fact `execute` used to throw away by returning
- * `void`, which is the one reason `sync` never called it at all. */
 export interface MarketplaceSyncSettingsResult {
   /** Tools whose own CLI actually ran, whether or not every step inside it succeeded. */
   activated: readonly ToolId[];
   /** Tools with a native activation whose binary was not on PATH — nothing of theirs
    * ran, so the settings this pass wrote will not load until it has. */
   binaryMissing: readonly { toolId: ToolId; binary: string }[];
-  /** What a recoverable, best-effort step logged — the same text `logger.warn` already
-   * received, returned so a caller can act on it without capturing output. */
+  /** What a recoverable, best-effort step logged — the same text `logger.warn` received. */
   warnings: readonly string[];
-  /** A hard failure a tool's activation raised that is not the recoverable
-   * `NativePluginCliError` family. Two shapes reach here: a bug in the activator itself
-   * (every failure a real adapter throws is a `NativePluginCliError`, so anything else
-   * it raises is that), and a deliberate refusal from the source-conflict guard in
-   * `registerMarketplace` — a `MarketplaceSourceConflictError` is not a bug either side
-   * produced, it is the guard doing exactly what it exists to do. Returned rather than
-   * thrown: whether that makes the whole command fail is `sync.ts`'s decision, the same
-   * split `restoreAllUseCase` already holds for a restore failure. */
+  /** A hard failure that is not the recoverable `NativePluginCliError` family: a bug in an
+   * activator, or the source-conflict guard's deliberate refusal. Returned rather than thrown,
+   * so whether the whole command fails stays the caller's decision. */
   errors: readonly { scope: string; message: string }[];
 }
 
@@ -149,12 +107,10 @@ const EMPTY_RESULT: MarketplaceSyncSettingsResult = {
   errors: [],
 };
 
-/** Syncing marketplace settings into the tools that read them, as its callers need it. */
 export interface MarketplaceSyncSettings {
   execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult>;
 }
 
-/** What one execute() run's native activation did, across every tool it touched. */
 interface ActivationRun {
   outcomes: ReadonlyMap<ToolId, ActivationOutcome>;
   binaryMissing: readonly { toolId: ToolId; binary: string }[];
@@ -172,28 +128,19 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     /** Native plugin CLI activators, keyed by the `binary` each profile declares. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>,
     private readonly ensureBuilt: EnsureBuiltMarketplace,
-    /** Readers of a host's own marketplace registry, keyed by `AiToolId` — only a tool
-     * whose profile declares `NativeActivation.marketplaceRegistry` is ever looked up
-     * here (see `guardAgainstConflict`), so a tool absent from this map still syncs
-     * exactly as before. Defaults to empty for every existing caller that predates
-     * this guard. */
+    /** Readers of a host's own marketplace registry, keyed by `AiToolId` — only a tool whose
+     * profile declares `NativeActivation.marketplaceRegistry` is ever looked up here, so a tool
+     * absent from this map still syncs. */
     private readonly hostMarketplaceRegistries: ReadonlyMap<
       AiToolId,
       HostMarketplaceRegistryReader
     > = new Map(),
-    /** Root of a user-scope marketplace's built tree, mirroring
-     * `EnsureBuiltMarketplaceUseCase`'s own `userCacheRoot` — `guardAgainstConflict`
-     * needs it to decide a version/migration drift the same way `doctor`'s own
-     * `checkMarketplaceSources` does. No separate CLI-version reader is needed here,
-     * unlike `DoctorRegistrationUseCase`: the version a drift is decided against comes
-     * from `builtDir` itself, already built by `ensureBuilt` before this ever runs,
-     * rather than a path recomputed without one. */
+    /** Root of a user-scope marketplace's built tree, mirroring `EnsureBuiltMarketplaceUseCase`'s
+     * own `userCacheRoot` — the version a drift is decided against comes from `builtDir` itself,
+     * already built before this runs, never from a path recomputed without one. */
     private readonly userCacheRoot: () => string = () => "",
-    /** Re-registers the shared machine-scope source when this run finds no marketplace
-     * at all — the fix for a clone whose committed manifest predates this machine's own
-     * copy of the registry (`userConfigDir()`, never inside the project). Absent for
-     * every caller that predates this, which keeps the old silent no-op instead of
-     * guessing what to register. */
+    /** Re-registers the shared machine-scope source when this run finds no marketplace at all.
+     * Absent keeps the silent no-op instead of guessing what to register. */
     private readonly marketplaceRegisterFrameworkUseCase?: MarketplaceRegisterFramework,
     private readonly userSourceReferences?: UserSourceReferences,
     private readonly currentVersionProvider?: VersionReader
@@ -216,15 +163,12 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
         ? recreatedMarketplaces
         : recreatedMarketplaces.filter((m) => options.marketplaceNames?.includes(m.name));
     if (marketplaces.length === 0) return EMPTY_RESULT;
-    // A user-scope run has no project-scope manifest for a later `clean` to ever
-    // decrement this claim from — same reasoning as `SetupUseCase.registerMarketplace`'s
-    // own guard, restated here because `sync --scope user` reaches this `execute` too,
-    // never through that guard.
+    // A user-scope run has no project-scope manifest for a later `clean` to decrement this
+    // claim from.
     if (scope !== "user") await this.recordSharedSourceReference(projectRoot, marketplaces);
     const toolIds = this.selectToolIds(manifest, options.toolIds);
     let anyToolUpdated = false;
-    // A user-scope run's whole point is that nothing lands under `projectRoot` — there
-    // is no project settings file for a user-scope activation to mirror into.
+    // A user-scope run lands nothing under `projectRoot`, so no project settings file mirrors it.
     if (scope === "project") {
       for (const toolId of toolIds) {
         if (await this.syncTool(toolId, projectRoot, manifest, marketplaces)) anyToolUpdated = true;
@@ -259,29 +203,11 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * A clone whose committed manifest predates this machine's own copy of the shared
-   * registry finds `marketplaces` empty on its very first `sync`: the registry lives
-   * under `userConfigDir()`, never inside the project, so nothing about a fresh clone
-   * carries it. Silently doing nothing here used to be indistinguishable from "nothing
-   * to sync". Recreating the one entry almost every project relies on, the framework's
-   * own marketplace, is exactly what `setup`'s own auto-register already does by
-   * default — a bare `sync` now matches it instead of leaving the project inert until
-   * someone remembers to run `setup` again.
-   *
-   * Only ever called when `options.recreateFrameworkIfMissing` is set — every other
-   * caller of `execute` reaching an empty registry (`marketplace add | remove |
-   * refresh`, `plugin install | remove | update`) is reading a person's own deliberate
-   * choice to have no marketplace at all, not a fresh clone's missing copy, and must
-   * see that choice reflected back, not silently overwritten.
-   *
-   * Also the one place `sync` migrates a project installed *before* the shared source
-   * existed: a project-scope `aidd-framework` entry is retired to the machine-scope
-   * one the same way `setup` already does on every run
-   * (`SetupMarketplaceRegistrationUseCase`), rather than only when the registry is
-   * empty outright. Its own `pluginSource` is carried forward from the entry being
-   * migrated — never left to `MarketplaceRegisterFrameworkUseCase`'s own default,
-   * which is `{ kind: "local", path: "." }` and would silently replace a project
-   * installed from GitHub or a custom path with the wrong source.
+   * Only ever called when `recreateFrameworkIfMissing` is set: every other caller reaching an
+   * empty registry is reading a deliberate choice to have no marketplace at all. A project-scope
+   * `aidd-framework` entry is retired to the machine-scope one here, carrying forward its own
+   * `pluginSource` — the register use case's default would silently replace a project installed
+   * from GitHub or a custom path with `{ kind: "local", path: "." }`.
    */
   private async ensureFrameworkRegistered(
     projectRoot: string,
@@ -298,27 +224,10 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * Deletes this project's own `.aidd/cache/built/aidd-framework/` once the shared
-   * source has taken its place — the last step of the migration `ensureFrameworkRegistered`
-   * starts, never run before every tool's own native activation has had a chance to
-   * read the tree it is unregistering from (a host's own CLI needs that tree to still
-   * exist to resolve what it is undoing, `aidd_docs/memory/cli.md`'s own measured
-   * fact about `clean`'s ordering, which applies here for the same reason).
-   *
-   * Gated on `activateNativeTools` reporting no `errors` at all, on every requested
-   * tool's own registration having actually been driven this run — a binary off `PATH`
-   * (`binaryMissing`) or a build that failed (`ActivationOutcome.buildFailed`) both leave
-   * a host registry that may still name this project's own pre-migration tree, and
-   * purging it out from under that dangling registration is exactly the hazard this
-   * gate exists to avoid — and on the framework marketplace resolving to the shared,
-   * machine-scope source at the end of this run. `guardAgainstConflict`'s own
-   * `version-behind` skip is not such a gap: that host already follows a newer shared
-   * build, which is never this project's cache.
-   *
-   * `resolveCacheCandidate` is the same whitelist `clean`'s own cache purge uses:
-   * `realpath` both sides, refuse anything that does not resolve strictly inside
-   * `projectRoot`. A symlinked or corrupted path is left in place and named, never
-   * followed.
+   * Never run before every tool's own native activation: a host's CLI needs the tree it is
+   * unregistering from to still exist, and a binary off `PATH` or a failed build can leave a
+   * registration still naming this project's own pre-migration cache. `resolveCacheCandidate`
+   * refuses anything that does not `realpath` strictly inside `projectRoot`.
    */
   private async purgeStaleProjectCache(
     projectRoot: string,
@@ -357,12 +266,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * Refreshed on every run that finds the shared source registered, never only the run
-   * that had to recreate it above — another project on this machine having already
-   * registered it is the ordinary case, not the exception, and this project's own
-   * reference is still missing the first time its own `sync` (or `setup`) runs here.
-   * What a `clean --scope user` (not yet built) will read before it purges anything the
-   * machine-scope entry owns.
+   * Refreshed on every run that finds the shared source registered, not only the one that had to
+   * recreate it: this project's own reference is still missing the first time its `sync` runs here.
    */
   private async recordSharedSourceReference(
     projectRoot: string,
@@ -376,13 +281,6 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     await this.recordReferenceForRoot(projectRoot);
   }
 
-  /**
-   * The one write both `recordSharedSourceReference` (this project's own claim) and
-   * `decideOnDrift` (a foreign project's claim, discovered from the host's own
-   * registered path when it still names *another* project's pre-migration cache) make
-   * against `references.json` — extracted so the two do not carry two separately
-   * written copies of the same resolve-then-add sequence.
-   */
   private async recordReferenceForRoot(root: string): Promise<void> {
     if (this.userSourceReferences === undefined || this.currentVersionProvider === undefined) {
       return;
@@ -395,8 +293,6 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     });
   }
 
-  /** Every installed tool, narrowed to `toolIds` when the caller named one — what
-   * `sync --tool <id>` needs so it touches only that tool's settings and activation. */
   private selectToolIds(
     manifest: Manifest,
     toolIds: readonly ToolId[] | undefined
@@ -407,10 +303,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return installed.filter((toolId) => requested.has(toolId));
   }
 
-  /** Runs each tool's own CLI, keyed to what it was asked to register — never a tool
-   * with no native activation at all, and never one whose binary is absent: neither
-   * wrote anything, so a settings file that differs for it differs because a person
-   * changed it. Blessing that as ours is the one thing this must not do. */
+  /** Never a tool with no native activation, and never one whose binary is absent: neither wrote
+   * anything, so a settings file that differs for it differs because a person changed it. */
   private async activateNativeTools(
     projectRoot: string,
     manifest: Manifest,
@@ -449,33 +343,11 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return { outcomes, binaryMissing, warnings, errors };
   }
 
-  /** Writes the manifest's own record of what each tool's CLI was asked to register —
-   * the state `doctor` later compares against the host's real registry, and `clean`
-   * undoes through the same binary. Only for a tool this run actually activated: a
-   * tool whose CLI never ran gets no `nativeRegistrations` write, the same rule
-   * `recordWhatActivationWrote` already holds for the settings-file hash.
-   *
-   * The keyed merge below applies only when `narrowed` is true — a
-   * `marketplaceNames`-scoped run (`marketplace add`, `plugin install --from`), where
-   * `outcome` carries only the one marketplace this run touched, so an existing entry
-   * for every other marketplace must survive untouched: the record `clean`, `doctor`
-   * and `hostNameFor` all read, and a narrowed run erasing it would strand a later
-   * `clean` unable to unregister what this run never asked about. An unnarrowed run
-   * (`sync`, `setup`) instead does the old whole-entry replace: `outcome` there already
-   * carries every marketplace this project knows, so anything not in it is a dead
-   * registration — a marketplace this project no longer registers, or one whose
-   * `hostName` an upstream catalog rename changed on this very run — and must not
-   * survive, since `setNativeRegistrations` is called from nowhere else in the tree to
-   * ever drop it later.
-   *
-   * `pluginRefs` merges by the `@<hostName>` suffix the touched marketplaces own, but
-   * only for a hostName no *retained* marketplace still owns: two of this project's
-   * own local aliases are free to resolve to the same `hostName` (a supported
-   * capability, never a conflict — see `architecture.md`'s bullet on what this CLI
-   * refuses that a host's own CLI would silently accept), so filtering by hostName
-   * alone would drop the untouched alias's own refs too. A ref both sides happen to
-   * carry (the touched alias's own, replayed by this run) is deduplicated rather than
-   * doubled. */
+  /** Only for a tool this run actually activated. A `narrowed` run's `outcome` carries only the
+   * marketplace it touched, so every other entry must survive the merge; an unnarrowed run replaces
+   * outright, since anything absent from `outcome` is a dead registration nothing else ever drops.
+   * `pluginRefs` merge by the `@<hostName>` suffix only for a hostName no retained marketplace
+   * still owns — two local aliases may resolve to one hostName. */
   private recordNativeRegistrations(
     manifest: Manifest,
     activated: ReadonlyMap<ToolId, ActivationOutcome>,
@@ -513,17 +385,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * The host's own CLI writes its registration into the very file `syncTool` had just
-   * hashed — Claude Code declares one `settingsPath` for both marketplaces and enabled
-   * plugins, so both halves land in `.claude/settings.json`. The tracked hash then described
-   * content that no longer existed, and nothing re-read it: `status` and `doctor` reported
-   * a file the person never touched as drifted for as long as the manifest stood, and
-   * `restore` would have undone the host's own registration to reach a state AIDD held for
-   * the length of one function.
-   *
-   * Re-read rather than re-derive, and only for a tool whose CLI actually ran: what is
-   * stored is what is on disk after the write, which is the observation, not a guess at
-   * what the host would have written.
+   * A host's own CLI writes its registration into the very file `syncTool` had just hashed, so
+   * the hash is re-read from disk after activation rather than re-derived — what is stored is
+   * then the observation, not a guess at what the host would have written.
    */
   private async recordWhatActivationWrote(
     projectRoot: string,
@@ -556,10 +420,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return nativeActivationOf(toolId)?.binary;
   }
 
-  /** Runs this tool's own CLI, returning what it was asked to register. The caller has
-   * already checked `isAvailable()`, so every failure reaching here is either a
-   * recoverable `NativePluginCliError` — collected into `warnings`, never thrown — or a
-   * genuine bug in the activator, which propagates. */
+  /** The caller has already checked `isAvailable()`, so every failure reaching here is either a
+   * recoverable `NativePluginCliError` — collected into `warnings`, never thrown — or a genuine
+   * bug in the activator, which propagates. */
   private async activateTool(
     toolId: ToolId,
     activator: NativePluginActivator,
@@ -569,17 +432,12 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     warnings: string[],
     scope: MarketplaceScope
   ): Promise<ActivationOutcome> {
-    // Every known marketplace, never only the ones a plugin points at — declaring a
-    // marketplace and installing a plugin from it are two acts, and a person does the first
-    // alone all the time. This used to narrow to the plugins' own marketplaces for a tool
-    // that enables plugins through its CLI, on the reasoning that enabling teaches it the
-    // marketplace; a smoke run against the real `claude` binary measured the consequence —
-    // a project with two registered marketplaces and no plugin told it about neither.
-    // `execute` already returned early when `marketplaces` is empty (see above), so there
-    // is nothing left to guard here.
+    // Every known marketplace, never only the ones a plugin points at: declaring a marketplace
+    // and installing a plugin from it are two acts. Measured against the real `claude` binary —
+    // a project with two registered marketplaces and no plugin was told about neither.
     //
-    // Each step is independently best-effort: one failing plugin or marketplace
-    // must warn and let the others through, never abort the whole activation.
+    // Each step is independently best-effort: one failing plugin or marketplace must warn and
+    // let the others through, never abort the whole activation.
     const registeredMarketplaces: NativeMarketplaceRegistration[] = [];
     let buildFailed = false;
     for (const marketplace of marketplaces) {
@@ -615,18 +473,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     }
   }
 
-  /** The `<plugin>@<hostName>` refs this tool's own CLI is asked to enable — every
-   * recorded plugin whose marketplace this project still knows, and nothing else. Which
-   * marketplaces get registered is a separate question, answered by the registry itself.
-   *
-   * Keyed by `hostName`, not `plugin.marketplace` (aidd's own alias): this ref is a
-   * host-facing call (`claude plugin install <ref>`), and the host resolves the
-   * marketplace half of it against its own registry, which knows this catalog only by
-   * the name it declares itself — never by whatever local alias this project chose.
-   * `hostNameByAlias` carries one entry per marketplace `activateTool` iterated,
-   * `registerMarketplace`'s own alias fallback included, so the lookup below is
-   * defensive rather than a real gap — nothing in `marketplaces` is ever missing from
-   * it. */
+  /** Keyed by `hostName`, not `plugin.marketplace` (aidd's own alias): the host resolves the
+   * marketplace half of a ref against its own registry, which knows this catalog only by the
+   * name it declares itself. */
   private pluginRefsToEnable(
     toolId: ToolId,
     manifest: Manifest,
@@ -645,12 +494,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return refs;
   }
 
-  // Native tools must read the BUILT (transformed) tree, not the raw Claude-format
-  // source. Returns the name this project's own registration is actually known by once
-  // this call returns — always the host's own catalog name, never this project's local
-  // alias: a catalog this project just built and cannot read back is not registered at
-  // all (see the throw below), so by the time this returns, `hostName` is always a fact
-  // read from the catalog itself.
+  // Native tools must read the BUILT (transformed) tree, not the raw Claude-format source.
+  // Returns the host's own catalog name, never this project's local alias: a catalog this
+  // project just built and cannot read back is not registered at all (see the throw below).
   private async registerMarketplace(
     activator: NativePluginActivator,
     toolId: ToolId,
@@ -675,8 +521,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       projectRoot,
       warnings
     );
-    // A "skip" is a host already following a newer shared build than this run's own —
-    // registered, and never on this project's pre-migration cache, so it counts as such.
+    // A "skip" is a host already following a newer shared build, never this project's own
+    // pre-migration cache, so it counts as registered.
     if (decision === "skip") return { hostName, registered: true };
     try {
       activator.addMarketplace(builtDir, marketplace.scope);
@@ -688,54 +534,12 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * Refuses to drive `addMarketplace` where doing so would silently replace a
-   * *different catalog* a host's own registry already holds under this name —
-   * measured against the real `claude` binary: `plugin marketplace add` derives the
-   * registered name from the source's own catalog, never from an argument, and
-   * re-adding the same name from a different tree replaces `installLocation` with no
-   * prompt and no error.
-   *
-   * This project's own local alias for a marketplace is deliberately not compared
-   * against the catalog's own declared name here: a project choosing a local alias its
-   * catalog does not declare itself under is a supported capability (`smoke-tools.sh`'s
-   * own `local`/`scoped`/`userscoped` fixtures exercise exactly that), never a fault —
-   * the host registers, and this guard reads the host's registry, by the *catalog's*
-   * name throughout, never aidd's alias. See `native-registrations.ts` for where that
-   * distinction is carried forward into what this run records.
-   *
-   * Gated on `NativeActivation.marketplaceRegistry` being declared at all, which
-   * today only claude's profile does — codex refuses that re-add itself, copilot
-   * refuses every re-add — so this never reads a registry for either of them, and
-   * carries no `if (toolId === "claude")` anywhere to say so.
-   *
-   * Thrown rather than collected as a best-effort warning: a conflict is not a
-   * recoverable `NativePluginCliError`, and letting `addMarketplace` run anyway is
-   * exactly the silent overwrite this guard exists to stop.
-   *
-   * The registry lookup itself is `hostMarketplaceSourceConflict`, shared with
-   * `DoctorRegistrationUseCase`'s own `checkMarketplaceSources` pass — both key it by
-   * `requestedIdentity.name` alone, in the one place that keying happens, so the two
-   * cannot drift onto different keys.
-   *
-   * The host's registry already holding this name pointed at the *same* catalog
-   * reached through a different, resolved path (two projects, one shared build) is
-   * not a conflict either: only a genuinely different catalog under the same name
-   * refuses.
-   *
-   * A version/migration drift is decided first, from the path alone, the same
-   * context `doctor`'s own `checkMarketplaceSources` builds — computed for every
-   * `aidd-framework` entry regardless of its own recorded `scope`, since it is the
-   * rollback refusal itself that must hold on that state:
-   *
-   * - the host already follows a *newer* build of aidd's own shared source
-   *   (`version-behind`) — this run must never repoint it backward, so it writes
-   *   nothing and returns `"skip"`, warning rather than throwing: this is not this
-   *   project's fault, and every other tool this run touches must still proceed.
-   * - the host still points at this project's own pre-migration cache
-   *   (`unmigrated-project-source`) — this run's own build is the newer, shared
-   *   source, so it proceeds exactly as an unguarded call would: `addMarketplace`
-   *   moves the host onto it, which is the migration itself completing.
-   * - no drift at all — a genuine different-catalog conflict throws, as before.
+   * Refuses `addMarketplace` where it would silently replace a *different catalog* the host holds
+   * under this name — measured: claude derives the registered name from the source's own catalog
+   * and re-adds over it with no prompt and no error. A local alias differing from the catalog's
+   * declared name is supported and never compared here, and the same catalog reached through a
+   * differently resolved path is no conflict. A drift decides first: a host on a newer shared build
+   * returns `"skip"` and is never written backward, one on a pre-migration cache proceeds.
    */
   private async guardAgainstConflict(
     toolId: ToolId,
@@ -776,26 +580,11 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * The rollback refusal itself: a host already following a newer build never gets
-   * written backward. Warned, not thrown — this is not a bug in this project's own
-   * request, and a caller iterating several tools must still proceed to the rest.
-   *
-   * The one other drift `guardAgainstConflict` ever hands here, a host still tracking
-   * *another* project's own pre-migration cache, is not a refusal at all: this run's
-   * build is the shared source that other project has not migrated to yet, so
-   * `addMarketplace` below proceeds exactly as an unguarded call would (claude
-   * silently repoints, the migration itself completing) — the one thing this method
-   * adds for it is recording that other project's own claim on the shared source
-   * (`references.json`), alongside this project's own, since neither project has lost
-   * anything the host will still resolve for it. Never for `version-behind`: a rollback
-   * this run refuses to write is not a claim this run may extend into either.
-   *
-   * That other project's own root is recorded only once it is proven still to exist:
-   * `resolveProjectRootForReferences` falls back to the path as given on `ENOENT` so a
-   * later `clean` can still drop a reference to a project removed after the fact, but
-   * that fallback is not a reason to add one here — a root nobody can find any more
-   * would be recorded solely to be pruned again on the very next write, which grows
-   * `references.json` with a dead entry for no gain.
+   * A host already following a newer build is never written backward — warned, not thrown, so a
+   * caller iterating several tools still proceeds. A host tracking *another* project's
+   * pre-migration cache is no refusal: the repoint completes that migration and its claim is
+   * recorded alongside this project's, but only once that root is proven to still exist —
+   * `resolveProjectRootForReferences` falls back to the path as given on `ENOENT`.
    */
   private async decideOnDrift(
     toolId: ToolId,
@@ -820,32 +609,13 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return "skip";
   }
 
-  // `add` refused, which for a global registry means the name is already held. Whose
-  // it is decides what may be done: a registration that still resolves belongs to a
-  // project that is alive, and taking it would break that project — two projects would
-  // otherwise steal the name from each other on every sync, uninstalling each other's
-  // plugins. One whose source is gone belongs to nobody, and holding it hostage breaks
-  // every project that comes after.
-  //
-  // `hostName`, never `marketplace.name`, drives every one of the host-facing calls
-  // below: `registrationState`/`removeMarketplace` ask and act on the name the host's
-  // own CLI actually knows a registration by, which is the catalog's own declared name,
-  // not this project's local alias for it. Asking about the alias instead would answer
-  // "dead" for a perfectly live registration whenever the two differ, and then force-
-  // remove a name the host never held — exactly the bug this project's own
-  // `local`/`scoped`/`userscoped` smoke fixtures would have hit.
-  //
-  // A second, narrower door into the same reclaim: the reserved framework name, at
-  // its own shared (`"user"`) scope, on a tool `guardAgainstConflict` never even asked
-  // — codex declares no `sourceCheckVerb` at all (`registrationState` always answers
-  // `"unknown"`), copilot's own `sourceCheckVerb` answers `"live"` for any name that is
-  // simply registered, migrated or not — so the `!== "dead"` branch above never fires
-  // for either, and a project installed before the shared source existed would stay
-  // stuck on its own pre-migration registration forever. Safe specifically *because*
-  // it is this reserved name: every registration under it is this CLI's own packaged
-  // catalog, never a person's unrelated marketplace, so reclaiming it on any refusal
-  // — not only a proven-dead one — cannot take a name away from somebody else's
-  // project the way doing this for an arbitrary marketplace would.
+  // `add` refused, which for a global registry means the name is already held. A registration that
+  // still resolves belongs to a live project and taking it would break that project; one whose
+  // source is gone belongs to nobody. `hostName`, never `marketplace.name`, drives every host-facing
+  // call below: the alias would answer "dead" for a live registration whenever the two differ. The
+  // reserved framework name at `"user"` scope is reclaimed on any refusal, not only a proven-dead
+  // one — codex answers `"unknown"` for every name, copilot `"live"` — safe only because every
+  // registration under that name is this CLI's own packaged catalog.
   private reclaimOrReport(
     toolId: ToolId,
     activator: NativePluginActivator,
@@ -906,10 +676,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   /**
-   * Builds every known marketplace for this tool. The registration that points at those
-   * trees is written by the tool's own CLI, so nothing here needs the built paths back —
-   * but the build has to happen either way, including on a machine where that CLI is
-   * absent and activation stops short.
+   * The registration pointing at these trees is written by the tool's own CLI, so nothing here
+   * needs the built paths back — but the build has to happen either way, including on a machine
+   * where that CLI is absent and activation stops short.
    */
   private async buildAllForTool(
     toolId: ToolId,
@@ -951,10 +720,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return marketplaceChanged || pluginsChanged;
   }
 
-  // The marketplaces key names built trees by absolute path, so a profile may send it
-  // to a file of its own rather than the shared settings file. When it does, that file
-  // is written but never hashed: recording an absolute path in the manifest would make
-  // every other machine read as drift.
+  // The marketplaces key names built trees by absolute path, so a profile may send it to a file
+  // of its own. That file is written but never hashed: an absolute path recorded in the manifest
+  // would read as drift on every other machine.
   private async syncMarketplacesFile(
     toolId: ToolId,
     projectRoot: string,
@@ -962,16 +730,14 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     settings: MarketplaceSettings,
     marketplaces: readonly Marketplace[]
   ): Promise<boolean> {
-    // Building the tree is this CLI's job whoever registers it: a tool that is not
-    // installed today may be tomorrow, and the tree is what any registration points at.
-    // So build first, unconditionally, and leave the registration itself to the tool.
+    // Building the tree is this CLI's job whoever registers it: a tool that is not installed
+    // today may be tomorrow, and the tree is what any registration points at.
     await this.buildAllForTool(toolId, marketplaces, projectRoot);
     return this.evictMarketplacesFromSharedFile(toolId, projectRoot, manifest, settings);
   }
 
-  // An install made before the key moved left it in the shared, committed file, where
-  // it keeps an absolute path that is wrong for everyone but its author. Take it out
-  // and re-hash, so the move reaches projects that already exist.
+  // The key kept an absolute path in the shared, committed file, wrong for everyone but its
+  // author. Take it out and re-hash, so the move reaches projects that already exist.
   private async evictMarketplacesFromSharedFile(
     toolId: ToolId,
     projectRoot: string,
@@ -1044,10 +810,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return {};
   }
 
-  // These files are co-owned: the tool writes them too, and the machine-local one is
-  // untracked and gitignored, which is exactly the kind of file people hand-edit. A
-  // trailing comma must not take the whole sync down with it — start from empty and
-  // let the merge put back what belongs to this CLI.
+  // These files are co-owned and the machine-local one is untracked and gitignored, which is
+  // exactly the kind of file people hand-edit: a trailing comma must not take the whole sync
+  // down with it.
   private async loadSettings(absPath: string): Promise<Record<string, unknown>> {
     if (!(await this.fs.fileExists(absPath))) return {};
     const content = await this.fs.readFile(absPath);
@@ -1065,10 +830,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 }
 
-/** Whether two recorded registrations are the same fact, order included — both sides
- * are built from the same marketplace/plugin iteration order each run, so a real
- * difference is the only reason this returns false. Keeps a no-op sync from rewriting
- * the manifest on every run. */
+/** Order included: both sides are built from the same marketplace/plugin iteration order each
+ * run, so a difference is real. Keeps a no-op sync from rewriting the manifest. */
 function nativeRegistrationsEqual(
   a: NativeRegistrations | undefined,
   b: NativeRegistrations

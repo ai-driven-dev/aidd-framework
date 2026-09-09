@@ -2,10 +2,7 @@ import { FrameworkPlaceholderInPluginError } from "../../../kernel/errors.js";
 
 const TOOLS_PLACEHOLDER = "@{{TOOLS}}/";
 
-/**
- * Guards against @{{TOOLS}}/ references inside plugin content.
- * Used by all BuildOutputStrategy implementations.
- */
+/** Guards against `@{{TOOLS}}/` references inside plugin content. */
 export function assertNoToolsPlaceholder(
   content: string,
   pluginName: string,

@@ -1,8 +1,3 @@
-/**
- * Integration tests for per-tool flat hook config registration.
- * Covers claude, cursor, codex hook output shapes and codex no-install-hook leak.
- * Spec §Per-tool contract, AC 1-5, 7.
- */
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { JsonSchemaValidator } from "../../../../../src/contexts/tools/domain/ports/schema-validator.js";
@@ -20,9 +15,8 @@ import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-ad
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
-// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
-// drive-relative and prepends the current drive, so production's own resolve(outDir)
-// would otherwise write under a different key than this constant's raw string names.
+// resolve(), not the bare literal: on Windows a leading "/" is drive-relative, so
+// production's own resolve(outDir) would key the tree differently from this constant.
 const ABS_OUT = resolve("/tmp/aidd-flat-hooks-int-test");
 const PLUGIN = "aidd-test";
 // Avoid biome noTemplateCurlyInString
@@ -48,9 +42,8 @@ function makeOpencodeAssetProvider(): AssetProvider {
 }
 
 function makeIsDirectory(fs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
-  // listUnder() normalizes path before comparing; a hand-rolled prefix scan here would
-  // compare a native-separator outDir against the adapter's "/"-only keys and never match
-  // on Windows, where production's resolve(outDir) is backslash-joined.
+  // listUnder() normalizes the path first; a hand-rolled prefix scan would compare a
+  // native-separator outDir against the adapter's "/"-only keys and never match on Windows.
   return async (path: string): Promise<boolean> => {
     if (fs.has(path)) return false;
     return fs.listUnder(path).length > 0;
@@ -81,8 +74,6 @@ function makeStrategy(
   );
   return new FrameworkBuildUseCase(memFs, makeValidator(), makeAssetProvider(), logger, strategy);
 }
-
-// ── claude flat hooks ──────────────────────────────────────────────────────────
 
 describe("claude flat hooks", () => {
   let memFs: InMemoryFileAdapter;
@@ -140,8 +131,6 @@ describe("claude flat hooks", () => {
     expect(raw).toContain(`./.claude/hooks/${PLUGIN}/check.sh`);
   });
 });
-
-// ── cursor flat hooks ──────────────────────────────────────────────────────────
 
 describe("cursor flat hooks", () => {
   let memFs: InMemoryFileAdapter;
@@ -220,7 +209,6 @@ describe("cursor flat hooks", () => {
   });
 
   it("cursor hooks.json has no unresolved CLAUDE_PLUGIN_ROOT", async () => {
-    // Override fixture with a SessionStart event for a real end-to-end path check
     memFs.setFile(
       `${FIXTURE_DIR}/plugins/${PLUGIN}/hooks/hooks.json`,
       JSON.stringify({
@@ -242,8 +230,6 @@ describe("cursor flat hooks", () => {
   });
 });
 
-// ── copilot flat hooks (shape) ─────────────────────────────────────────────────
-
 describe("copilot flat hooks shape", () => {
   let memFs: InMemoryFileAdapter;
 
@@ -262,7 +248,6 @@ describe("copilot flat hooks shape", () => {
     };
     expect(parsed.version).toBe(1);
     const entries = parsed.hooks?.PreToolUse ?? [];
-    // Each entry must be {type, command} directly — no nested {hooks:[...]} wrapper
     for (const entry of entries) {
       expect(entry).not.toHaveProperty("hooks");
       expect(entry).toHaveProperty("type");
@@ -270,8 +255,6 @@ describe("copilot flat hooks shape", () => {
     }
   });
 });
-
-// ── codex flat hooks ───────────────────────────────────────────────────────────
 
 describe("codex flat hooks (no install-hook leak)", () => {
   let memFs: InMemoryFileAdapter;
@@ -316,17 +299,6 @@ describe("codex flat hooks (no install-hook leak)", () => {
   });
 });
 
-// ── opencode flat hooks ─────────────────────────────────────────────────────────
-
-// Regression coverage for the route `aidd setup --ai opencode` and
-// `aidd framework build --target opencode --flat` both drive (finding #1): before this
-// fix `buildOpencodeFlatContract` declared `hooks: { supported: false }` regardless of
-// opencode.ts's own `acceptsHooks: true`, so neither route delivered a plugin's hook
-// script, and both warned hooks were skipped.
-//
-// Lot A (opencode-and-scope.md): a plain hook script no longer lands under
-// .opencode/plugin/, the directory OpenCode's own loader imports in-process — it
-// killed the host there. It is namespaced under .opencode/hooks/<plugin>/ instead.
 describe("opencode flat hooks", () => {
   let memFs: InMemoryFileAdapter;
   let logger: CapturingLogger;

@@ -1,11 +1,9 @@
 import { ManifestValidationError } from "./errors.js";
 import type { MergeStrategy } from "./merge.js";
 
-// Where a file's own emptiness is marked; kernel vocabulary because `removeRedundantGitkeeps`
-// below reasons about it independently of any context's directory conventions.
+// Kernel vocabulary because `removeRedundantGitkeeps` below reasons about it independently
+// of any context's directory conventions.
 export const GITKEEP_FILE = ".gitkeep";
-
-// ── FileHash ──────────────────────────────────────────────────────────────────
 
 const MD5_PATTERN = /^[0-9a-f]{32}$/;
 
@@ -25,8 +23,6 @@ export class FileHash {
     return this.value === other.value;
   }
 }
-
-// ── InstallationFile ──────────────────────────────────────────────────────────
 
 export class InstallationFile {
   readonly relativePath: string;

@@ -1,11 +1,3 @@
-/**
- * What `aidd auth login` and `aidd auth status` do, at the seam where a credential is
- * verified and recorded.
- *
- * `logout` is pinned by `auth-logout-use-case.integration.test.ts`; this file covers the
- * two paths that had no test executing them at all — every mutant in `login`, `status` and
- * `verifyConfig` was reported `NoCoverage`.
- */
 import { describe, expect, it } from "vitest";
 import { AuthenticationError } from "../../../src/kernel/errors.js";
 import type { AuthConfig } from "../../../src/runtime/auth/auth.js";

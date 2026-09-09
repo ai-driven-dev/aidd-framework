@@ -223,7 +223,7 @@ describe("PluginAddUseCase", () => {
       it("fetches and materializes flat files", async () => {
         const deps = await buildUnitDeps(PROJECT_ROOT);
         await initAndInstall(deps, PROJECT_ROOT, "opencode");
-        // OpenCode now copies its per-target flat BUILT tree (skills nested under
+        // OpenCode copies its per-target flat BUILT tree (skills nested under
         // <plugin>/, agents namespaced <plugin>-<name>).
         deps.fs.setFile(
           "/built/opencode/.opencode/skills/sample-plugin/demo/SKILL.md",
@@ -268,7 +268,7 @@ describe("PluginAddUseCase", () => {
         deps.pluginFetcher.register(GIT_SUBDIR_SOURCE, PLUGIN_FIXTURE);
         const registry = await makeGithubRegistry(PROJECT_ROOT);
         const fetchSpy = vi.spyOn(deps.pluginFetcher, "fetch");
-        // Cursor now copies the per-target BUILT tree verbatim; seed it.
+        // Cursor copies the per-target BUILT tree verbatim; seed it.
         deps.fs.setFile("/built/cursor/plugins/sample-plugin/skills/demo/SKILL.md", "# Demo skill");
         const useCase = new PluginAddUseCase(
           deps.fs,
@@ -469,7 +469,7 @@ describe("PluginAddUseCase", () => {
       it("materializes flat files even when source is local marketplace", async () => {
         const deps = await buildUnitDeps(PROJECT_ROOT);
         await initAndInstall(deps, PROJECT_ROOT, "opencode");
-        // OpenCode now copies its per-target flat BUILT tree (skills nested under
+        // OpenCode copies its per-target flat BUILT tree (skills nested under
         // <plugin>/, agents namespaced <plugin>-<name>).
         deps.fs.setFile(
           "/built/opencode/.opencode/skills/sample-plugin/demo/SKILL.md",
@@ -516,10 +516,8 @@ describe("PluginAddUseCase", () => {
 
   describe("zero-files guard regression (Blocker 2)", () => {
     it("native tool + local source + marketplace + zero-translation distribution → manifest entry NOT added", async () => {
-      // Regression: on main, if translateWithComponentPaths yields zero files the plugin is
-      // NOT added to the manifest. Before this fix, ModeAMarketplaceTranslator bypassed the guard.
-      // A distribution with no recognized manifest path produces zero translated files for
-      // any native tool (findSourceManifestContent returns null, no component files → files=[]).
+      // A distribution with no recognized manifest path produces zero translated files for a
+      // native tool, and a plugin with zero files is never added to the manifest.
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "claude");
       const zeroFilesReader: PluginDistributionReader = {

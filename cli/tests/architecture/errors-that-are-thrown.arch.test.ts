@@ -1,18 +1,7 @@
 /**
- * Every error the catalog declares is thrown somewhere.
- *
- * `kernel/errors.ts` is one catalog for the whole codebase, which is what makes it easy to
- * read and easy to rot: a class outlives the code that threw it, and nothing complains. Five
- * did. Three had never been thrown in this repository's history; two were orphaned by a
- * deliberate feature removal and stayed behind, one of them still telling users to
- * "Use 'ai' or 'ide'" — commands that no longer exist.
- *
- * `knip --production` cannot see this: it reports an export unused only when no file imports
- * it, and these were imported by their own tests. A test asserting `new SomeError().name` is
- * not a caller; it is the catalog testing itself.
- *
- * The baseline is empty and must stay that way. An error with no thrower is either a missing
- * code path or a leftover, and both are worth stopping for.
+ * One catalog for the whole codebase is easy to read and easy to rot: a class outlives the
+ * code that threw it and nothing complains. knip cannot see it — an error imported by its own
+ * test reads as used, and a test asserting `new SomeError().name` is not a caller.
  */
 import { describe, expect, it } from "vitest";
 import { expectRatchet, read, sourceFiles } from "./helpers.js";
@@ -25,7 +14,6 @@ function declaredErrors(): string[] {
   );
 }
 
-/** Class names appearing after `throw new`, anywhere but the catalog itself. */
 function thrownErrors(files: readonly string[]): Set<string> {
   const thrown = new Set<string>();
   for (const file of files) {
@@ -36,14 +24,13 @@ function thrownErrors(files: readonly string[]): Set<string> {
   return thrown;
 }
 
-/** Errors declared in the catalog that no production file throws. */
+/** Empty and staying so: an error with no thrower is a missing code path or a leftover. */
 const BASELINE: string[] = [];
 
 describe("the error catalog carries no class nothing throws", () => {
   it("every declared error is thrown by some production file", () => {
-    // The catalog is excluded: a class testing its own name in an assertion is not a
-    // caller, and neither is a throw sitting inside the catalog's own file — that would
-    // let a class outlive every real thrower as long as it still mentions itself once.
+    // The catalog is excluded: a throw inside it would let a class outlive every real
+    // thrower as long as it mentions itself once.
     const thrown = thrownErrors(sourceFiles().filter((file) => file !== CATALOG));
     const orphans = declaredErrors()
       .filter((name) => !thrown.has(name))

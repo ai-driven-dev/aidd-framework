@@ -1,20 +1,7 @@
 /**
- * Every command the documentation presents as available must exist.
- *
- * `ARCHITECTURE.md` announced `aidd sync` in its command surface long before any such
- * command was declared. A reader cannot tell a promise from a fact; this test can.
- *
- * Naming a command in order to say it is gone is not a lie. A citation is therefore
- * accepted when its line marks it as removed, denies its existence, or is a migration
- * table row mapping an old command to its replacement. That keeps the check honest
- * without a name allowlist going stale the day a command comes back.
- *
- * Checking pairs, not just the first word, is what makes this test worth having: reading
- * only the first word after `aidd` cleared `aidd plugin bogus` outright, because `plugin`
- * is a real command group and `bogus` was never looked at. `declaredCommands()` and
- * `unresolvedCommandMentions()` are shared with `errors-that-instruct.arch.test.ts`, which
- * checks the same property for an error message instead of a document — one extractor, one
- * pair-aware check, used by both.
+ * A reader cannot tell a promised command from a declared one; this test can. Naming a command
+ * in order to say it is gone is not a lie, so a citation is accepted when its line marks it
+ * removed or is a migration row — which keeps the check honest without a name allowlist.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -25,12 +12,8 @@ import {
   unresolvedCommandMentions,
 } from "./helpers.js";
 
-/**
- * Documents that present the CLI's surface to a reader.
- *
- * The memory bank was outside this scope for one phase and it is the document an agent reads
- * first, in every session. `GUIDELINES.md` names the commands a contributor runs.
- */
+/** Documents that present the CLI's surface to a reader — the memory bank included, since an
+ * agent reads it first in every session. */
 const DOCS = [
   "ARCHITECTURE.md",
   "README.md",
@@ -48,16 +31,9 @@ function isMigrationRow(line: string): boolean {
 }
 
 /**
- * Strips every paragraph that talks about a command's history rather than claims it works
- * today, so the mentions that remain are exactly the ones this rule may hold to account.
- *
- * `MARKED_GONE` is checked against the whole paragraph, unwrapped to one line first:
- * markdown wraps prose at a column width, so a sentence's citation and the word that marks
- * it gone can land on different physical lines — "you ran `aidd telemetry endpoint` on an
- * older version, that is a fact ... this plugin can no longer see" wrapped exactly that way,
- * and a per-line check cleared the citation while missing "no longer" one line down. A
- * migration table row is still read one line at a time: a row is genuinely one line, and a
- * whole table has no blank line between its rows to unwrap.
+ * `MARKED_GONE` is checked against a whole paragraph unwrapped to one line: markdown wraps
+ * prose, so a citation and the word marking it gone can land on different physical lines. A
+ * migration row is still read one line at a time, a table having no blank line to unwrap at.
  */
 function textClaimingCommandsWork(text: string): string {
   const paragraphs = text.split(/\n\s*\n/);
@@ -74,7 +50,6 @@ function textClaimingCommandsWork(text: string): string {
   return kept.join("\n\n");
 }
 
-/** Which commands a document cites as available today that the CLI does not declare. */
 function undeclaredCommands(text: string, declared: ReadonlySet<string>): string[] {
   return [...new Set(unresolvedCommandMentions(textClaimingCommandsWork(text), declared))].sort();
 }
@@ -98,8 +73,7 @@ describe("documented commands exist", () => {
     expect(undeclaredCommands("Run `aidd bogus-command` to do it.", knownCommands)).toEqual([
       "bogus-command",
     ]);
-    // `plugin` exists; `plugin bogus` does not. Reading only the first word after `aidd`
-    // would clear this, and that is exactly how it shipped wrong.
+    // `plugin` exists; `plugin bogus` does not, and reading only the first word clears it.
     expect(undeclaredCommands("Run `aidd plugin bogus` to do it.", knownCommands)).toEqual([
       "plugin bogus",
     ]);

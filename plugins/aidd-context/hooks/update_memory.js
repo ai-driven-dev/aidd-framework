@@ -1,56 +1,31 @@
 #!/usr/bin/env node
 /**
- * update_memory.js - Syncs the project memory block in AI context files.
+ * Syncs the project memory block in a project's AI context files: root memory files as
+ * always-loaded references, `internal/` and `external/` as a read-on-demand list.
  *
- * Scans aidd_docs/memory/ and updates the block delimited by
- * <!-- aidd_project_memory:start --> / <!-- aidd_project_memory:end --> in each
- * context file with two tiers:
- *   - Root memory files       -> always loaded, via a tool-appropriate reference.
- *   - internal/ and external/ -> listed (plain paths, no @), read on demand.
+ * Only Claude Code resolves the `@` import form, so AGENTS.md and the copilot instructions
+ * take a markdown link, where an `@` line would be inert text loading nothing.
  *
- * Reference syntax for the always-loaded tier:
- *   CLAUDE.md                    -> @aidd_docs/memory/file.md
- *   AGENTS.md                    -> [aidd_docs/memory/file.md](aidd_docs/memory/file.md)
- *   .github/copilot-instructions -> [aidd_docs/memory/file.md](../aidd_docs/memory/file.md)
- *
- * Only Claude Code resolves the @ import form. The tools reading AGENTS.md
- * (codex, cursor, opencode) do not, so an @ line there was inert text; a link
- * is at least navigable.
- *
- * Usage:
- *   node update_memory.js                  every context file already present
- *   node update_memory.js claude codex     only those tools' context files
- *
- * The auto hook calls it with no argument. The project-memory skill passes the
- * tools the user picked, so a context file the user did not choose is left
- * alone even when it exists.
- *
- * It only ever fills a block that is already there. Creating the file, or the
- * block inside it, is the skill's job.
+ * With no argument it fills every context file present; named tools narrow it, so a file the
+ * user never picked keeps its block untouched. It only ever fills a block already there.
  */
-
-// ── Constants ─────────────────────────────────────────────────────
 
 const DOCS_DIR = "aidd_docs";
 const MEMORY_SUBDIR = "memory";
 const ON_DEMAND_DIRS = ["internal", "external"];
-// HTML comment markers, not a bare <aidd_project_memory> tag. A line opening a
-// bare tag starts an HTML block that runs to the next blank line, and an @import
-// inside one is skipped by the context loader exactly like a fenced code block,
-// so the memory silently never loads. A comment closes on its own line.
+// Comment markers, not a bare tag: a bare tag opens an HTML block running to the next blank
+// line, and a context loader skips an @import inside one, so the memory never loads.
 const BLOCK_OPEN = "<!-- aidd_project_memory:start -->";
 const BLOCK_CLOSE = "<!-- aidd_project_memory:end -->";
 
-// The shape written before the markers above. Blocks already in a user's context
-// file are rewritten to the new markers on the next run; without that they stop
-// matching, the file is skipped with no output, and the memory stays unloaded.
+// A block written with these is rewritten on the next run: unmigrated, it stops matching and
+// the file is skipped with no output at all.
 const LEGACY_BLOCK_OPEN = "<aidd_project_memory>";
 const LEGACY_BLOCK_CLOSE = "</aidd_project_memory>";
 const ON_DEMAND_NOTE = "<!-- read on demand, not auto-loaded -->";
 const EXCLUDED_FILES = new Set([".gitkeep", "README.md"]);
 
-// Human-facing index of the memory bank. The hook refreshes the list between
-// these markers; everything else in the file is hand-written and preserved.
+// The list between these markers is refreshed; the rest of the file is hand-written.
 const MEMORY_README = "README.md";
 const TOC_OPEN = "<!-- files:start -->";
 const TOC_CLOSE = "<!-- files:end -->";
@@ -61,7 +36,7 @@ const TARGET_FILES = [
   { path: ".github/copilot-instructions.md", syntax: "link" },
 ];
 
-// Which context file each tool reads. Mirrors the skill's references/tools.md.
+// Mirrors the skill's references/tools.md.
 const TOOL_FILES = {
   claude: "CLAUDE.md",
   codex: "AGENTS.md",
@@ -70,15 +45,12 @@ const TOOL_FILES = {
   copilot: ".github/copilot-instructions.md",
 };
 
-// ── Helpers ───────────────────────────────────────────────────────
-
 function memoryPath(path, ...parts) {
   return path.join(DOCS_DIR, MEMORY_SUBDIR, ...parts);
 }
 
-// Read a file's text, or null if it does not exist. Opening directly (instead
-// of an existsSync check first) avoids a time-of-check/time-of-use race: the
-// file is touched exactly once. Real errors (permissions, etc.) still throw.
+// Opening directly rather than checking existence first touches the file once, so no
+// time-of-check/time-of-use race. A real error still throws.
 function readTextOrNull(fs, filePath) {
   try {
     return fs.readFileSync(filePath, "utf8");
@@ -88,8 +60,7 @@ function readTextOrNull(fs, filePath) {
   }
 }
 
-// List a directory, or [] if it does not exist. Same single-touch rationale as
-// readTextOrNull: no separate existence check before reading.
+// Single-touch, like readTextOrNull: no existence check before reading.
 function readDirOrEmpty(fs, dir) {
   try {
     return fs.readdirSync(dir, { withFileTypes: true });
@@ -99,7 +70,6 @@ function readDirOrEmpty(fs, dir) {
   }
 }
 
-// Top-level .md at the root of memory/ (always-loaded tier).
 function scanRootFiles(fs, path) {
   return readDirOrEmpty(fs, memoryPath(path))
     .filter((e) => e.isFile() && e.name.endsWith(".md") && !EXCLUDED_FILES.has(e.name))
@@ -107,7 +77,6 @@ function scanRootFiles(fs, path) {
     .sort();
 }
 
-// .md under memory/<sub>/ recursively (on-demand tier).
 function scanSubdir(fs, path, sub) {
   const out = [];
   const walk = (dir) => {
@@ -121,11 +90,9 @@ function scanSubdir(fs, path, sub) {
   return out.sort();
 }
 
-// A markdown link resolves against the file holding it, so it has to climb back
-// out of whatever directory that file sits in. Derived from the target's own
-// depth rather than hardcoded: a root-level AGENTS.md needs no prefix, while
-// .github/copilot-instructions.md needs one "../". Hardcoding one level made
-// every root-level link point outside the repository.
+// A markdown link resolves against the file holding it, so it climbs out of that file's own
+// directory. Derived from the target's depth: hardcoding one level made every root-level
+// link point outside the repository.
 function relativePrefix(targetPath) {
   return "../".repeat(targetPath.split("/").length - 1);
 }
@@ -143,17 +110,13 @@ function buildBlockContent(rootFiles, onDemandFiles, syntax, prefix = "") {
     for (const f of onDemandFiles) lines.push(`- ${f.replace(/\\/g, "/")}`);
   }
   if (lines.length === 0) return "\n";
-  // Blank line on each side of the content. The markers are comments, which
-  // close on their own line, but a context loader that treats any line opening
-  // with `<` as an HTML block running to the next blank line would otherwise
-  // swallow the imports. The blank lines hold under either reading.
+  // A blank line on each side: a context loader treating any `<` line as an HTML block
+  // running to the next blank line would otherwise swallow the imports.
   return `\n\n${lines.join("\n")}\n\n`;
 }
 
-// The real block is the one whose markers each own their line, outside any code
-// fence. Substring search is not enough: these markers are the strings every
-// upgrade note and migration doc quotes, and cutting on a quoted one would
-// mangle that prose while leaving the real block untouched and unloaded.
+// Markers that each own their line, outside any code fence. Substring search would cut on
+// the quoted marker every upgrade note carries, mangling prose and missing the real block.
 function findBlockLines(lines, open, close) {
   let fence = null;
   let openLine = -1;
@@ -179,7 +142,6 @@ function findBlockLines(lines, open, close) {
   return null;
 }
 
-// Replace the text between an open and close marker, leaving the rest intact.
 function updateMarkers(content, open, close, innerContent) {
   const lines = content.split("\n");
   const found = findBlockLines(lines, open, close);
@@ -192,7 +154,6 @@ function updateMarkers(content, open, close, innerContent) {
   );
 }
 
-// Rewrite a legacy <aidd_project_memory> block to the comment markers.
 function migrateLegacyMarkers(content) {
   const lines = content.split("\n");
   const found = findBlockLines(lines, LEGACY_BLOCK_OPEN, LEGACY_BLOCK_CLOSE);
@@ -203,8 +164,8 @@ function migrateLegacyMarkers(content) {
   return lines.join("\n");
 }
 
-// A file carrying one marker without its pair can never be filled again. Say so:
-// silence about a block that does not sync is what kept the memory unloaded.
+// One marker without its pair can never be filled again, and silence about a block that
+// does not sync is what keeps memory unloaded.
 function reportUnpairedMarkers(filePath, content) {
   const has = (marker) => content.includes(marker);
   const unpaired =
@@ -226,7 +187,6 @@ function memoryRelative(path, filePath) {
   return filePath.replace(/\\/g, "/").replace(`${memoryPath(path)}/`, "");
 }
 
-// Human-facing TOC of the memory bank, grouped by load tier.
 function buildToc(rootFiles, onDemandFiles, path) {
   const link = (f) => {
     const rel = memoryRelative(path, f);
@@ -240,9 +200,8 @@ function buildToc(rootFiles, onDemandFiles, path) {
   return `\n${lines.join("\n")}\n`;
 }
 
-// The context files to fill. No tool named: every target already present, which
-// is what the auto hook wants. Tools named: only theirs, so an AGENTS.md the
-// user never picked keeps its block untouched.
+// No tool named means every target present, which is what the auto hook wants; tools named
+// means only theirs.
 function resolveTargets(tools) {
   if (tools.length === 0) return TARGET_FILES;
 
@@ -267,20 +226,16 @@ function gitAdd(childProcess, files) {
   }
 }
 
-// ── Main ──────────────────────────────────────────────────────────
-
-// Runs as a script, never imported: no require, no module.exports, and every
-// dependency pulled in with dynamic import(). The file is copied into the user's
-// project by the CLI, so a project declaring "type": "module" decides how it is
-// parsed. CommonJS syntax here would crash the hook on load in any such project.
+// Runs as a script, never imported, with every dependency pulled in through dynamic
+// import(): the file is copied into a user's project, so a project declaring
+// "type": "module" decides how it is parsed and CommonJS syntax would crash it on load.
 (async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
   const childProcess = await import("node:child_process");
 
-  // Every path below is project-relative, so anchor on the project root when
-  // Claude Code names it. Without this a run started elsewhere finds no bank
-  // and exits 0, which reads as success.
+  // Every path below is project-relative: without this anchor a run started elsewhere finds
+  // no bank and exits 0, which reads as success.
   const root = process.env.CLAUDE_PROJECT_DIR;
   if (root && fs.existsSync(root)) process.chdir(root);
 
@@ -304,9 +259,8 @@ function gitAdd(childProcess, files) {
       target.syntax,
       relativePrefix(target.path),
     );
-    // Compare against what is on disk, not against the migrated text: a file
-    // whose memory list is unchanged would otherwise look identical and skip
-    // the write, leaving the legacy markers in place forever.
+    // Compared against what is on disk, not against the migrated text: an unchanged memory
+    // list would otherwise skip the write and leave the old markers in place forever.
     const updated = updateBlock(migrateLegacyMarkers(original), innerContent);
 
     if (updated === null) {
@@ -319,7 +273,7 @@ function gitAdd(childProcess, files) {
     changed.push(target.path);
   }
 
-  // Refresh the human-facing TOC in memory/README.md, only if it opts in with markers.
+  // Only if the README opts in with its own markers.
   const readmePath = memoryPath(path, MEMORY_README);
   const readmeOriginal = readTextOrNull(fs, readmePath);
   if (readmeOriginal !== null) {
@@ -331,14 +285,11 @@ function gitAdd(childProcess, files) {
     }
   }
 
-  // Stage only when running as the auto hook, which owns no other change. Called
-  // by the skill, generate has just written files this script knows nothing about,
-  // so staging its own two would leave a partial index that reads like the whole
-  // change. The skill reports instead, and the user stages what they mean to commit.
+  // Only as the auto hook, which owns no other change: called by the skill, staging its own
+  // two files would leave a partial index that reads like the whole change.
   if (changed.length > 0 && tools.length === 0) gitAdd(childProcess, changed);
 
-  // Only when tools were named, which means the skill called us and its sync
-  // action stops on a non-zero exit. The auto hook must never fail a session
-  // start over a file the user has yet to repair.
+  // Only when tools were named, so the skill's sync action can stop: the auto hook must
+  // never fail a session start over a file the user has yet to repair.
   if (unpaired && tools.length > 0) process.exit(1);
 })();

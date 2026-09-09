@@ -17,10 +17,8 @@ const SESSION_FIXTURE = join(
   "claude-code-session-start.json"
 );
 
-// Every other test runs the journal hook from the source tree. Installation moves it, and
-// a move that drops hooks/lib/ leaves a hook that throws on its first require — silently,
-// since a hook that fails is a hook that never records. Only running the installed copy
-// catches that.
+// Installation moves the journal hook, and a move dropping `hooks/lib/` leaves one that
+// throws on its first require - silently, since a hook that fails never records.
 describe("E2E: the journal hook runs from where installation puts it", () => {
   it("records a session through the installed plugin, not the source tree", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-hook-install");

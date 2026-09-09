@@ -77,9 +77,8 @@ describe("DoctorRegistrationUseCase", () => {
     expect(issues[0].severity).toBe("warning");
   });
 
-  // The registration is written by the tool itself, so it cannot exist while the tool
-  // does not. Reporting it missing then would be reporting that something uninstalled
-  // is unconfigured.
+  // The registration is written by the tool itself, so it cannot exist while the tool does not:
+  // reporting it missing would be reporting that something uninstalled is unconfigured.
   it("says nothing about a tool whose binary is out of reach", async () => {
     expect(await issuesFor(null, "claude", false)).toEqual([]);
   });
@@ -88,9 +87,8 @@ describe("DoctorRegistrationUseCase", () => {
     expect(await issuesFor(null, "cursor")).toEqual([]);
   });
 
-  // Copilot declares no place at all rather than a path, and `null` once slipped past
-  // a guard that only rejected `undefined` — straight into `join(root, null)`, which
-  // threw and took `plugin doctor` down with it. Caught by the smoke suite.
+  // Copilot declares no place at all rather than a path, and a guard rejecting only `undefined`
+  // lets `null` reach `join(root, null)`, which throws and takes `plugin doctor` down.
   it("stays silent, and does not throw, for a tool that declares no place at all", async () => {
     await expect(issuesFor(null, "copilot")).resolves.toEqual([]);
   });
@@ -210,9 +208,8 @@ describe("DoctorRegistrationUseCase — native registrations against the host's 
     expect(issues[0].message).toContain("ENOENT");
   });
 
-  // `nativeRegistrations.marketplaces` names a marketplace the host registered with no
-  // plugin behind it — §2.2b's own justification for the field. Nothing here can be
-  // asked about a marketplace on its own, so this must stay silent, not invent a ref.
+  // `nativeRegistrations.marketplaces` names a marketplace the host registered with no plugin
+  // behind it, and nothing here can be asked about one alone, so this stays silent.
   it("says nothing for a registered marketplace with no plugin ref to check", async () => {
     const issues = await nativeIssuesFor(
       manifestWithNativeRegistrations(

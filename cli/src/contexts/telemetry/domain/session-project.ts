@@ -1,9 +1,7 @@
 import type { RunJournal } from "./ports/run-journal-reader.js";
 
-/** Which of `session_start`'s two fields named the project. The same reason
- * `vendor_field` exists on the identifier: `project_id` alone is a directory name that
- * collides across machines, `project_remote` is absent without a remote, and a consumer
- * has to be able to tell which one it got. */
+/** Which of `session_start`'s two fields named the project: `project_id` is a directory name
+ * that collides across machines, so a consumer has to be told which one it got. */
 export type ProjectField = "project_id" | "project_remote";
 
 export interface SessionProject {
@@ -11,15 +9,8 @@ export interface SessionProject {
   readonly projectField: ProjectField;
 }
 
-/**
- * The project a journalled session ran in, one hop past `session_start` — which already
- * resolved both fields and stops there. `project_remote` wins when present: it is the
- * same value for every checkout of one repository, where `project_id` alone falls back to
- * a directory name that does not carry that guarantee.
- *
- * A journal with no session, or a session naming neither field, answers `null` — no
- * project is the honest reading, never a guess at the caller's own repository.
- */
+/** `project_remote` wins when present: one value for every checkout of a repository, where
+ * `project_id` carries no such guarantee. Neither field named answers `null`, never a guess. */
 export function resolveSessionProject(journal: RunJournal | null): SessionProject | null {
   const session = journal?.session;
   if (!session) return null;

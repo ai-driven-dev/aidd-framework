@@ -8,23 +8,20 @@ export interface NativePluginCliShape {
   readonly sourceCheckVerb?: string;
   readonly upgradeVerb?: string;
   readonly enableVerb?: string;
-  /** How the tool spells removing a plugin it installed: `remove` for codex, `uninstall`
-   * for claude and copilot. Absent for a tool whose plugins this CLI enables through a
-   * file it writes — there is nothing to ask the tool to undo. */
+  /** How the tool spells removing a plugin it installed: `remove` for codex, `uninstall` for
+   * claude and copilot. Absent where this CLI enables plugins through a file it writes. */
   readonly disableVerb?: string;
   /** Arguments every `plugin <verb> <ref>` call carries, after the reference. Claude needs
-   * `--yes` on both install and uninstall: `--yes` gates a prune confirmation the call never
-   * requests, but a headless stdin has no terminal to answer any prompt at all. */
+   * `--yes`: a headless stdin cannot answer its prune confirmation. */
   readonly pluginArgs?: readonly string[];
 }
 
 /**
- * Drives a tool's own plugin CLI. Everything that differs between tools comes from the
- * tool's profile, so supporting one more is a profile entry rather than another
- * subclass — and no tool name is written outside its profile.
- *
- * A tool that enables plugins through a file this CLI writes declares no verbs. It
- * still registers its marketplaces here, because that it does better.
+ * Drives a tool's own plugin CLI. Everything that differs between tools comes from the tool's
+ * profile, so supporting one more is a profile entry rather than another subclass, and no tool
+ * name is written outside its profile. A tool that enables plugins through a file this CLI
+ * writes declares no verbs; it still registers its marketplaces here, because that it does
+ * better.
  */
 export class NativePluginCliAdapter extends AbstractNativePluginCliAdapter {
   constructor(
@@ -38,10 +35,8 @@ export class NativePluginCliAdapter extends AbstractNativePluginCliAdapter {
     return this.shape.enableVerb !== undefined;
   }
 
-  /**
-   * A tool that cannot tell a dead registration from a live one answers `"unknown"`,
-   * which keeps callers from taking over a name that may belong to a live project.
-   */
+  /** A tool that cannot tell a dead registration from a live one answers `"unknown"`, which
+   * keeps callers from taking over a name that may belong to a live project. */
   registrationState(name: string): "live" | "dead" | "unknown" {
     const verb = this.shape.sourceCheckVerb;
     if (verb === undefined) return "unknown";
@@ -63,11 +58,9 @@ export class NativePluginCliAdapter extends AbstractNativePluginCliAdapter {
     );
   }
 
-  /**
-   * Undoes what `enablePlugin` did. The same trailing arguments travel here on purpose: a
+  /** Undoes what `enablePlugin` did. `scope` must match what `enablePlugin` was called with: a
    * tool that installed at one scope and uninstalls at its default would silently miss the
-   * entry it wrote — `scope` must match what `enablePlugin` was called with.
-   */
+   * entry it wrote. */
   uninstallPlugin(pluginRef: string, scope: MarketplaceScope = "project"): void {
     const verb = this.shape.disableVerb;
     if (verb === undefined) return;

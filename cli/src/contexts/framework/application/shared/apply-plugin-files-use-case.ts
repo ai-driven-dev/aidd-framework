@@ -31,7 +31,7 @@ interface ApplyPluginFilesOptions {
   fileFilter?: ((relativePath: string) => boolean) | null;
 }
 
-/** Optional deps that let restore re-materialize via the build pipeline (parity with install). */
+/** Optional deps that let restore re-materialize through the build pipeline, as install does. */
 export interface BuiltMaterializationDeps {
   ensureBuilt: EnsureBuiltMarketplace;
   marketplaceRegistry: MarketplaceRegistry;
@@ -78,10 +78,9 @@ export class ApplyPluginFilesUseCase {
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, projectRoot, manifest } = options;
-    // Mode A never materializes files, so any manifest-tracked path here is a leftover
-    // from a run before that was true (see plugin-update-use-case.ts's unconditional
-    // equivalent). Scoped to the manifest's own keys under the plugin's base dir — never
-    // a directory scan — so it cannot touch files the plugin never wrote.
+    // Mode A never materializes files, so any manifest-tracked path here is a leftover from a run
+    // before that was true. Scoped to the manifest's own keys under the plugin's base dir — never a
+    // directory scan — so it cannot touch files the plugin never wrote.
     if (translator.mode === "marketplace" && this.builtDeps !== undefined) {
       const baseDir = resolveBaseDirFromRecord(
         plugin.scope,

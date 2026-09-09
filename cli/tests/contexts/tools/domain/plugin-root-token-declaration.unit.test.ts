@@ -13,12 +13,9 @@ import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import type { PluginsCapability } from "../../../../src/contexts/tools/domain/capabilities/plugins-capability.js";
 import { getAiToolConfig } from "../../../../src/contexts/tools/domain/registry.js";
 
-/**
- * A hook whose command names a variable the host does not expand installs cleanly, runs on
- * every event, and silently does nothing. That is how it went unnoticed on three tools, so
- * the variable each one expands is declared beside the rest of what that tool supports —
- * and these hold the two install routes to that single declaration.
- */
+/** A hook whose command names a variable the host does not expand installs cleanly, runs on
+ * every event, and silently does nothing, so the variable each tool expands is declared beside
+ * the rest of what that tool supports. These hold the two install routes to that declaration. */
 
 const CONTRACTS: ReadonlyArray<[AiToolId, () => { pluginRootToken?: string | null }]> = [
   ["claude", buildClaudeContract],
@@ -57,8 +54,8 @@ describe("which variable a tool expands to its installed plugin's directory", ()
     expect(examined).not.toBe(0);
   });
 
-  // The state this ticket existed to remove: a tool that declares the variable it expands
-  // and still does not receive the hooks that would use it.
+  // A tool that declares the variable it expands and still does not receive the hooks that would
+  // use it is the state this forbids.
   it("pairs the declaration with actually receiving hooks", () => {
     let examined = 0;
     for (const tool of AI_TOOL_IDS) {

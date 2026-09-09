@@ -1,21 +1,5 @@
-/**
- * `clean` must not disable a plugin another project on this machine still needs.
- *
- * At a host that enables a plugin machine-wide (no `NativeActivation.scopeArgs` —
- * codex, copilot), one project's own `clean` used to uninstall every ref it recorded
- * regardless of who else still referenced the shared source it came from —
- * `undoMarketplaceRegistration` protects the marketplace *registration* itself, but
- * `uninstallPluginRef` ran for every ref unconditionally (see
- * `aidd_docs/memory/testing.md`'s "Three facts" gotcha, point 1). This guards the ref
- * instead: left enabled, and named, whenever another project still references the
- * shared source that ref came from.
- *
- * `listAllReferencingProjects` filters by `fs.fileExists(root)` — seeding
- * `/other-project` in `references.json` without ever writing a file under it would
- * read back as zero other projects, and every "guarded" test below would pass for the
- * wrong reason. Every test that needs `/other-project` to still exist writes a marker
- * file under it first.
- */
+/** At a host that enables a plugin machine-wide (no `NativeActivation.scopeArgs` — codex,
+ * copilot), a ref is left enabled while another project still references its shared source. */
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { describe, expect, it } from "vitest";
@@ -73,10 +57,8 @@ function seedReferences(fs: InMemoryFileAdapter, roots: readonly string[]): void
     `${USER_CONFIG_DIR}/references.json`,
     JSON.stringify({ "1.0.0": [PROJECT_ROOT, ...roots] })
   );
-  // This project's own directory exists too — it is where `clean` is running from —
-  // so a mutation that reads `listAllReferencingProjects` before this project's own
-  // claim is dropped would see it as one more "other" project unless this marker
-  // makes `fs.fileExists(PROJECT_ROOT)` true, exactly like a real filesystem.
+  // `listAllReferencingProjects` filters by `fs.fileExists(root)`, so every root seeded here
+  // needs a marker of its own or it reads back as no project at all.
   fs.setFile(`${PROJECT_ROOT}/marker`, "");
   for (const root of roots) fs.setFile(`${root}/marker`, "");
 }
@@ -209,9 +191,8 @@ describe("clean guards a ref another project on this machine still needs", () =>
 
   it("disables codex's ref when no claim was ever recorded for this project, and no other project references it either", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
-    // No references.json at all: `removeReference` finds nothing for this project,
-    // and `listAllReferencingProjects()` reads back empty too — a claim genuinely
-    // absent, and genuinely nothing else to guard on either.
+    // No references.json at all: no claim of this project's own to drop, and nothing else
+    // referencing the source to guard on either.
     const activator = new FakeNativePluginActivator({ available: true });
 
     const useCase = buildUseCase({
@@ -232,13 +213,8 @@ describe("clean guards a ref another project on this machine still needs", () =>
     expect(activator.uninstalledPlugins).toContain("aidd-vcs@aidd-framework");
   });
 
-  // S1 (lot 8 review): "this project's own claim was never recorded" must not
-  // collapse into "no other project references it" — those are different facts.
-  // `references.json` here names only `OTHER_PROJECT`, never `PROJECT_ROOT`, so
-  // `removeReference` finds nothing of this project's own to drop, yet another
-  // project's own live claim still guards the ref. Deleting the early return this
-  // finding fixed (`if (removed === undefined) return undefined;`) makes this test
-  // go red: the ref would be uninstalled instead of staying guarded.
+  // "This project's own claim was never recorded" and "no other project references it" are
+  // different facts: only `OTHER_PROJECT` is named here, and its live claim still guards.
   it("keeps codex's ref enabled when this project's own claim was never recorded but another project's still is", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     fs.setFile(`${USER_CONFIG_DIR}/references.json`, JSON.stringify({ "1.0.0": [OTHER_PROJECT] }));

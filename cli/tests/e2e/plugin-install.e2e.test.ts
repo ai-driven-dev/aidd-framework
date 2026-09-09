@@ -13,8 +13,6 @@ async function writeMarketplace(
   await writeFile(join(dir, ".claude-plugin", "marketplace.json"), JSON.stringify({ plugins }));
 }
 
-// TODO(feat/cli-v5-cleanup follow-up): replace `install ai <tool> --path` setup
-// with `aidd framework install --tool <tool>` in all tests that use it.
 describe.concurrent("E2E: aidd plugin marketplace", () => {
   it("marketplace add → registers a project-scope marketplace and skips trust prompt with --yes", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("mkt-add");

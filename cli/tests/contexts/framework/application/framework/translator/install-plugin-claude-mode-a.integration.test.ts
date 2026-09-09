@@ -18,9 +18,7 @@ const PROJECT_ROOT = "/test-project";
 const MARKETPLACE_NAME = "aidd-framework";
 
 /** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
- * "claude" to — a real build always leaves one there, so a fixture standing in for one
- * must too, now that an unreadable catalog is a hard failure rather than a silent fall
- * back to this project's own local alias (`UnreadableBuiltCatalogError`). */
+ * "claude" to — a real build always leaves one there, and an unreadable one now fails hard. */
 async function seedBuiltCatalog(fs: InMemoryFileAdapter, name = MARKETPLACE_NAME): Promise<void> {
   await fs.writeFile(
     "/built/claude/.claude-plugin/marketplace.json",
@@ -181,9 +179,8 @@ describe("install claude plugin via Mode A (integration)", () => {
 
     expect(shared.extraKnownMarketplaces).toBeUndefined();
     expect(activator.addedMarketplaces).toContain("/built/claude");
-    // Both branches wrote the shared file in this one call — the eviction, then the
-    // enabled-plugins merge. Asserting the plugin landed proves the second write
-    // happened, and that it did not carry the evicted key back with it.
+    // Both branches wrote the shared file in this one call — the eviction, then the enabled-
+    // plugins merge; the plugin landing proves the second did not carry the evicted key back.
     expect(
       (shared.enabledPlugins as Record<string, boolean>)[`aidd-context@${MARKETPLACE_NAME}`]
     ).toBe(true);

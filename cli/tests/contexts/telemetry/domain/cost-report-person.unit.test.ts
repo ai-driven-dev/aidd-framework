@@ -47,8 +47,6 @@ function report(overrides: Partial<CostReportInput> = {}) {
   });
 }
 
-/** One person declared two identifiers, from two different machines - the Test Scope's own
- * setup. */
 function twoIdentitiesOnePerson(): PersonIdentity {
   return { personId: "person-a", origin: "adopted", alsoMe: ["machine-1", "machine-2"] };
 }
@@ -115,9 +113,8 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
     ]);
   });
 
-  // With an identity declared, a record that carried no identifier is this machine's own
-  // person: the sink has one writer, and every line in it was read by this machine. Kept
-  // apart from `mapped`, which is the record naming a person this identity claims.
+  // A record that carried no identifier is this machine's own person: the sink has one writer.
+  // Kept apart from `mapped`, which is a record naming a person this identity claims.
   it("a record with no identifier lands in this machine's own row, distinct from every unresolved one", () => {
     const built = report({
       identity: twoIdentitiesOnePerson(),
@@ -203,9 +200,8 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
     expect(built.totals.cacheCreationTokens).toBe(20);
   });
 
-  // Strongest claim first, and every resolution present is placed - a filter per group
-  // drops whatever it does not name, which is exactly how `this-machine` rows went missing
-  // from this breakdown while the totals they belonged to stayed.
+  // A filter per group drops whatever it does not name, which is how `this-machine` rows went
+  // missing from this breakdown while the totals they belonged to stayed.
   it("orders mapped rows first, then this machine's own, then unresolved, then no identifier", () => {
     const withIdentity = report({
       identity: twoIdentitiesOnePerson(),
@@ -291,11 +287,8 @@ describe("the envelope carries by_person for a program to parse", () => {
 });
 
 describe("byPeople — a billed call seen by both routes keeps its person", () => {
-  // The export route never carries a person (telemetry-sink-record.ts's own contract), so
-  // the survivor `mergeBilledRequestGroup` picks by `cost_usd` is exactly the export
-  // record - the one sibling in the group with no person_id at all. Discharging the note
-  // `mergeBilledRequestGroup`'s doc comment used to carry: without `withPersonBackfill`,
-  // this exact case would silently drop a mapped person's own work into `"none"`.
+  // The export route never carries a person, so the survivor `mergeBilledRequestGroup` picks
+  // by `cost_usd` is the one sibling in the group with no person_id at all.
   it("backfills the local-read sibling's person_id onto the export-route survivor", () => {
     const built = report({
       identity: twoIdentitiesOnePerson(),

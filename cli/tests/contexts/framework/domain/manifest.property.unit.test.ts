@@ -5,12 +5,9 @@ import { FileHash, InstallationFile } from "../../../../src/kernel/file.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { VALID_TOOL_IDS } from "../../../../src/kernel/tool.js";
 
-// ── Arbitraries ──────────────────────────────────────────────────────────────
-
 /** 32-char lowercase hex → valid MD5. fast-check v4 removed hexaString; use stringMatching. */
 const md5Arb = fc.stringMatching(/^[0-9a-f]{32}$/);
 
-/** File path: no null bytes, no leading slash, non-empty. */
 const relativePathArb = fc
   .string({ minLength: 1, maxLength: 60 })
   .filter((s) => !s.includes("\0") && !s.startsWith("/") && s.trim().length > 0);
@@ -22,7 +19,6 @@ const installationFileArb = fc
       new InstallationFile({ relativePath, content: "x", hash: new FileHash(hash) })
   );
 
-/** Valid tool id drawn from the real constant list. */
 const toolIdArb = fc.constantFrom(...(VALID_TOOL_IDS as ToolId[]));
 
 const toolEntryArb = fc.record({
@@ -33,9 +29,7 @@ const toolEntryArb = fc.record({
   files: fc.array(installationFileArb, { maxLength: 6 }),
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Build a v6 Manifest from tool entries. Dedup by toolId (last-wins via addTool). */
+/** Deduplicates by toolId, last one winning, the way `addTool` does. */
 function buildManifest(
   tools: Array<{ toolId: ToolId; version: string; files: InstallationFile[] }>
 ): Manifest {
@@ -45,8 +39,6 @@ function buildManifest(
   }
   return m;
 }
-
-// ── Property 1: round-trip identity ──────────────────────────────────────────
 
 describe("Manifest property tests", () => {
   it("toJSON → fromJSON → toJSON is identity", () => {
@@ -61,8 +53,6 @@ describe("Manifest property tests", () => {
       { numRuns: 100 }
     );
   });
-
-  // ── Property 2: the version guard is a no-op on its own output ──────────────
 
   it("fromJSON on v6 input round-trips cleanly (guard is a no-op at the supported version)", () => {
     fc.assert(

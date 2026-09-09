@@ -9,9 +9,8 @@ import {
 } from "../../../../src/contexts/telemetry/infrastructure/run-journal-reader-adapter.js";
 import { journalRecord, journalRepo } from "../../../helpers/telemetry-journal-hook.js";
 
-// A real-shaped ULID (26 Crockford-base32 characters), matching what
-// plugins/aidd-telemetry/hooks/lib/record.cjs's generateUlid mints — the adapter splits a
-// run file's name on this fixed length, never on "__", so the id itself must be genuine.
+// A real-shaped ULID (26 Crockford-base32 characters): the adapter splits a run file's name
+// on that fixed length, never on "__", so the id itself must be genuine.
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -90,12 +89,8 @@ describe("RunJournalReaderAdapter", () => {
     ]);
   });
 
-  // The hook that writes a journal anchors at `git rev-parse --show-toplevel`
-  // (plugins/aidd-telemetry/hooks/lib/repo.cjs), so a session started anywhere inside a
-  // checkout writes into ONE directory at its root. A reader anchored at the process
-  // working directory instead finds that directory only when the command happens to be run
-  // from the root - and answers "this session declared no task" when it is not, which is a
-  // claim about the work rather than about the read.
+  // The writing hook anchors at the repository root, so a reader anchored at the working
+  // directory answers "this session declared no task" — a claim about the work, not the read.
   it("anchors at the repository root, so a subdirectory finds the journal the hook wrote", async () => {
     await mkdir(join(projectRoot, ".git"), { recursive: true });
     await writeFile(
@@ -112,10 +107,8 @@ describe("RunJournalReaderAdapter", () => {
     ]);
   });
 
-  // A linked worktree's `.git` is a FILE holding `gitdir: …`, not a directory. Accepting
-  // only a directory would leave every worktree anchored at the process working directory -
-  // and this repository is developed in worktrees, so the case is the common one, not a
-  // corner.
+  // A linked worktree's `.git` is a FILE holding `gitdir: …`, not a directory, so accepting
+  // only a directory leaves every worktree anchored at the process working directory.
   it("accepts a linked worktree, whose .git is a file rather than a directory", async () => {
     await writeFile(join(projectRoot, ".git"), "gitdir: /elsewhere/.git/worktrees/w\n");
     await writeFile(
@@ -168,10 +161,8 @@ describe("RunJournalReaderAdapter", () => {
   });
 });
 
-// Duplicated on purpose, not shared at runtime — see the adapter's own doc comment for
-// why. This is what proves the duplication stays honest: if repo.cjs's regex ever moves,
-// this test turns red before a session id merely fails to match its own journal file,
-// silently, with every other test still green.
+// Duplicated on purpose, not shared at runtime: this keeps the copy honest, so the hook's
+// regex moving turns this red rather than leaving a session id silently unmatched.
 describe("sanitizePathSegment — agrees with the journal hook's own function", () => {
   it.each([
     "22222222-2222-4222-8222-222222222222",
@@ -368,10 +359,8 @@ describe("RunJournalReaderAdapter.deleteRunFile — confined to the directory it
     await expect(adapter.deleteRunFile(runsDir, "never-existed.jsonl")).resolves.toBeUndefined();
   });
 
-  // Finding 4: `deleteRunFile("../../VICTIM.txt")` used to delete outside the runs
-  // directory — `join` normalises `..` away visually but still deletes wherever the
-  // normalised path lands. Confinement must be a property of this method, not an accident
-  // of `readdir` yielding bare components.
+  // `join` normalises `..` away visually but still deletes wherever the normalised path
+  // lands, so confinement must be a property of this method, not of who calls it.
   it("refuses a relative walk out of the directory it is handed, rather than deleting outside it", async () => {
     // aidd_docs/runs -> .. -> aidd_docs -> .. -> projectRoot: "../../VICTIM.txt" lands here.
     const victimPath = join(projectRoot, "VICTIM.txt");
@@ -389,12 +378,8 @@ describe("RunJournalReaderAdapter.deleteRunFile — confined to the directory it
     await expect(adapter.deleteRunFile(runsDir, ".")).rejects.toThrow();
   });
 
-  // Finding 1: `AIDD_RUNS_DIR` relocated between the moment a person is shown `runsDir`
-  // (the preview) and the moment `deleteRunFile` runs (the removal) used to reach the
-  // relocated directory instead of the one shown, because the old `deleteRunFile` re-read
-  // `resolveRunsDir()` on every call. `runsDir` is now frozen at construction, and
-  // `deleteRunFile` takes `dir` as an explicit argument — this proves it acts on whatever
-  // `dir` it is handed, never on a live re-resolution of `AIDD_RUNS_DIR`.
+  // `runsDir` is frozen at construction and `deleteRunFile` takes `dir` explicitly, so
+  // `AIDD_RUNS_DIR` moving between the preview and the removal cannot redirect it.
   it("acts on the dir it is handed, immune to AIDD_RUNS_DIR being relocated afterwards", async () => {
     await writeFile(join(runsDir, "shown.jsonl"), "shown\n");
     const adapter = new RunJournalReaderAdapter(projectRoot);
@@ -414,9 +399,8 @@ describe("RunJournalReaderAdapter.deleteRunFile — confined to the directory it
   });
 });
 
-/** The hook stamps `schema_version` on every `session_start` it writes, and until now this
- * reader dropped it — so a journal written under a schema whose line shapes had changed was
- * read as if it were this one, which is a silent misreading rather than a refusal. */
+/** The hook stamps `schema_version` on every `session_start`: a journal written under a
+ * schema whose line shapes changed must be refused, not read as if it were this one. */
 describe("RunJournalReaderAdapter — the schema a journal states it was written under", () => {
   let projectRoot: string;
   let runsDir: string;
@@ -495,10 +479,8 @@ describe("RunJournalReaderAdapter — the schema a journal states it was written
     expect(await adapter.read(SESSION_ID)).toBeNull();
   });
 
-  // Absence is not a stated disagreement. Every journal on disk before this reader looked at
-  // the field was read without it, and refusing them now would drop attribution this reader
-  // has always been able to give - the fault "an unknown is never a zero" names, applied to
-  // the reader rather than to a figure.
+  // Absence is not a stated disagreement: every journal written before this field existed was
+  // read without it, and refusing them now would drop attribution this reader can still give.
   it("still reads a journal that states no schema at all", async () => {
     await writeJournal(header({}), {
       type: "step_start",
@@ -513,9 +495,8 @@ describe("RunJournalReaderAdapter — the schema a journal states it was written
     expect(journal?.boundaries).toHaveLength(1);
   });
 
-  // What a refusal must not cost: the fact that a run file is there. Dropped silently, the
-  // diagnostic reads "none carry a readable session_start" about a file whose header it read
-  // perfectly well, and prints a torn write as the cause of a version disagreement.
+  // Dropped silently, the diagnostic reads "none carry a readable session_start" about a file
+  // whose header it read perfectly well, blaming a torn write for a version disagreement.
   it("still names the schema of every journal it refused", async () => {
     await writeJournal(header({ schema_version: READABLE_JOURNAL_SCHEMA_VERSION + 1 }));
     const adapter = new RunJournalReaderAdapter(projectRoot);

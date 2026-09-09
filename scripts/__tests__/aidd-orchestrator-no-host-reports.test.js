@@ -6,13 +6,10 @@ const test = require("node:test");
 const ROOT = path.resolve(__dirname, "../..");
 
 /**
- * A skill never links outside itself (the tree ships both flat and as a marketplace, so no
- * relative path survives both), which is why the explanation for why a skill must announce
- * its own end by hand is written out in full in every orchestrating skill rather than linked
- * once. That triplication is a deliberate tradeoff, not an oversight - but nothing pinned the
- * three copies to each other, so one could drift and a flow would stop being measured
- * without anything going red. This is that pin, on the model of
- * aidd-telemetry-step-end.test.js's own parity checks.
+ * A skill never links outside itself, so the explanation of why a skill must announce its own
+ * end is written out in full in every orchestrating skill rather than linked once. This pins
+ * the copies to each other: one could otherwise drift and a flow would stop being measured
+ * with nothing going red.
  */
 const ORCHESTRATING_SKILLS = [
   "plugins/aidd-orchestrator/skills/00-async-dev/SKILL.md",

@@ -26,9 +26,8 @@ function isSupported(target: FrameworkBuildTarget, mode: FrameworkBuildMode): bo
 }
 
 /**
- * Both the wiring and the domain read the pairs off the profiles, so they cannot
- * disagree about which exist. What is still worth running is the other half: that every
- * pair the domain announces actually resolves to a use case the wiring can construct.
+ * Both the wiring and the domain read the pairs off the profiles and cannot disagree on which
+ * exist; what is worth running is that each resolves to a use case the wiring can construct.
  */
 describe("every announced build target/mode resolves to a wired use case", () => {
   for (const target of ALL_TARGETS) {

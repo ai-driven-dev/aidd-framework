@@ -24,9 +24,8 @@ import {
 import { CLIOutput } from "../../../src/presentation/output.js";
 import { InMemoryTelemetrySink } from "../../helpers/ports/in-memory-telemetry-sink.js";
 
-/** Extends the real output rather than standing in for it — the same reasoning
- * `cost-report-display.unit.test.ts` gives: a widened double stops failing the day the
- * class grows a method the printer starts calling. */
+/** Extends the real output rather than standing in for it: a widened double stops failing
+ * the day the class grows a method the printer calls. */
 class CapturingOutput extends CLIOutput {
   readonly lines: string[] = [];
 
@@ -64,12 +63,8 @@ function readResult(overrides: Partial<ReadLocalCostResult> = {}): ReadLocalCost
 }
 
 describe("what `telemetry read` says about each tool", () => {
-  /**
-   * The six statuses are the "an unknown is never a zero" rule in printed form: five of
-   * them mean something different from "this tool billed nothing", and any two sharing a
-   * label would let a session that was never measured read as free. So the labels are held
-   * apart from each other, not matched one by one against a wording that may change.
-   */
+  /** Five of the six statuses mean something other than "this tool billed nothing", so the
+   * labels are held apart rather than matched against a wording that may change. */
   it("gives every status a label of its own, so no two can be read as the same fact", () => {
     const statuses: readonly LocalCostToolStatus[] = [
       "found",
@@ -252,9 +247,8 @@ describe("what the identity commands say", () => {
 });
 
 describe("the warning about where the figures land", () => {
-  /** The real in-memory sink, with only the one field this printer reads set — never an
-   * object literal widened into the port, which `check-cli-layering.mjs` refuses and which
-   * would stop failing the day the port grows a member. */
+  /** The real in-memory sink with only the field this printer reads — never an object literal
+   * widened into the port, which would stop failing the day the port grows a member. */
   function sink(locatedBy: TelemetrySink["locatedBy"]): TelemetrySink {
     const built = new InMemoryTelemetrySink();
     built.locatedBy = locatedBy;

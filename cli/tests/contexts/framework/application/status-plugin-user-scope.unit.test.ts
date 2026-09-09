@@ -84,7 +84,6 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
       );
       await useCase.execute({ projectRoot: "/proj" });
 
-      // All checked paths must be absolute (resolved from user home, not from projectRoot)
       expect(checkedPaths.some((p) => p.includes(join(".cursor", "plugins", "local")))).toBe(true);
       expect(checkedPaths.every((p) => !p.includes(join("/proj", PLUGIN_KEY)))).toBe(true);
     });

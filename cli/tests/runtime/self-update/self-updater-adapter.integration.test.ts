@@ -50,8 +50,8 @@ function makeAdapter(): SelfUpdaterAdapter {
 
 function mockInstall(whichOutput: string, os: "win32" | "linux" | "darwin" = "linux"): void {
   mockPlatform.mockReturnValue(os);
-  // which/where is read with `encoding: "utf8"` (a string); the install call runs with
-  // piped stdio and yields a Buffer. Both are what execSync really returns.
+  // which/where is read with `encoding: "utf8"` and answers a string; the install call runs
+  // piped and answers a Buffer. Both are what execSync really returns.
   mockExecSync.mockReturnValueOnce(whichOutput).mockReturnValue(Buffer.alloc(0));
 }
 

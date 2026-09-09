@@ -1,5 +1,3 @@
-// ── Win32 platform transform ─────────────────────────────────────────────────
-
 interface McpServerWin32 {
   command?: string;
   args?: string[];
@@ -31,8 +29,6 @@ export function transformFor(platform: string): ((content: string) => string) | 
   return platform === "win32" ? transformMcpForWin32 : undefined;
 }
 
-// ── McpExclusion VO ──────────────────────────────────────────────────────────
-
 export interface McpExclusion {
   readonly configPath: string;
   readonly entryKey: string;
@@ -41,5 +37,3 @@ export interface McpExclusion {
 export function mcpExclusionEquals(a: McpExclusion, b: McpExclusion): boolean {
   return a.configPath === b.configPath && a.entryKey === b.entryKey;
 }
-
-// ── MCP server key extraction and filtering ──────────────────────────────────

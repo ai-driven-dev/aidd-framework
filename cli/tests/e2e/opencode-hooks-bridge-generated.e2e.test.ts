@@ -1,20 +1,6 @@
 /**
- * Guard for opencode-and-scope.md, Lot B — the generated event bridge, against the real
- * built binary. Proves three things a unit or an integration test cannot, because each
- * needs the actual translate output tree:
- *
- *   (a) `.opencode/plugin/<plugin>-hooks.js` exists, imports cleanly in a child process
- *       with a live, non-empty argv (the same shape a real host provides — see
- *       opencode-flat-hooks-loader-guard.e2e.test.ts, whose own guard this file leaves
- *       untouched), and the child survives.
- *   (b) importing it alone spawns nothing — only calling the exported factory, then
- *       firing an event, does.
- *   (c) calling the factory and then `event({ type: "session.idle" })` really spawns the
- *       fixture's own Stop script, which writes a marker file this test can see.
- *
- * The fixture plugin (`aidd-test`) is extended here, at test run time, in a private copy
- * of the source tree — never in the checked-in fixture, which several other suites already
- * share (flat-build-strategy.hooks.integration.test.ts among them).
+ * The bridge is only observable in a real translate output tree. The fixture plugin is
+ * extended in a private copy of the source, never in the checked-in one other suites share.
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -29,9 +15,8 @@ const execFileAsync = promisify(execFile);
 
 const STOP_SCRIPT = 'require("node:fs").writeFileSync("marker.txt", "spawned");\n';
 
-// Built rather than written as a literal "${CLAUDE_PLUGIN_ROOT}" string — biome reads a
-// plain string holding "${...}" as a forgotten template literal (see
-// flat-build-strategy.hooks.integration.test.ts's own CLAUDE_ROOT_VAR).
+// Concatenated, since biome reads a plain string holding "${...}" as a forgotten template
+// literal.
 const ROOT = "$" + "{CLAUDE_PLUGIN_ROOT}";
 
 const IMPORT_ONLY_HARNESS =
@@ -79,7 +64,7 @@ describe("opencode's generated event bridge, against the real build", () => {
       const bridgePath = join(outDir, ".opencode", "plugin", "aidd-test-hooks.js");
       expect(existsSync(bridgePath)).toBe(true);
 
-      // (a) imports cleanly with a live, non-empty argv, and never spawns on import alone.
+      // A live, non-empty argv is the shape a real host provides.
       const harnessPath = join(tempDir, "import-only.mjs");
       await writeFile(harnessPath, IMPORT_ONLY_HARNESS, "utf-8");
       const { stdout } = await execFileAsync(
@@ -90,9 +75,8 @@ describe("opencode's generated event bridge, against the real build", () => {
       expect(stdout).toContain("HOST ALIVE");
       expect(existsSync(join(outDir, "marker.txt"))).toBe(false);
 
-      // (b)/(c) calling the factory, then firing session.idle, spawns the Stop script —
-      // a real child process, not the mapping alone: run this step in its own child too,
-      // so the marker file lands relative to a cwd this test controls.
+      // Driven in its own child, so the marker file lands relative to a cwd this test
+      // controls.
       const driverPath = join(tempDir, "drive-session-idle.mjs");
       await writeFile(
         driverPath,

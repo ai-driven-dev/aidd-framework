@@ -1,15 +1,5 @@
-/**
- * Removal undoing native activation: `claude`, `codex`, and `copilot` only load a
- * plugin once their own CLI has registered it in a user-global registry
- * (`installed_plugins.json`, `config.toml`, `~/.copilot/config.json`). Install drives
- * that CLI via `NativePluginActivator.enablePlugin` (see marketplace-sync-settings-use-case
- * and deps.ts's `nativePluginActivators` map). Before this test, `PluginRemoveUseCase`
- * had no reference to that map at all — it deleted local files and updated AIDD's own
- * manifest, but the plugin stayed enabled in every host registry install wrote to. This
- * file proves the removal counterpart: `uninstallPlugin` is called with the same
- * `<plugin>@<marketplace>` ref install used, and every unreachable-host case still
- * completes the removal while naming what it could not clean up.
- */
+// `claude`, `codex` and `copilot` only load a plugin once their own CLI has registered it, so
+// removal must drive `uninstallPlugin` with the same `<plugin>@<marketplace>` ref install used.
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { describe, expect, it, vi } from "vitest";
 import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
@@ -163,12 +153,8 @@ describe("PluginRemoveUseCase undoes native activation", () => {
     expect(logger.warnMessages).toEqual([]);
   });
 
-  // The same regression `clean` had: before scope threading existed, `enablePlugin`
-  // carried no scope argument, so a real `claude` binary registered every plugin at
-  // its own implicit default, `"user"`, regardless of what the manifest went on to
-  // record for the plugin's own files (`"project"`, mode A's own install scope for
-  // claude). `uninstallViaActivator` used to try `"project"` only, which a real
-  // `claude` binary refuses outright for an entry registered at a different scope.
+  // A real `claude` binary registers at its own implicit `"user"` default whatever scope the
+  // manifest records for the plugin's files, and refuses an uninstall aimed at another scope.
   it("falls back to the other scope when the manifest's own scope does not match what was actually registered", async () => {
     const activator = new FakeNativePluginActivator({
       available: true,
@@ -192,10 +178,8 @@ describe("PluginRemoveUseCase undoes native activation", () => {
     expect(logger.warnMessages).toEqual([]);
   });
 
-  // Lot 9, item A: the host call must address the host by `hostName`, read from this
-  // tool's own `nativeRegistrations` the same way `purgeCachedPlugin` already reads it
-  // — never by `plugin.marketplace`, this project's own local alias, which a host never
-  // learns. Before the fix, `ref` was always built from `plugin.marketplace`.
+  // The host call must address the host by `hostName`, read from this tool's own
+  // `nativeRegistrations` — never by `plugin.marketplace`, a local alias a host never learns.
   it("uses the host's own name for the marketplace, read from this tool's own native registrations", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
     const logger = new CapturingLogger();
@@ -301,16 +285,8 @@ describe("PluginRemoveUseCase undoes native activation", () => {
     expect(logger.warnMessages.some((m) => m.includes(MARKETPLACE_NAME))).toBe(true);
   });
 
-  /**
-   * Lot 9 review, A-N1: `removeNativeActivation` used to call
-   * `manifest.getNativeRegistrations(toolId)` twice for the same decision — once through
-   * `hostNameFor` to resolve the host's own name, once more to ask whether a registration
-   * exists at all (the warn-gate above). One read into a local, branched on once, says
-   * the same thing once. `purgeCachedPlugin`'s own read is a separate decision (whether
-   * to purge a cache, made after the uninstall itself), so it still reads once on its
-   * own — the fixture below reaches it too, so the count pins both call sites at once:
-   * 1 (removeNativeActivation) + 1 (purgeCachedPlugin) = 2, not the pre-fix 3.
-   */
+  // Two reads, not three: `removeNativeActivation` resolves the host name and the warn gate
+  // from one read, and `purgeCachedPlugin`'s own read is a separate decision made after it.
   it("reads this tool's own native registrations once per decision, not twice for the warn gate", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
     const logger = new CapturingLogger();

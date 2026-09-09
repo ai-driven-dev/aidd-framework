@@ -1,11 +1,6 @@
 import type { MarketplaceCachePort } from "../../../src/contexts/distribution/domain/ports/marketplace-cache.js";
 
-/**
- * Pure in-memory MarketplaceCachePort.
- *
- * Names only, since clearing is the whole port: the entries a real cache holds are
- * directories on disk, and nothing asks this port to describe them.
- */
+/** Pure in-memory MarketplaceCachePort: names only, since clearing is the whole port. */
 export class InMemoryMarketplaceCache implements MarketplaceCachePort {
   private readonly names = new Set<string>();
   /** Every clear() argument in call order, so callers can assert whether and how it was cleared. */
@@ -23,8 +18,6 @@ export class InMemoryMarketplaceCache implements MarketplaceCachePort {
       this.names.clear();
     }
   }
-
-  // ── Inspection helpers ──────────────────────────────────────────────────────
 
   has(name: string): boolean {
     return this.names.has(name);

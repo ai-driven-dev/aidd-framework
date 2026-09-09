@@ -27,10 +27,8 @@ import type { CLIOutput } from "../output.js";
 
 const LABEL_WIDTH = 22;
 
-// The label strings a check report prints. They were pinned, word for word, to the
-// plugin's own `diagnose.cjs` so a report read identically whichever side answered it;
-// that script is gone and this is the only side, so these are now simply the names -
-// changing one changes every report, and nothing else has to be changed with it.
+// The only names a check report prints, now that the plugin's own `diagnose.cjs` these were
+// once pinned to word for word is gone: changing one changes every report and nothing else.
 const CLAIM_LABELS: Record<TelemetryClaimId, string> = {
   "hook-fired": "hook fired",
   "session-journalled": "session journalled",
@@ -48,9 +46,8 @@ function pad(label: string): string {
   return label.padEnd(LABEL_WIDTH);
 }
 
-// A sentence, never the claims' `ok`/`FAIL`/`--` verdict column — that vocabulary is
-// reserved for a grade, and nothing here is graded yet. Naming the location a fact came
-// from is what lets a person go and change it.
+// A sentence naming where a fact came from, never the claims' `ok`/`FAIL`/`--` column: that
+// vocabulary is reserved for a grade, and nothing here is graded.
 function printSetupRow(output: CLIOutput, label: string, detail: string): void {
   output.print(`  ${pad(label)}${detail}`);
 }
@@ -77,24 +74,14 @@ function describeRecorderDeclaration(declaration: TelemetryRecorderDeclarationSe
   if (declaration.unreadable.length > 0) {
     return `could not be read — ${declaration.unreadable.join(", ")}`;
   }
-  // Five absolute paths on one ~500-char line is the hardest possible form to act on —
-  // this is the row a person reads specifically to go add the declaration somewhere, so
-  // each candidate gets its own indented line rather than a single comma-joined run-on.
+  // The row a person reads to go add the declaration somewhere, so each candidate gets its
+  // own line rather than five absolute paths comma-joined into one.
   return `nowhere this build checks — looked in:${indentedPaths(declaration.locationsChecked)}`;
 }
 
-// Printed first, and printed whether or not measurement is on — a person switched off
-// needs this exactly as much as one who is on, and today they get nothing. Visibly
-// distinct from the four claims below: a sentence naming a location, never the claims'
-// own `ok`/`FAIL`/`--` verdict column.
-/** What produced the lines a person is reading, and — when nothing did — why.
- *
- * Read back out of the journal rather than re-derived, so this can only ever say what the
- * hook itself said. `"unrecorded"` names the one case that is a real problem: a hook that
- * ran, wrote lines, and could not name its own build. That happens when the plugin arrived
- * by neither install route — copied in by hand — and the sentence says so, because a person
- * seeing a bare "unknown" has no way to guess what to do about it.
- */
+/** Read back out of the journal rather than re-derived, so it can only say what the hook
+ * itself said. `"unrecorded"` is the one real problem — a hook that ran and could not name
+ * its own build, which happens when the plugin was copied in by neither install route. */
 function describePluginVersion(plugin: TelemetryPluginVersionSetup): string {
   if (plugin.kind === "recorded") return `${plugin.version} (as the hook recorded it)`;
   if (plugin.kind === "nothing-journalled") return "no session journalled yet";
@@ -105,25 +92,17 @@ function describePluginVersion(plugin: TelemetryPluginVersionSetup): string {
   );
 }
 
-/** The other half of `recorder declared`: whether the host will act on the declaration.
- *
- * One line per plugin rather than a single verdict, because the answer is genuinely per
- * plugin and a rolled-up "some are not registered" is the kind of sentence a person cannot
- * act on. Ordered so what a person must fix comes first: anything that will not load, then
- * what nobody could ask about, then what is fine — a reader who stops after one line has
- * still read the problem.
- *
- * `nothing installed` is a real, healthy answer and says so, rather than printing an empty
- * block that reads like a failure to look. */
+/** Whether the host will act on the declaration. One line per plugin, since the answer is
+ * genuinely per plugin, ordered so what must be fixed comes first: a reader who stops after
+ * one line has still read the problem. Nothing installed is a healthy answer and says so. */
 function describeHostRegistration(registration: TelemetryHostRegistrationSetup): string {
   if (registration.manifestUnreadable !== undefined) {
     return `AIDD's own manifest could not be read — ${registration.manifestUnreadable}`;
   }
   const entries = registration.entries;
   if (entries.length === 0) return "no plugin recorded for any tool";
-  // Keyed on the answer type, not on `string`: a fifth answer then fails to compile here
-  // rather than sorting silently last, which is how a new "will not load" state would end up
-  // printed below the ones that are fine.
+  // Keyed on the answer type, never `string`: a fifth answer must fail to compile here rather
+  // than sort silently last, below the ones that are fine.
   const rank: Record<HostRegistrationAnswer, number> = {
     "not-registered": 0,
     "registered-disabled": 1,
@@ -145,28 +124,22 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
   );
 }
 
-/** The trailer, in one sentence that leads with the only fact about the chain rather than
- * about its parts: how many recent commits actually carry it. A person reading one line has
- * then read the answer; the pieces below it say why, and only when there is a why. */
+/** Leads with the only fact about the chain rather than its parts — how many recent commits
+ * carry it — so one line is the answer and the pieces below it are the why. */
 function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
-  // Outside a repository there is nothing to say about hooks — the same fact the claims
-  // below refuse to read as a failure. Saying "nothing installed" here would describe a
-  // repository this project is not in.
+  // Outside a repository there is nothing to say about hooks; "nothing installed" would
+  // describe a repository this project is not in.
   if (trailer.hooksDirMissing === "no-repository") {
     return "no repository here, so no hook to carry it";
   }
-  // A repository whose git could not name its hooks directory still has a history, and the
-  // count is the fact that matters. Dropping it and saying "no repository" was measured
-  // wrong on a git that rejects `--git-path`: one true fact replaced by one false one.
+  // A git that rejects `--git-path` still has a history, and the count is the fact that
+  // matters: saying "no repository" would replace one true fact with a false one.
   if (trailer.hooksDir === undefined) {
     return `${describeTrailerCount(trailer)} — git could not say where it runs hooks from`;
   }
 
-  // Named now, because the name comes from a marker file at the repository root rather than
-  // from reading the hook, and because there is a job to print that changes what a person
-  // does: `callSite: "missing"` here is not a fault, it is the ordinary shape of a manager
-  // calling the delegate through its own config rather than through the absolute-path line
-  // this CLI would otherwise look for.
+  // The manager comes from a root marker file, never from reading the hook, and under one
+  // `callSite: "missing"` is the ordinary shape rather than a fault.
   if (trailer.hookManager !== undefined) return describeManagedCommitTrailer(trailer);
 
   const parts: string[] = [];
@@ -186,23 +159,17 @@ function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
   return `${describeTrailerCount(trailer)}${parts.length === 0 ? "" : ` — ${parts.join("; ")}`}\n    hooks run from ${trailer.hooksDir}`;
 }
 
-/** The row for a repository lefthook or husky owns. Wired — that manager's own config
- * already calls the delegate — reports the chain through the manager and prints nothing
- * else: there is no job to add. Not wired names the manager and prints the job to add,
- * which is the one actionable fact `telemetry on` also prints. Neither case ever reads
- * `callSite: "missing"` as a fault: that field describes the absolute-path line this CLI
- * would otherwise look for, which a manager never calls the delegate through. */
+/** The row for a repository lefthook or husky owns: wired reports the chain through the
+ * manager, not wired prints the job to add. Neither reads `callSite: "missing"` as a fault —
+ * that field describes an absolute-path line a manager never calls the delegate through. */
 function describeManagedCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
   const manager = trailer.hookManager;
   if (manager === undefined) throw new Error("describeManagedCommitTrailer needs a manager");
   const count = describeTrailerCount(trailer);
   if (trailer.managerCallsDelegate === true) {
-    // The manager's own config calling the delegate is only half the chain — the delegate
-    // still has to be there, and executable, for the call to do anything. Reporting "wired"
-    // from `managerCallsDelegate` alone would call this repository healthy on a checkout
-    // where `telemetry on` was never run (B-S1): the config names the job, nothing answers
-    // it, and a person reading "wired" has no reason left to run the one command that fixes
-    // it.
+    // Half the chain: the delegate still has to be there and executable. Reporting "wired"
+    // from `managerCallsDelegate` alone calls a checkout healthy where `telemetry on` never
+    // ran, leaving a reader no reason to run the one command that fixes it.
     if (trailer.delegate !== "executable") {
       const state =
         trailer.delegate === "absent"
@@ -219,12 +186,9 @@ function describeManagedCommitTrailer(trailer: TelemetryCommitTrailerSetup): str
   return `${count} — ${manager} owns prepare-commit-msg here; ${sessionTrailerManagerInstruction(manager, targetFile)}:\n${snippet}\n    hooks run from ${trailer.hooksDir}`;
 }
 
-/** The count, and what it is not.
- *
- * A commit no session made carries no trailer, by design — the delegate writes nothing
- * without a session variable, and skips merges outright. So a number below the total is not
- * by itself a fault, and a bare "4 of 20" invites reading it as one. The qualifier is added
- * exactly when it could mislead: some commits carrying it, and every part in place. */
+/** A commit no session made carries no trailer by design, so a number below the total is not
+ * itself a fault though a bare "4 of 20" reads as one. The qualifier is added exactly when it
+ * could mislead: some commits carrying it, every part in place. */
 function describeTrailerCount(trailer: TelemetryCommitTrailerSetup): string {
   const carried = trailer.recentlyCarrying;
   if (carried === undefined) return "no commit history to read";
@@ -232,9 +196,8 @@ function describeTrailerCount(trailer: TelemetryCommitTrailerSetup): string {
   const everyPartWorks =
     trailer.delegate === "executable" &&
     (trailer.callSite === "present" || trailer.managerCallsDelegate === true);
-  // `carrying > 0` and not `>= 0`: zero with every part in place is the finding this whole
-  // row exists to surface, and excusing it as by-design is the one thing that must not
-  // happen. The docstring above says "some", and this is what makes that true.
+  // `> 0`, never `>= 0`: zero with every part in place is the finding this row exists to
+  // surface, and must never be excused as by-design.
   const someCarry = carried.carrying > 0 && carried.carrying < carried.examined;
   if (!everyPartWorks || !someCarry) return count;
   return `${count} — a commit no session made carries none, by design`;
@@ -271,11 +234,9 @@ function printUncovered(output: CLIOutput, uncovered: DiagnoseTelemetryUncovered
   output.print(`  ${label}${"--".padEnd(4)}  ${uncovered.reason}`);
 }
 
-// Never a claim, and never printed on stdout beside the four: a stale export lives in a
-// tool's own settings file, not in anything the hook, the journal or a reader can see, so
-// it is named on stderr as a warning rather than folded into the health count "no claim
-// mentions exporting" guards. See DiagnoseTelemetryResult's own doc for why it is gathered
-// independently of the gate above.
+// Never a claim: a stale export lives in a tool's own settings file, nothing the hook, the
+// journal or a reader can see, so it is warned on stderr rather than folded into the health
+// count.
 function printLeftoverExportConfig(
   output: CLIOutput,
   leftovers: readonly TelemetryExportLeftover[]

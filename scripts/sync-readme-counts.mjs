@@ -1,13 +1,7 @@
 #!/usr/bin/env node
-// Keeps the hand-typed counts in README.md in sync with the filesystem so they
-// can never silently drift. Computes: total plugins, total skills, total agents,
-// and per-plugin skill counts, then rewrites README.md in place.
-//
-//   node scripts/sync-readme-counts.mjs           # rewrite README.md
-//   node scripts/sync-readme-counts.mjs --check    # exit 1 if README is stale (CI)
-//
-// Hero counts live between <!--counts:start--> and <!--counts:end-->.
-// Per-plugin counts are the `N skill(s)` code-span after each plugin heading.
+// Keeps the hand-typed counts in README.md in sync with the filesystem. Hero counts live
+// between <!--counts:start--> and <!--counts:end-->; a per-plugin count is the
+// `N skill(s)` code-span after that plugin's heading. `--check` reports instead of writing.
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 
@@ -21,9 +15,8 @@ const files = (p) =>
   existsSync(p) ? readdirSync(p, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name) : [];
 
 const plugins = dirs(PLUGINS).sort();
-// A directory under skills/ is a skill only once it carries a SKILL.md - the same test
-// the CLI's own plugin-source-tree-reader.ts uses. Without it, a plugin-wide directory
-// that carries no SKILL.md would count as a skill.
+// A directory under skills/ is a skill only once it carries a SKILL.md — the same test
+// the CLI's own plugin-source-tree-reader.ts uses.
 const skillsOf = (name) =>
   dirs(`${PLUGINS}/${name}/skills`).filter((skill) =>
     existsSync(`${PLUGINS}/${name}/skills/${skill}/SKILL.md`)
@@ -37,15 +30,13 @@ const totalAgents = plugins.reduce((n, p) => n + agentsOf(p), 0);
 let md = readFileSync(README, "utf8");
 const before = md;
 
-// 1. Hero counts (between markers).
 const hero = `<kbd>${totalPlugins} plugins</kbd> · <kbd>${totalSkills} skills</kbd> · <kbd>${totalAgents} agents</kbd>`;
 md = md.replace(/<!--counts:start-->[\s\S]*?<!--counts:end-->/, `<!--counts:start-->${hero}<!--counts:end-->`);
 
-// 2. Per-plugin `N skill(s)` after each plugin heading link.
 for (const name of plugins) {
   const n = skillsOf(name);
   const word = n === 1 ? "skill" : "skills";
-  // Match the plugin heading link, then the first `\d+ skill(s)` code-span within ~140 chars.
+  // The first `\d+ skill(s)` code-span within ~140 chars of the plugin's heading link.
   const re = new RegExp(
     `(\\[${name}\\]\\(plugins/${name}/README\\.md\\)[\\s\\S]{0,140}?\`)\\d+\\s+skills?(\`)`,
   );

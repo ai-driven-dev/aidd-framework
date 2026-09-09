@@ -1,16 +1,11 @@
 #!/usr/bin/env node
-// Renders the repository's star history as an SVG on stdout, from the GitHub
-// stargazers API. Since June 30 2026 that API only answers a repository's own
-// admins and collaborators, which killed the third-party chart services the
-// README used to embed. Running it here, with the repository's own credentials,
-// is the only way left to keep a live chart.
+// Renders the repository's star history as an SVG on stdout. The stargazers API answers
+// only a repository's own admins and collaborators, which killed the third-party chart
+// services, so a live chart has to be rendered here with the repository's own credentials.
 //
-//   GH_TOKEN=$(gh auth token) node scripts/generate-star-history.mjs > star-history.svg
-//
-// The output is deterministic: identical star data yields identical bytes, so a
-// scheduled run that finds no new star produces no commit. Nothing renders the
-// current date, and no <style> or <script> is emitted, because GitHub strips
-// both when it serves an SVG into a README.
+// Identical star data yields identical bytes, so a scheduled run finding no new star
+// produces no commit. Nothing renders the current date, and no <style> or <script> is
+// emitted: GitHub strips both when it serves an SVG into a README.
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "ai-driven-dev/framework";
 const TOKEN = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
@@ -61,8 +56,8 @@ function nextPage(linkHeader) {
   return linkHeader?.match(/<([^>]+)>;\s*rel="next"/)?.[1] ?? null;
 }
 
-// A cumulative curve of N stars is N points; every chart is 800px wide. Keeping
-// one point per pixel at most holds the file small without any visible loss.
+// One point per pixel at most: the chart is 800px wide, so the file stays small with no
+// visible loss.
 function sample(dates) {
   if (dates.length <= MAX_POINTS) {
     return dates.map((date, index) => ({ date, count: index + 1 }));
@@ -75,8 +70,8 @@ function sample(dates) {
   });
 }
 
-// Rounds a tick step up to the next 1, 2 or 5 x 10^k, so labels read as round
-// numbers instead of arbitrary fractions of the total.
+// Up to the next 1, 2 or 5 x 10^k, so labels read as round numbers rather than arbitrary
+// fractions of the total.
 function niceStep(rawStep) {
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const normalized = rawStep / magnitude;

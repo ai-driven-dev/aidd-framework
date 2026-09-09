@@ -36,8 +36,7 @@ describe("refAnotherProjectStillNeeds", () => {
   });
 });
 
-// S3 (lot 8 review): the extracted message builder must keep singular/plural correct —
-// nothing else in the suite pins this sentence's grammar, so a swapped branch
+// Nothing else in the suite pins this sentence's grammar, so a swapped singular/plural branch
 // ("references"/"reference", "project"/"projects") would pass every other test.
 describe("describeGuardedPluginRefMessage", () => {
   it("uses singular wording for exactly one other project", () => {
@@ -58,10 +57,8 @@ describe("describeGuardedPluginRefMessage", () => {
     expect(message).toContain("2 other projects still reference");
   });
 
-  // Lot 9, item D2: the plugin stays because those other projects still need it, and
-  // full removal names both commands, in order — `aidd clean` in each of them before
-  // `aidd clean --scope user` — the same shared clause `clean --scope user`'s own
-  // no-registration report states.
+  // Full removal names both commands in order — `aidd clean` in each other project before
+  // `aidd clean --scope user` — the same clause `clean --scope user`'s own report states.
   it("names the projects and both removal commands, in order, sharing the same clause clean --scope user uses", () => {
     const message = describeGuardedPluginRefMessage({
       binary: "codex",
@@ -76,9 +73,6 @@ describe("describeGuardedPluginRefMessage", () => {
     );
   });
 
-  // Lot 9 review, D2-N1: "still reference the shared source" and "still need it" stated
-  // the same fact twice in one sentence. The rewritten clause states the fact once, then
-  // gives the causal reason it stays, rather than restating it.
   it("states the fact once, not twice ('still reference' the source, not also 'still need it')", () => {
     const message = describeGuardedPluginRefMessage({
       binary: "codex",

@@ -228,21 +228,9 @@ describe("copilot", () => {
   });
 });
 
-/**
- * What a reference to another framework file becomes once installed for Copilot.
- *
- * This is not decoration. Deleting this rewriting as "dead" once shipped `{{TOOLS}}/...`
- * verbatim into installed files on `aidd plugin install --tool copilot`, and every gate
- * stayed green: `translate` never calls `rewriteContent`, so the golden cannot see it, and
- * the one golden cell frozen byte-for-byte is claude, whose rewrite is the identity.
- *
- * Today's plugins carry no placeholder, so nothing here fires for them. What does carry one
- * is any pinned older release — this repository ships one as `framework-real` — and any
- * third-party plugin using the syntax.
- *
- * The whole rewritten string is asserted, never a fragment: a mutant that changes the link
- * target while keeping the label survives a `toContain`.
- */
+/** What a reference to another framework file becomes once installed for Copilot. No other gate
+ * sees it: `translate` never calls `rewriteContent`, and the byte-frozen golden cell is claude,
+ * whose rewrite is the identity. The whole rewritten string is asserted, never a fragment. */
 describe("a reference to another framework file, installed for Copilot", () => {
   const rewrite = (content: string) => copilot.rewriteContent(content);
 
@@ -318,7 +306,7 @@ describe("a reference to another framework file, installed for Copilot", () => {
     });
 
     it("resolves the plugins path a pinned release still ships", () => {
-      // The exact line that regressed, from framework-real's 00-sdlc skill.
+      // A real placeholder-carrying line, from framework-real's 00-sdlc skill.
       expect(rewrite("validator: `{{TOOLS}}/plugins/aidd-pm/skills/05-spec/x.yml`")).toBe(
         "validator: `.github/plugins/aidd-pm/skills/05-spec/x.yml`"
       );

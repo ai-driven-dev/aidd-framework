@@ -15,10 +15,8 @@ import { GitAdapter } from "../../../../src/runtime/git/git-adapter.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 
 /**
- * The real adapter against real repositories, because the whole question is where git looks
- * for a hook — which is not knowable from the shape of `.git` alone. A `core.hooksPath` and
- * a linked worktree each move it somewhere the obvious answer does not point, and in both
- * cases a hook installed at the obvious place is silently never run.
+ * The real adapter against real repositories: where git looks for a hook is not knowable
+ * from the shape of `.git` alone — `core.hooksPath` and a linked worktree each move it.
  */
 const created: string[] = [];
 
@@ -64,9 +62,8 @@ describe("installing the trailer hook where git will actually run it", () => {
     expect(existsSync(join(hooks, SESSION_TRAILER_DELEGATE_FILE))).toBe(true);
   });
 
-  // The defect this test exists for: `.git/hooks` is not where git looks when a
-  // `core.hooksPath` is set, and a hook written there runs on nothing while reporting
-  // success. This machine's own checkout is configured exactly this way.
+  // `.git/hooks` is not where git looks when a `core.hooksPath` is set, and a hook written
+  // there runs on nothing while reporting success.
   it("installs where core.hooksPath points, never into .git/hooks it would ignore", async () => {
     const repo = makeRepo("hookspath");
     const elsewhere = join(repo, "team-hooks");
@@ -150,9 +147,8 @@ describe("installing the trailer hook where git will actually run it", () => {
     ).resolves.toEqual({ lineAdded: false });
   });
 
-  // B-N5: a lefthook marker outside a git repository has no
-  // `$(git rev-parse --git-common-dir)` for a hand-added job to ever resolve against —
-  // reporting `hookManager` there would have a caller print a job that can never run.
+  // A lefthook marker outside a git repository has no `$(git rev-parse --git-common-dir)`
+  // for a hand-added job to resolve against, so naming a manager there prints a dead job.
   it("names no manager outside a repository, even with a lefthook marker at the root", async () => {
     const notARepo = mkdtempSync(join(tmpdir(), "aidd-trailer-lefthook-nogit-"));
     created.push(notARepo);
@@ -169,12 +165,8 @@ describe("installing the trailer hook where git will actually run it", () => {
 });
 
 /**
- * Neither `lefthook.yml` nor `.husky/*` is ever written by this CLI — both are committed,
- * shared files, and an automatic append would reach every clone through a commit nobody
- * reviewed. The delegate script still has to land where the printed job resolves it,
- * `$(git rev-parse --git-common-dir)/hooks`, which a husky repository's own
- * `core.hooksPath` does *not* point at — that divergence is exactly what would leave the
- * printed job's `[ -f "$delegate" ]` guard false forever if the script went anywhere else.
+ * Neither `lefthook.yml` nor `.husky/*` is ever written by this CLI, yet the delegate must
+ * land at `$(git rev-parse --git-common-dir)/hooks`, which husky's `core.hooksPath` misses.
  */
 describe("installing where lefthook or husky already owns prepare-commit-msg", () => {
   it("reports the manager, writes no line, and touches nothing lefthook owns", async () => {
@@ -268,15 +260,8 @@ describe("removing it again", () => {
     ).resolves.toEqual({ removed: false });
   });
 
-  /**
-   * B-B1: `on` writes the delegate to `$(git rev-parse --git-common-dir)/hooks`, ignoring
-   * `core.hooksPath`, once a manager owns `prepare-commit-msg` — husky routes that setting
-   * under `.husky/`. Before this fix `off` still resolved through `resolveHooksDir`, which
-   * *follows* `core.hooksPath`: under husky the two land in different directories, so `off`
-   * found nothing to delete and reported it removed nothing. Mutation: make
-   * `removeCommitMessageDelegate` resolve through `--git-path hooks` again (ignoring the
-   * manager) and this goes red.
-   */
+  /** Once a manager owns `prepare-commit-msg`, `on` writes the delegate to
+   * `$(git rev-parse --git-common-dir)/hooks`, ignoring `core.hooksPath`; `off` must agree. */
   it("removes the delegate on and off agree on, even where husky moves core.hooksPath", async () => {
     const repo = makeRepo("husky-remove");
     mkdirSync(join(repo, ".husky"), { recursive: true });
@@ -304,14 +289,8 @@ describe("removing it again", () => {
 });
 
 /**
- * The evidence behind a stated limit, pinned so the limit cannot quietly stop being true.
- *
- * `commit-session-trailer.ts` and the metrics contract both say the commit-to-session join
- * is measured on Claude Code and unconfirmed on Codex, and give a concrete reason: a resumed
- * Codex rollout carries a `session_meta.id` — which is what becomes a record's `vendor_id` —
- * different from its own `session_meta.session_id`, so "the thread" and "the rollout" are
- * demonstrably two things there. If the captured rollout were replaced by one where they
- * agree, that reason would evaporate while both documents went on giving it.
+ * A resumed Codex rollout carries a `session_meta.id` — what becomes a record's `vendor_id`
+ * — different from its own `session_meta.session_id`: thread and rollout are two things.
  */
 describe("the reason the Codex half of this join is only a candidate", () => {
   it("still holds a resumed rollout whose own id differs from the session it continues", () => {

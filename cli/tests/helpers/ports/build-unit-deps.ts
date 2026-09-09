@@ -43,10 +43,8 @@ import { seedFromDirectory } from "./seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
 
-/**
- * Builds in-memory deps for use-case unit tests.
- * The InMemoryFileAdapter is pre-seeded with the framework fixture content (absolute paths).
- */
+/** Builds in-memory deps for use-case unit tests, the file adapter pre-seeded with the
+ * framework fixture content under absolute paths. */
 export async function buildUnitDeps(_projectRoot: string) {
   const hasher = new DeterministicHasher();
   const fs = new InMemoryFileAdapter({}, hasher);
@@ -88,7 +86,6 @@ export async function buildUnitDeps(_projectRoot: string) {
     fakeEnsureBuiltMarketplace()
   );
 
-  // Seed the framework fixture content so the install use-case can read it
   await seedFromDirectory(fs, FIXTURE_DIR, { useAbsolutePaths: true });
 
   return {

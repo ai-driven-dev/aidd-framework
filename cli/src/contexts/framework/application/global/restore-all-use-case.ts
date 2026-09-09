@@ -109,9 +109,9 @@ export class RestoreAllUseCase {
         version,
         projectRoot,
         files,
-        // Consent to overwrite a modified file comes from one of two places: the
-        // checkbox the interactive run already made the user answer, or --force
-        // when there is no TTY to ask. Neither is a reason to ask a second time.
+        // Consent to overwrite a modified file comes from either the checkbox the interactive run
+        // already made the user answer, or `--force` when there is no TTY to ask. Neither is a reason
+        // to ask a second time.
         force: force || interactive,
         interactive,
         manifest,

@@ -16,20 +16,15 @@ function isOutdated(version: string, latest: string): boolean {
   return isSemver(version) && compareSemver(version, latest) < 0;
 }
 
-/** Where this cache is written: under `cache/`, beside every other disposable thing, rather
- * than loose among the files a person chose. Nothing here is a choice — it is the last
- * version seen and when, refetched whenever it is missing. */
+/** Under `cache/`, beside every other disposable thing: nothing here is a choice a person
+ * made. The resolution is `userConfigDir()`'s, so the file a machine-scope `clean` purges is
+ * the file this writes, whatever the machine's own configuration says. */
 function resolveCachePath(): string {
-  // The same resolution every other machine-local file uses (`AIDD_USER_CONFIG_DIR`, then
-  // `XDG_CONFIG_HOME`, then the home default): the file a machine-scope `clean` purges must
-  // be the file this writes, whatever the machine's own configuration says.
   return join(userConfigDir(), "cache", "update-check.json");
 }
 
-/** Where it used to be written, read when the current path holds nothing. A cache that
- * appeared to be missing would cost one needless network call on the next online command —
- * harmless, and still worth not doing to every existing install at once. Never written to,
- * so the old file simply stops being touched and can be deleted by hand. */
+/** Read when the current path holds nothing, never written to, so an existing install is not
+ * made to refetch. */
 function legacyCachePath(): string {
   return join(userConfigDir(), "update-check.json");
 }
@@ -42,7 +37,7 @@ export class CheckUpdateUseCase {
     private readonly fs: FileReader & FileWriter
   ) {}
 
-  /** Hot path: print the update notice from cached value only — fresh OR stale, never network. */
+  /** Hot path: the cached value only, fresh or stale, never the network. */
   async printFromCacheOnly(): Promise<void> {
     const cached = await this.readCacheRaw();
     if (cached === null) return;
@@ -54,7 +49,6 @@ export class CheckUpdateUseCase {
     this.logger.warn("Run `aidd update`.");
   }
 
-  /** Online piggyback path: fetch the latest release and persist the cache. Awaited. */
   async refresh(): Promise<void> {
     const { version: latest } = await this.cliUpdater.fetchLatestRelease();
     await this.writeCache(latest);

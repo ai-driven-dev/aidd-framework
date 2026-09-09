@@ -14,9 +14,8 @@ function createMockOutput(): CLIOutput {
   };
 }
 
-/** Same shape `error-handler.unit.test.ts` uses: `process.exit` returns `never`, so a
- * double that returns normally lets a test walk through code the real process would
- * never reach. Throwing is what "does not return" looks like in-process. */
+/** `process.exit` returns `never`, so a double that returns normally lets a test walk through
+ * code the real process would never reach: throwing is what "does not return" looks like. */
 class ProcessExited extends Error {
   constructor(readonly code: number | string | null | undefined) {
     super(`process.exit(${String(code)})`);

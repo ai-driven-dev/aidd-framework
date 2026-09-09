@@ -97,11 +97,8 @@ describe("TelemetrySinkAdapter", () => {
     const adapter = new TelemetrySinkAdapter(userConfigDir);
     await adapter.ensureWritable();
     await adapter.appendRecord(RECORD, new Date("2026-08-15T10:00:00Z"));
-    // A directory happens to match the day-file naming pattern — `listDayFiles` filters by
-    // name alone, so it lists this the same as any other day file, and `readFile` on it
-    // fails the same way a file rotated or deleted between listing and reading would:
-    // listed a moment ago, unreadable now. Deterministic, unlike racing a real deletion
-    // against the read that follows it.
+    // `listDayFiles` filters by name alone, so a directory matching the pattern is listed
+    // and then fails to read — the deterministic stand-in for a file deleted mid-scan.
     await mkdir(join(adapter.rootDir, "2026-08-16.jsonl"));
 
     await expect(adapter.readRecordsForVendor("s-1")).resolves.toHaveLength(1);
@@ -117,9 +114,8 @@ describe("TelemetrySinkAdapter", () => {
     expect(records).toHaveLength(1);
   });
 
-  // chmod-based permission denial is meaningless for root (common in CI containers) and
-  // for Windows ACLs — this project's CI matrix has neither, but the guard keeps the test
-  // honest instead of silently passing on a platform where chmod doesn't block writes.
+  // chmod blocks no write for root or behind Windows ACLs, where this would pass without
+  // testing anything.
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     "fails ensureWritable at startup with a message naming the path, when the directory cannot be written",
     async () => {
@@ -139,10 +135,8 @@ describe("TelemetrySinkAdapter.readRecordsInPeriod", () => {
   let userConfigDir: string;
   let adapter: TelemetrySinkAdapter;
 
-  // Every fixture below is appended on one day and stamped with another. That gap is the
-  // whole point: a session read locally days after it ran lands in today's day file while
-  // its records carry their own, older moments, and a report asking what last week cost
-  // means the moment — not the day we happened to hear about it.
+  // Every fixture is appended on one day and stamped with another: a session read days
+  // later lands in today's file while its records carry their own, older moments.
   const STORED_ON = new Date("2026-08-21T09:00:00Z");
 
   beforeEach(async () => {
@@ -172,7 +166,7 @@ describe("TelemetrySinkAdapter.readRecordsInPeriod", () => {
     await append("july", "2026-07-29");
     await append("august", "2026-08-18");
 
-    // Both were appended on 2026-08-21, so both live in the same day file.
+    // Both were appended on the same day, so both live in one day file.
     expect(await adapter.listDayFiles()).toEqual(["2026-08-21.jsonl"]);
     expect((await period("2026-07-01", "2026-07-31")).records.map((r) => r.vendor_id)).toEqual([
       "july",
@@ -246,7 +240,7 @@ describe("TelemetrySinkAdapter.readRecordsInPeriod", () => {
 
   it("places a moment written with a non-UTC offset on the day it actually happened", async () => {
     await adapter.appendRecord(
-      // 2026-08-18T01:00+05:00 is 2026-08-17T20:00Z — the 17th, not the 18th.
+      // 01:00+05:00 on the 18th is 20:00Z on the 17th.
       { ...RECORD, vendor_id: "offset", event_timestamp: "2026-08-18T01:00:00+05:00" },
       STORED_ON
     );
@@ -280,9 +274,8 @@ describe("TelemetrySinkAdapter.readRecordsInPeriod", () => {
 });
 
 describe("the real sink and its in-memory double place a record on the same day", () => {
-  // A double that buckets differently from the adapter it stands for lets phase 2's
-  // aggregation tests agree with the double and disagree with production. These are the
-  // four shapes the two could diverge on.
+  // A double that buckets differently from the adapter it stands for would let aggregation
+  // tests agree with the double and disagree with production. Four shapes could diverge.
   const MOMENTS: readonly (string | undefined)[] = [
     "2026-08-17T10:00:00.000Z",
     "2026-08-18T01:00:00+05:00",
@@ -331,8 +324,8 @@ describe("the real sink and its in-memory double place a record on the same day"
     expect(ids(fromDouble)).toEqual(ids(fromAdapter));
   });
 
-  // Finding 4's confinement, mirrored for the sink: `deleteDayFile` shares the same
-  // `isBareFileName` check as `RunJournalReaderAdapter.deleteRunFile`.
+  // `deleteDayFile` shares the `isBareFileName` check `RunJournalReaderAdapter.deleteRunFile`
+  // applies.
   it("refuses a relative walk out of the directory it is handed, rather than deleting outside it", async () => {
     const adapter = new TelemetrySinkAdapter(userConfigDir);
     await adapter.ensureWritable();

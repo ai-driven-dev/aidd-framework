@@ -68,11 +68,8 @@ describe("buildTelemetryAllowedSetup — whose choice this was", () => {
   });
 });
 
-/**
- * From root marker files alone, never from the hook's own contents — a manager regenerates
- * `prepare-commit-msg` from its own config on every install, so anything read from the hook
- * by the time this runs has already been overwritten.
- */
+/** From root marker files alone: a manager regenerates `prepare-commit-msg` from its own
+ * config on every install, so the hook's own contents say nothing by the time this runs. */
 describe("detectHookManager — which manager owns prepare-commit-msg, from the root alone", () => {
   it("reads lefthook.yml as lefthook", () => {
     expect(detectHookManager(["lefthook.yml"])).toBe("lefthook");

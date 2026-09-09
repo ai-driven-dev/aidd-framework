@@ -11,18 +11,13 @@ import type { FileWriter } from "../../../src/kernel/ports/file-writer.js";
 import type { Hasher } from "../../../src/kernel/ports/hasher.js";
 import { stripJsonComments } from "../../../src/kernel/reading/jsonc.js";
 
-/**
- * Pure in-memory implementation of the FileReader, FileWriter, and FileMerger ports.
- * Uses a Map<path, content> — no real I/O.
- */
 export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   /** Executable when `chmodExecutable` was called for it, absent otherwise — the two states
    * `delegateState` tells apart, without a filesystem. */
   private readonly executable = new Set<string>();
 
-  /** Normalized like every other reader in this class. Skipping `norm` made this the one
-   * method that could answer for a path `fileExists` disagreed with — which is the exact
-   * contradiction `FileReader.isExecutable` sits behind the port to prevent. */
+  /** Normalized like every other reader here: an un-normalized key would answer for a path
+   * `fileExists` disagrees with. */
   async isExecutable(path: string): Promise<boolean> {
     const key = norm(path);
     return this.files.has(key) && this.executable.has(key);
@@ -72,9 +67,7 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     return content;
   }
 
-  /**
-   * Returns relative paths of all files under dirPath (recursive), same as FileAdapter.
-   */
+  /** Relative paths, recursive, the shape `FileAdapter` returns. */
   async listDirectory(dirPath: string): Promise<string[]> {
     const normalizedDir = norm(dirPath);
     const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
@@ -103,11 +96,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     return this.hasher.hash(content);
   }
 
-  /**
-   * Resolves through the longest matching registered symlink, same shape as a real
-   * `fs.realpath` walking a symlinked ancestor directory. Identity when nothing was
-   * declared for this path — most paths in a test are never symlinked.
-   */
+  /** Resolves through the longest matching registered symlink, like a real `fs.realpath`
+   * walking a symlinked ancestor; identity when none was declared for the path. */
   async realpath(path: string): Promise<string> {
     const key = norm(path);
     let bestMatch: { link: string; target: string } | undefined;
@@ -182,8 +172,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     return result;
   }
 
-  // ── Inspection helpers for test assertions ──────────────────────────────────
-
   setFile(path: string, content: string): void {
     this.files.set(norm(path), content);
   }
@@ -212,8 +200,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
 function norm(path: string): string {
   return path.replaceAll("\\", "/");
 }
-
-// ── Private helpers ───────────────────────────────────────────────────────────
 
 class DefaultHasher implements Hasher {
   hash(content: string): FileHash {

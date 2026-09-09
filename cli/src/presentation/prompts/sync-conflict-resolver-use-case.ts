@@ -1,14 +1,9 @@
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 
-/**
- * Determines whether a target file is in conflict (modified since last sync).
- * A conflict occurs when the disk file differs from its manifest hash.
- * Does NOT prompt the user — conflict recording is handled by the caller.
- */
+/** Decides a conflict, never prompts: recording one is the caller's. */
 export class SyncConflictResolverUseCase {
   constructor(private readonly fs: FileReader) {}
 
-  /** Returns true when the target file exists and its disk hash differs from its manifest hash. */
   async isConflict(
     diskTargetPath: string,
     diskTargetExists: boolean,
@@ -21,11 +16,7 @@ export class SyncConflictResolverUseCase {
     return targetManifestHash !== undefined && diskTargetHash.value !== targetManifestHash.value;
   }
 
-  /**
-   * Resolves the write outcome for a target file given transformed content.
-   * Returns the outcome ("skipped" | "conflict" | "write") and whether a conflict was detected.
-   * The conflict flag is true even for "write" when force overrides a detected conflict.
-   */
+  /** `conflict` is true even for a `"write"`, when `force` overrode a detected conflict. */
   async resolveWriteOutcome(opts: {
     diskTargetPath: string;
     diskTargetExists: boolean;
@@ -58,12 +49,8 @@ export class SyncConflictResolverUseCase {
     return { outcome: "write", conflict };
   }
 
-  /**
-   * Simplified conflict check for plugin-file propagation (no manifest map lookup needed).
-   * Returns true when the target file exists and the new content differs from disk content.
-   * In plugin propagation, any existing target file is considered a potential overwrite;
-   * conflict is detected when force is false and the file exists.
-   */
+  /** Plugin propagation has no manifest hash to compare, so any existing target file counts
+   * as a potential overwrite. */
   async resolvePluginWriteOutcome(opts: {
     diskTargetPath: string;
     targetContent: string;

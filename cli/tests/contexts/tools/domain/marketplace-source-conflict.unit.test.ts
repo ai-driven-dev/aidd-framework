@@ -65,11 +65,8 @@ describe("marketplaceSourceConflict", () => {
     });
   });
 
-  // Bloquant 3: identity is a catalog's declared name plus its plugin set — never its
-  // version. Each discriminator below isolates one component so a mutation collapsing
-  // it (`samePluginNames` -> `true`, `a.name` -> `true`) fails here specifically,
-  // rather than passing every existing test the way both did before this file named
-  // a case for each one on its own.
+  // Identity is a catalog's declared name plus its plugin set, never its version, and each
+  // case below isolates one component so a mutation collapsing it fails here specifically.
   describe("identity: declared name plus plugin set, never version", () => {
     const reading = { location: LOCATION, entries: new Map([["probe-mkt", "/src/A"]]) };
 

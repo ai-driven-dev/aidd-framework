@@ -12,14 +12,8 @@ import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetr
 
 const PROJECT_ROOT = "/repo";
 
-/**
- * `on` cannot promise a trailer where lefthook or husky owns `prepare-commit-msg` and
- * regenerates it out from under whatever this CLI appended — the correctness bug this lot
- * exists to fix. `installCommitMessageDelegate` reports which manager, and whether that
- * manager's own config already calls the delegate; this suite holds `on`'s reaction to both
- * bits apart from the git mechanics, which the adapter's own integration suite proves
- * against real repositories.
- */
+/** `on` cannot promise a trailer where lefthook or husky owns `prepare-commit-msg` and
+ * regenerates it out from under whatever this CLI appended. */
 function managedGit(hookManager: HookManager, managerCallsDelegate: boolean): VersionControl {
   return {
     ...noGit,
@@ -81,14 +75,8 @@ describe("TelemetryOnUseCase — where a manager owns prepare-commit-msg", () =>
     expect(said).not.toContain("lefthook.yml");
   });
 
-  /**
-   * The bug this lot exists to fix, reproduced directly: under lefthook, the append this CLI
-   * makes is wiped by the very next regeneration, so the real adapter reports
-   * `lineAdded: true` on *every* `on`, never only the first. A use case reading `lineAdded`
-   * alone would print the unqualified promise every single time, which is false the moment
-   * lefthook regenerates the hook. `hookManager` set alongside `lineAdded: true` is exactly
-   * that adapter-observed shape.
-   */
+  /** Under lefthook the append is wiped by the next regeneration, so the real adapter reports
+   * `lineAdded: true` on every `on`, never only the first. */
   it("reads hookManager over lineAdded, so a lefthook repo never gets the false promise", async () => {
     const { logger, useCase } = useCaseWith(managedGit("lefthook", false));
     // Faking the adapter's own measured shape: `lineAdded` still reports `true` because the

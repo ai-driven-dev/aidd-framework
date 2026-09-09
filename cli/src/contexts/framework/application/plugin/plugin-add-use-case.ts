@@ -42,7 +42,6 @@ export interface PluginAddOptions {
   replace?: boolean;
 }
 
-/** Adding a plugin to the tools that host it, as its callers need it. */
 export interface PluginAdd {
   execute(options: PluginAddOptions): Promise<void>;
 }

@@ -1,20 +1,15 @@
-/** One `step_start` line from a session's run journal: a step's own start, and the
- * skill name recorded for it. Mirrors what `plugins/aidd-telemetry/hooks/lib/record.cjs`'s
- * `buildStepStartLine` writes. No end is ever carried — the journal was deliberately
- * written without one, since no tool measured so far exposes when a skill's work finishes;
- * an interval's end is the reader's own derivation, not a fact on this line. */
+/** One `step_start` line from a session's run journal: a step's own start and the skill
+ * recorded for it. No end is carried — no tool measured so far exposes when a skill's work
+ * finishes, so an interval's end is the reader's derivation, not a fact on this line. */
 export interface RunJournalStepStart {
   readonly type: "step_start";
   readonly at: string;
   readonly skill: string;
-  /** The host's own identifier for the prompt this step opened under, where it hands one to
-   * a hook — Claude Code's `prompt_id`. Named `turn_id` on the line because that is what
-   * `buildStepStartLine` has always written; it is a prompt, not a turn, and three steps
-   * opened under one prompt share it.
-   *
-   * Matched against a record's `prompt_id`, it attributes a step **exactly** rather than by
-   * asking which interval a moment fell in — the only reading that survives two tasks
-   * advancing at once. Absent for every host that hands its hooks no such identifier. */
+  /** The host's own identifier for the prompt this step opened under, where it hands one to a
+   * hook. Named `turn_id` on the line, but it is a prompt: several steps opened under one
+   * share it. Matched against a record's `prompt_id` it attributes a step exactly, the only
+   * reading that survives two tasks advancing at once. Absent for a host that hands its hooks
+   * no such identifier. */
   readonly turn_id?: string;
 }
 
@@ -25,14 +20,10 @@ export interface RunJournalTurnEnd {
   readonly at: string;
 }
 
-/** One `step_end` line: the moment a skill said its own work was over, and the skill it
- * says it for. Mirrors `plugins/aidd-telemetry/hooks/lib/record.cjs`'s `buildStepEndLine`.
- *
- * The one thing about a step no host emits, which is why the skill declares it and the hook
- * writes it (`plugins/aidd-telemetry/hooks/lib/step-ends.cjs`). Carries its skill, and closes only that skill's own
- * open interval: closing "whatever is open" would close the wrong one the moment a skill
- * invokes another, and an end naming a skill this session never started closes nothing at
- * all rather than truncating whatever was running. */
+/** One `step_end` line: the moment a skill said its own work was over. No host emits this,
+ * which is why the skill declares it. It closes only its own skill's open interval: closing
+ * "whatever is open" would close the wrong one the moment a skill invokes another, and an end
+ * naming a skill this session never started closes nothing rather than truncating. */
 export interface RunJournalStepEnd {
   readonly type: "step_end";
   readonly at: string;
@@ -41,79 +32,61 @@ export interface RunJournalStepEnd {
 
 export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd | RunJournalStepEnd;
 
-/** The `session_start` line: the one line naming what a session was. `tool` holds the
- * journal hook's own host identifier ("claude-code", "codex", "copilot", "cursor"), which
- * is not an `AiToolId` — `journalHostToAiToolId` in `domain/tools/registry.ts` is the only
- * place the two are related, and it reads a declaration rather than a table. */
+/** The `session_start` line: the one line naming what a session was. `tool` holds the journal
+ * hook's own host identifier ("claude-code", "codex", "copilot", "cursor"), which is not an
+ * `AiToolId` — `journalHostToAiToolId` is the only place the two are related, and it reads a
+ * declaration rather than a table. */
 export interface RunJournalSessionStart {
   readonly type: "session_start";
   readonly at: string;
-  /** The schema the hook stamped this journal with, absent for a journal written before
-   * this reader looked at the field. Read and carried, never derived: which schema a file
-   * was written under is the writer's statement about it, and a reader that infers one
-   * from the shapes it happens to recognise is exactly the silent misreading the field
-   * exists to prevent. */
+  /** The schema the hook stamped this journal with, absent for one written before the field
+   * existed. Read and carried, never derived: a reader inferring a schema from the shapes it
+   * happens to recognise is the silent misreading this field exists to prevent. */
   readonly schema_version?: number;
   readonly run_id: string;
   readonly tool: string;
   readonly vendor_id: string;
   readonly project_id?: string;
-  /** The git remote this session's repository resolved to, absent for a repository with
-   * none. Carried beside `project_id` rather than replacing it, the same shape
-   * `record.cjs`'s own `session_start` line writes. */
+  /** The git remote this session's repository resolved to, absent for one with none. Carried
+   * beside `project_id` rather than replacing it. */
   readonly project_remote?: string;
-  /** Git's own name for the linked worktree this session ran in, so two worktrees
-   * of one repository are distinguishable in a journal. Absent — never `""` — for a plain
-   * checkout, which is the common case and is not an unknown worktree. */
+  /** Git's own name for the linked worktree this session ran in, so two worktrees of one
+   * repository are distinguishable. Absent — never `""` — for a plain checkout. */
   readonly worktree_id?: string;
   /** The repository those worktrees share, named from `--git-common-dir`. Recorded beside
    * `worktree_id` rather than left to `project_id`, which falls back to the worktree's own
    * directory name when a clone has no remote. Absent whenever `worktree_id` is. */
   readonly worktree_repo_id?: string;
-  /** The plugin's own version, read from its manifest by `record.cjs`'s
-   * `buildSessionStartLine` at the moment this line was written - never the framework's
-   * version, and never the CLI's, which stamps only the record it stores, not the journal
-   * line beside it (see `TelemetrySinkRecord.cli_version`). Absent for a line the hook
-   * could not read its own manifest to stamp, and for any line written before this field
-   * existed - either way reads as an unknown version, never as a default or a guess. */
+  /** The plugin's own version at the moment this line was written - never the framework's,
+   * and never the CLI's, which stamps only the record it stores. Absent reads as an unknown
+   * version, never as a default or a guess. */
   readonly plugin_version?: string;
 }
 
-/** A `file_written` line: a repository-relative, "/"-separated path a session wrote inside
- * a task folder, and when. Deliberately carries no task identity — the hook that writes it
- * refuses to store a derivation as a fact, so deriving the task is the reader's job. */
+/** A `file_written` line: a repository-relative, "/"-separated path a session wrote inside a
+ * task folder, and when. Carries no task identity — the hook refuses to store a derivation as
+ * a fact, so deriving the task is the reader's job. */
 export interface RunJournalFileWritten {
   readonly type: "file_written";
   readonly at: string;
   readonly path: string;
 }
 
-/** A `task_declared` line: a tool call named a file under a task folder, so this session is
- * on that task from here on — told rather than inferred, the way `step_start` names a
- * skill. Carries no task identity for the same reason `file_written` does not: `path` is
- * the same repository-relative shape, and deriving the task from it is `task-identity.ts`'s
- * job. Deliberately kept out of `RunJournalBoundary`: what opens or closes a step is a
- * `step_start` and a `step_end` naming its skill, and a declaration is neither. It reaches
- * every interval walk all the same - `buildTaskIntervals`, `buildFlowIntervals` and
- * `buildStepIntervals` each merge this array and `filesWritten` into `boundaries` before
- * walking - but as a moment the journal witnessed, never as a boundary that ends something.
- * The type keeps the two apart so a later reader cannot confuse them by accident. */
+/** A `task_declared` line: a tool call named a file under a task folder, so this session is on
+ * that task from here on — told rather than inferred. Carries no task identity for the reason
+ * `file_written` does not. Deliberately outside `RunJournalBoundary`: an interval walk merges
+ * it in as a moment the journal witnessed, never as a boundary that ends something, and the
+ * type keeps the two apart so a later reader cannot confuse them. */
 export interface RunJournalTaskDeclared {
   readonly type: "task_declared";
   readonly at: string;
   readonly path: string;
 }
 
-/** What the journal side promises a reader, for one session's run file, in file order —
- * lines read, nothing derived. Deriving intervals from `boundaries` is `domain/models/
- * step-attribution.ts`'s job; deriving a task from `filesWritten` is the cost report's.
- *
- * `boundaries` was once all of this: step attribution needed nothing else, and this port
- * said so. It is no longer the whole readership. A report has to know which tool and which
- * project a session belonged to, and which task it wrote into, and both facts are already
- * lines in the same file — so the exclusion was scoped to step attribution, never to the
- * journal as a source. `session` is optional because a file whose first line is torn is
- * still worth its boundaries. */
+/** What the journal side promises a reader, for one session's run file, in file order — lines
+ * read, nothing derived. Deriving intervals from `boundaries`, or a task from `filesWritten`,
+ * is the reader's job. `session` is optional because a file whose first line is torn is still
+ * worth its boundaries. */
 export interface RunJournal {
   readonly boundaries: readonly RunJournalBoundary[];
   readonly session?: RunJournalSessionStart;
@@ -122,62 +95,44 @@ export interface RunJournal {
 }
 
 /**
- * What a run-journal reader promises: the boundaries recorded for one session, or
- * `null` when nothing can be said about it — no run file for this session, an unreadable
- * runs directory, telemetry that was never enabled. Never throws: a missing, unreadable or
- * truncated journal costs attribution, not the read itself, so a session with no journal at
- * all yields the same figures it would without this port existing.
- *
- * Read-only on purpose: `diagnose-telemetry-use-case.ts`, `report-cost-use-case.ts` and
- * `read-local-cost-use-case.ts` each need to read a journal and none of them should be
- * handed something that can delete one. `RunJournalStore` below extends this the same way
- * `PersonIdentityStore` extends `PersonIdentityReader` — one adapter implements both, but a
- * caller that only reads is typed so it cannot reach for the verb that removes.
+ * The boundaries recorded for one session, or `null` when nothing can be said about it — no
+ * run file, an unreadable runs directory, telemetry never enabled. Never throws: a missing,
+ * unreadable or truncated journal costs attribution, not the read itself. Read-only on
+ * purpose, so a caller that only reads cannot reach the verb that removes; one adapter
+ * implements this and `RunJournalStore` below both.
  */
 export interface RunJournalReader {
   read(sessionId: string): Promise<RunJournal | null>;
-  /** Every session the journal holds, for a caller that has no identifier to ask about —
-   * a report covers a stretch of time, and the sessions inside it are what it is looking
-   * for. Filtering to a period is the caller's, from each journal's own `session.at`: the
-   * run file's name carries no date. Never throws, for the same reason `read` does not; a
-   * missing or unreadable runs directory answers an empty list. */
+  /** Every session the journal holds, for a caller with no identifier to ask about. Filtering
+   * to a period is the caller's, from each journal's own `session.at`: the run file's name
+   * carries no date. Never throws; an unreadable runs directory answers an empty list. */
   list(): Promise<readonly RunJournal[]>;
-  /** Every run file's own name, directly from the directory — never opened, never
-   * parsed. Distinct from `list()`, which reads and can silently drop a file it cannot
-   * parse: a caller counting what removing this journal would touch needs a name a
-   * damaged file still has, not a count that only survives files still readable. Never
-   * throws; a missing or unreadable runs directory answers an empty list, the same
-   * failure direction as `list()`. */
+  /** Every run file's own name, directly from the directory — never opened, never parsed.
+   * Distinct from `list()`, which can silently drop a file it cannot parse: a caller counting
+   * what removing this journal would touch needs a name a damaged file still has. Never
+   * throws, the same failure direction as `list()`. */
   listRunFiles(): Promise<readonly string[]>;
   /** The schema stated by every journal this reader refused to read, one entry per file.
-   * `list()` drops such a journal outright — reading it would mean guessing that whatever
-   * lines this parser still recognises mean what they used to — and a caller shown only
-   * that emptiness would report a missing or torn file about one whose header it parsed
-   * perfectly well. Empty is the ordinary answer: every journal on disk states the schema
-   * this build reads, or states none at all. Never throws, like everything else here. */
+   * `list()` drops such a journal outright, and a caller shown only that emptiness would
+   * report a torn file about one whose header it parsed perfectly well. Empty is the ordinary
+   * answer. Never throws, like everything else here. */
   listForeignSchemas(): Promise<readonly number[]>;
 }
 
 /**
- * What `ForgetTelemetryUseCase` needs beyond a plain read — extends `RunJournalReader`
- * rather than sitting beside it, so the one adapter that resolves the runs directory
- * implements exactly one port, the same shape `PersonIdentityStore` already uses over
- * `PersonIdentityReader`.
+ * What removing a journal needs beyond a plain read — extends `RunJournalReader` rather than
+ * sitting beside it, so the one adapter that resolves the runs directory implements one port.
  */
 export interface RunJournalStore extends RunJournalReader {
   /** Where this project's run journal lives — the same directory `read`/`list` and
-   * `listRunFiles` resolve, exposed so a caller that only needs to name the location
-   * (never open a file in it) has one place to ask, rather than re-deriving the same
-   * `AIDD_RUNS_DIR`-aware resolution itself. This is also the value `ForgetTelemetryUseCase`
-   * carries into `TelemetryRemovalPreview.journal.path` — `deleteRunFile` below never
-   * re-derives it, it is handed back exactly what this named. */
+   * `listRunFiles` resolve, exposed so a caller naming the location never re-derives the
+   * `AIDD_RUNS_DIR`-aware resolution itself. `deleteRunFile` below is handed back this value
+   * rather than deriving its own. */
   readonly runsDir: string;
-  /** Removes one run file, by the name `listRunFiles()` named it with, from `dir` —
-   * mirrors `TelemetrySink.deleteDayFile`. `dir` is never resolved inside this method: the
-   * caller (`forget-telemetry-use-case.ts`) passes `TelemetryRemovalPreview.journal.path`,
-   * the exact directory a person was already shown, so a removal can never reach a
-   * directory the preview never named — see that value's own doc for why. `fileName` must
-   * name exactly one entry directly inside `dir` (`isBareFileName`); anything else,
+  /** Removes one run file, by the name `listRunFiles()` named it with, from `dir` — mirrors
+   * `TelemetrySink.deleteDayFile`. `dir` is never resolved here: the caller passes the exact
+   * directory a person was already shown, so a removal can never reach one the preview never
+   * named. `fileName` must name exactly one entry directly inside `dir`; anything else,
    * including a relative walk out of it, is refused rather than deleted. A no-op, not a
    * failure, when the name is already gone. */
   deleteRunFile(dir: string, fileName: string): Promise<void>;

@@ -10,12 +10,6 @@ import { createTestEnv, gitInit, runCli } from "./helpers.js";
 const execFileAsync = promisify(execFile);
 const RUNS_ENTRY = "aidd_docs/runs/";
 
-/**
- * What `journal-privacy.cjs` did beyond flipping the switch, ported onto `aidd telemetry
- * on`/`off` now that `telemetry-switch.cjs` — and the plugin suite that drove it
- * (`aidd-telemetry-switch-gitignore.test.js`) — are deleted this same phase. Six
- * distinguishable claims, one per test, the same split the deleted suite used.
- */
 async function git(args: readonly string[], cwd: string): Promise<{ stdout: string }> {
   return execFileAsync("git", [...args], { cwd, env: environmentWithoutGitVariables(process.env) });
 }

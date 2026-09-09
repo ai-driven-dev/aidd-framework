@@ -8,18 +8,6 @@ import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./hel
 
 const execFileAsync = promisify(execFile);
 
-/**
- * `aidd telemetry forget` — the seventh command, and the only one that deletes data.
- * Covers phase-2.md's own Test Scope: preview vs. confirm, counts matching what was
- * shown, a damaged record file, a location that refuses removal (a directory named
- * `*.jsonl`) leaving the rest untouched, a relocated `AIDD_RUNS_DIR` and a relocated
- * `AIDD_USER_CONFIG_DIR` each reaching only the location named. The structural "removal
- * cannot resolve its own locations" guarantee is proven by mutation at the unit level, for
- * all three locations (`forget-telemetry-use-case.unit.test.ts`) and at the adapter level
- * for the journal and the identity (`run-journal-reader-adapter.integration.test.ts`,
- * `person-identity-adapter.integration.test.ts`) — this file proves the CLI journey a
- * person actually sees.
- */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const VENDOR_ID = "vendorabc";
 const JOURNAL_FILE = `${RUN_ID}__${VENDOR_ID}.jsonl`;
@@ -168,10 +156,8 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
     }
   });
 
-  // Finding 3: `git ls-files` reads the index, not history — a journal `git add`ed and
-  // never committed used to be relayed as "history certainly holds it", which is false in
-  // a repository with zero commits. This reproduces exactly that and asserts the honest
-  // reading instead.
+  // `git ls-files` reads the index, not history: a staged journal in a repository with no
+  // commits is not held by history at all.
   it("previews a staged-but-never-committed journal honestly, never as certainly held", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("forget-staged-preview");
     try {
@@ -192,9 +178,6 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
     }
   });
 
-  // Finding 1's journal leg, at the CLI: a relocated `AIDD_RUNS_DIR` must reach only the
-  // directory it names, the same shape the existing relocated-`AIDD_USER_CONFIG_DIR` test
-  // proves for the sink.
   it("a relocated AIDD_RUNS_DIR touches only the relocated location, never the project's own runs dir", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("forget-runs-relocated");
     try {
@@ -212,16 +195,14 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toContain(relocated);
       expect(await entries(relocated)).toEqual([]);
-      // The project's own runs directory is untouched.
       expect(await readFile(realJournalPath, "utf8")).toContain(VENDOR_ID);
     } finally {
       await cleanup();
     }
   });
 
-  // Finding 5: the claimed "a refused deletion leaving the rest untouched" case did not
-  // exist. A directory named `*.jsonl` refuses removal portably (`EISDIR` on POSIX,
-  // access-denied-shaped on Windows) with no `chmod` needed, through the real CLI.
+  // A directory named `*.jsonl` refuses removal portably — `EISDIR` on POSIX,
+  // access-denied-shaped on Windows — with no `chmod` needed.
   it("a run file that refuses removal (a directory named *.jsonl) is reported, and the rest is still removed", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("forget-refused-real");
     try {
@@ -238,7 +219,6 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
         /This project's run journal: 0 removed, 1 could not be removed/u
       );
       expect(result.stderr).toMatch(/Could not remove journal run file adir\.jsonl/u);
-      // The directory itself was never removed, and every other location still emptied.
       expect(await entries(runsDir)).toEqual(["adir.jsonl"]);
       expect(result.stdout).toMatch(/This machine's stored records: 1 removed/u);
       expect(result.stdout).toMatch(/This machine's identity: 1 removed/u);
@@ -293,7 +273,6 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
       expect(await entries(sinkDirIn(fakeHome))).toEqual([]);
       await expect(readFile(identityFileIn(fakeHome), "utf8")).rejects.toThrow();
 
-      // The switch is untouched, and measurement can be turned on again.
       expect(JSON.parse(await readSwitch(projectDir))).toEqual({ telemetry: { enabled: true } });
       const onAgain = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
       expect(onAgain.exitCode, onAgain.stderr).toBe(0);
@@ -374,7 +353,6 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toContain(relocated);
       expect(await entries(join(relocated, "telemetry"))).toEqual([]);
-      // The real profile's own record is untouched.
       expect(await readFile(realSinkPath, "utf8")).toContain("real");
     } finally {
       await cleanup();

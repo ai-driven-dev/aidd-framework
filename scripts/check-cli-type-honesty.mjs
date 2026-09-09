@@ -1,18 +1,8 @@
 #!/usr/bin/env node
 // Enforces the one invariant of cli/.claude/rules/00-architecture/0-hexagonal.md that a
-// linter cannot express: the type system is not bypassed by widening a value away from the
-// type it claims to hold.
-//
-// Dependency direction (domain never imports application/infrastructure, and so on) is
-// biome's own job now: `cli/biome.json`'s per-layer `noRestrictedImports` overrides match
-// the resolved path, not a hand-picked prefix, and are exercised by
-// `cli/tests/architecture/import-rules-bite.arch.test.ts`. A script duplicating that check
-// against `domain/`, `application/` and `infrastructure/` directly under `src/` stayed green
-// after the context refactor moved every one of those under `src/contexts/<context>/`,
-// because it never matched anything there to begin with.
-//
-// Usage:
-//   node scripts/check-cli-type-honesty.mjs   # exit 1 on any breach
+// linter cannot express: no value is widened away from the type it claims to hold.
+// Dependency direction belongs to biome, whose per-layer `noRestrictedImports` overrides
+// match the resolved path — a hand-picked prefix here goes stale the moment a layer moves.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -22,14 +12,9 @@ const SRC = path.join(CLI, "src");
 const TESTS = path.join(CLI, "tests");
 
 /**
- * `as unknown as T` walks up to `unknown` and back down; `as never` walks down to the
- * bottom type, assignable to everything; `as any` opts a value out of checking entirely.
- * `\bas` is what keeps prose out - "was never" has no word boundary before its "as". `any`
- * needs a second guard the other two do not: it is also an English word, and a comment
- * reading "the same as any other day file" or "as any two ... would be" matched the cast
- * syntax until the negative lookahead was added. A real cast's `any` is a complete type, so
- * whatever follows it is punctuation or whitespace-then-punctuation, never another word -
- * exactly what distinguishes it from "as any <word>" prose.
+ * `\bas` keeps prose out - "was never" has no word boundary before its "as". `any` needs the
+ * negative lookahead on top: it is also an English word, and a real cast's `any` is a
+ * complete type, so what follows it is punctuation, never another word.
  */
 const WIDENING_ANYWHERE = [
   /\bas\s+unknown\s+as\b/,
@@ -38,22 +23,14 @@ const WIDENING_ANYWHERE = [
 ];
 
 /**
- * `@ts-expect-error` and `@ts-ignore` silence the compiler instead of building a value the
- * type accepts - but a test whose whole point is that something does not compile has no
- * other way to assert that, and three do: `installed-plugin.unit.test.ts`,
- * `person-resolution.unit.test.ts` and `read-local-cost-use-case.unit.test.ts` each suppress
- * a directive-carrying line to prove a shape is rejected, with the rejected shape named in
- * the comment beside it. That is a compiler assertion, not a widened value, and it exists
- * only in `tests/` - production code has no "prove this doesn't compile" to make. So these
- * two directives are checked in `src/` only; `as unknown as`, `as never` and `as any` remain
- * checked in both, because a production value built by any of them is exactly the bug this
- * script exists to catch, and a test can widen one too.
+ * Checked in `src/` only: a test whose whole point is that a shape does not compile has no
+ * other way to assert it, and that is a compiler assertion rather than a widened value.
+ * Production code has no "prove this doesn't compile" to make.
  */
 const WIDENING_SRC_ONLY = [/@ts-expect-error\b/, /@ts-ignore\b/];
 
-/** Every cast the type system cannot express away, each with the reason it survives.
- * Paths are cli-relative. Listed so the debt is visible and shrinking rather than
- * silently permitted everywhere - adding a line here is a decision, not a default. */
+/** Cli-relative paths, each with the reason the cast survives. Listed so adding one is a
+ * decision rather than a default. */
 const CASTS_ALLOWED = new Map([
   [
     "src/contexts/translate/application/translate-source.ts",

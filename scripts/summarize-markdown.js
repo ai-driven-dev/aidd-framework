@@ -1,40 +1,7 @@
 #!/usr/bin/env node
 
-/**
- * Summarize Markdown Structure
- *
- * Scans a directory and generates markdown documentation with frontmatter metadata.
- * Supports injection mode using markers to update content within existing files.
- *
- * Usage:
- *   node summarize-markdown.js [inputPath] [outputPath] [options]
- *
- * Arguments:
- *   inputPath (optional) - Path to directory to scan. Defaults to '../prompts' relative to script location.
- *   outputPath (optional) - Path to output file. Defaults to '../docs/prompts-documentation.md'.
- *
- * Options:
- *   --depth=N   - Maximum depth to scan subdirectories (default: 3)
- *   --verbose   - Enable verbose output
- *   -v          - Alias for --verbose
- *
- *
- * Examples:
- *   node summarize-markdown.js                              # Uses defaults
- *   node summarize-markdown.js ./my-prompts                 # Custom input
- *   node summarize-markdown.js ./prompts docs/INDEX.md      # Custom input & output
- *   node summarize-markdown.js framework out.md --depth=4   # Scan 4 levels deep
- *
- * Supported file extensions: .md, .mdc, .txt
- *
- * Output:
- *   Generates or updates markdown file with organized tables of all files.
- */
-
-
-// Parse CLI flags early
 let verbose = false;
-let maxDepth = 3; // Default depth
+let maxDepth = 3;
 let customTitle = null;
 let customTagline = null;
 for (const arg of process.argv) {
@@ -53,7 +20,7 @@ for (const arg of process.argv) {
 	}
 }
 
-let allowedFields = null; // null = dynamic discovery (backwards compatibility)
+let allowedFields = null; // null = discover the columns from the frontmatter itself
 const ignoreNames = new Set();
 for (const arg of process.argv) {
 	if (arg.startsWith("--fields=")) {
@@ -100,19 +67,16 @@ function parseFrontmatter(content) {
 	let multilineType = null; // '>' for folded, '|' for literal
 
 	for (const line of frontmatterLines) {
-		// Check if continuation line (starts with whitespace and has content)
 		if (isMultiline && line.match(/^\s+\S/)) {
 			const separator = multilineType === "|" ? "\n" : " ";
 			currentValue += (currentValue ? separator : "") + line.trim();
 			continue;
 		}
 
-		// Save previous key if exists
 		if (currentKey && currentValue) {
 			frontmatter[currentKey] = currentValue.trim();
 		}
 
-		// Skip empty lines
 		if (line.trim() === "") {
 			currentKey = null;
 			currentValue = "";
@@ -120,13 +84,11 @@ function parseFrontmatter(content) {
 			continue;
 		}
 
-		// Parse new key: value
 		const colonIndex = line.indexOf(":");
 		if (colonIndex > 0) {
 			currentKey = line.substring(0, colonIndex).trim();
 			let value = line.substring(colonIndex + 1).trim();
 
-			// Check for multiline indicators
 			if (value === ">-" || value === ">" || value === "|" || value === "|-") {
 				isMultiline = true;
 				multilineType = value.startsWith("|") ? "|" : ">";
@@ -141,7 +103,6 @@ function parseFrontmatter(content) {
 		}
 	}
 
-	// Don't forget last key
 	if (currentKey && currentValue) {
 		frontmatter[currentKey] = currentValue.trim();
 	}
@@ -152,13 +113,6 @@ function parseFrontmatter(content) {
 	};
 }
 
-/**
- * Check if a file should be included in the catalog scan.
- * Markdown files (.md, .mdc, .txt) will have frontmatter parsed.
- * Other supported files (.json, .js, .sh) are listed without frontmatter.
- * @param {string} filename
- * @returns {boolean}
- */
 function isScannableFile(filename) {
 	return (
 		filename.endsWith(".md") ||
@@ -170,14 +124,6 @@ function isScannableFile(filename) {
 	);
 }
 
-/**
- * Recursively scan a directory for markdown files up to a maximum depth
- * @param {string} dir - Directory to scan
- * @param {number} currentDepth - Current recursion depth
- * @param {number} maxScanDepth - Maximum depth to scan
- * @param {string} relativePath - Relative path from the top-level folder
- * @returns {Array} Array of file objects
- */
 function scanDirectoryRecursive(dir, currentDepth, maxScanDepth, relativePath = "") {
 	const files = [];
 
@@ -227,7 +173,6 @@ function scanPromptsDirectory(dir, scanDepth = maxDepth) {
 		const stat = fs.statSync(itemPath);
 
 		if (stat.isDirectory() && item !== 'dist' && item !== 'node_modules' && item !== '.git' && !ignoreNames.has(item)) {
-			// Recursively scan subdirectory with configurable depth
 			// Start at depth 1 since we're inside the first-level folder
 			const files = scanDirectoryRecursive(itemPath, 1, scanDepth - 1, "");
 			folders[item] = files.sort((a, b) => a.name.localeCompare(b.name));
@@ -249,11 +194,6 @@ function formatFrontmatterValue(value) {
 	return `\`${value}\``;
 }
 
-/**
- * Group files by their first path component (subfolder)
- * @param {Array} files - Array of file objects
- * @returns {Object} Object with subfolder names as keys and file arrays as values
- */
 function groupFilesBySubfolder(files) {
 	const groups = {};
 	const rootFiles = [];
@@ -267,7 +207,6 @@ function groupFilesBySubfolder(files) {
 			}
 			groups[subfolder].push({
 				...file,
-				// Store the relative name without the first subfolder
 				relativeName: parts.slice(1).join("/"),
 			});
 		} else {
@@ -275,7 +214,6 @@ function groupFilesBySubfolder(files) {
 		}
 	}
 
-	// Add root files under a special key if any exist
 	if (rootFiles.length > 0) {
 		groups["_root"] = rootFiles;
 	}
@@ -283,12 +221,6 @@ function groupFilesBySubfolder(files) {
 	return groups;
 }
 
-/**
- * Generate a table of contents from markdown headings (h3/h4).
- * Produces GitHub-compatible anchor links (same as VS Code Markdown All in One).
- * @param {string} markdown - Markdown content to extract headings from
- * @returns {string} TOC as markdown list
- */
 function generateToc(markdown) {
 	const lines = markdown.split("\n");
 	const tocLines = [];
@@ -312,15 +244,7 @@ function generateToc(markdown) {
 	return tocLines.join("\n");
 }
 
-/**
- * Generate a markdown table for a group of files
- * Dynamically discovers columns from frontmatter keys.
- * @param {Array} files - Array of file objects
- * @param {string} outputFile - Path to output file for relative links
- * @returns {string} Markdown table content
- */
 function generateTable(files, outputFile) {
-	// First pass: parse all files and collect frontmatter keys
 	const parsedFiles = [];
 	const allKeys = new Set();
 
@@ -343,7 +267,6 @@ function generateTable(files, outputFile) {
 		}
 	}
 
-	// Build columns from discovered keys (preserve insertion order)
 	const extraColumns = allowedFields
 		? allowedFields.filter(f => allKeys.has(f))
 		: [...allKeys];
@@ -366,7 +289,6 @@ function generateTable(files, outputFile) {
 		rows.push({ group, fileLink, values });
 	}
 
-	// Header
 	const formatHeader = (key) =>
 		key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 	const groupHeader = hasGroup ? "| Group " : "";
@@ -374,7 +296,6 @@ function generateTable(files, outputFile) {
 	let markdown = `${groupHeader}| File |${extraColumns.length > 0 ? ` ${extraColumns.map(formatHeader).join(" | ")} |` : ""}\n`;
 	markdown += `${groupSep}|------|${extraColumns.map(() => "---").join("|")}${extraColumns.length > 0 ? "|" : ""}\n`;
 
-	// Rows
 	for (const { group, fileLink, values } of rows) {
 		const groupCell = hasGroup ? `| \`${group}\` ` : "";
 		markdown += `${groupCell}| ${fileLink} |${values.length > 0 ? ` ${values.join(" | ")} |` : ""}\n`;
@@ -383,13 +304,6 @@ function generateTable(files, outputFile) {
 	return markdown;
 }
 
-/**
- * Generate markdown documentation for a folder with subsections
- * @param {array} files
- * @param {string} folderName
- * @param {string} outputFile
- * @returns {string}
- */
 function generateMarkdownTable(files, folderName, outputFile) {
 	if (!files || files.length === 0) {
 		return `### \`${folderName.toLowerCase()}\`\n\nNo files found.\n`;
@@ -397,31 +311,25 @@ function generateMarkdownTable(files, folderName, outputFile) {
 
 	let markdown = `### \`${folderName.toLowerCase()}\`\n\n`;
 
-	// Group files by their first subfolder
 	const groups = groupFilesBySubfolder(files);
 	const sortedGroupNames = Object.keys(groups).sort((a, b) => {
-		// Put _root first if it exists
 		if (a === "_root") return -1;
 		if (b === "_root") return 1;
 		return a.localeCompare(b);
 	});
 
-	// If there's only one group and it's _root, or no subfolders, use flat table
 	if (sortedGroupNames.length === 1 && sortedGroupNames[0] === "_root") {
 		markdown += generateTable(groups["_root"], outputFile);
 		return `${markdown}\n`;
 	}
 
-	// Generate subsections for each group
 	for (const groupName of sortedGroupNames) {
 		const groupFiles = groups[groupName];
 
 		if (groupName === "_root") {
-			// Root files without subsection header
 			markdown += generateTable(groupFiles, outputFile);
 			markdown += "\n";
 		} else {
-			// Subsection with header
 			markdown += `#### \`${folderName.toLowerCase()}/${groupName}\`\n\n`;
 			markdown += generateTable(groupFiles, outputFile);
 			markdown += "\n";
@@ -446,10 +354,8 @@ function generatePromptsDocumentation(customPath = null, customOutput = null) {
 
 	if (verbose) console.log(`Found ${Object.keys(folders).length} folders with prompts`);
 
-	// Sort folders by name to ensure consistent output
 	const sortedFolderNames = Object.keys(folders).sort();
 
-	// Generate sections content (tables organized by folder)
 	let sectionsContent = "";
 	for (const folderName of sortedFolderNames) {
 		if (verbose) console.log(
@@ -462,10 +368,8 @@ function generatePromptsDocumentation(customPath = null, customOutput = null) {
 		);
 	}
 
-	// Generate TOC from section headings
 	const toc = generateToc(sectionsContent);
 
-	// Build full file content
 	const title = customTitle ?? "AIDD Framework Catalog";
 	const tagline =
 		customTagline ??
@@ -477,7 +381,6 @@ function generatePromptsDocumentation(customPath = null, customOutput = null) {
 	markdownContent += toc + "\n\n---\n\n";
 	markdownContent += sectionsContent;
 
-	// Write output
 	const outputDir = path.dirname(outputFile);
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });

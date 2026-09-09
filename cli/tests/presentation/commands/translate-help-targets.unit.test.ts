@@ -4,12 +4,8 @@ import { supportedBuildTargets } from "../../../src/contexts/translate/domain/bu
 import { registerTranslateCommand } from "../../../src/presentation/commands/translate.js";
 
 /**
- * `--to`'s help text names the targets in prose, which nothing derives and nothing else
- * reads. The validation right below it reads the profiles, so the two can drift: a sixth
- * tool would be accepted by the command and absent from the help that announces it.
- *
- * Asserting the set rather than the sentence keeps the wording free while making the
- * omission fail.
+ * The help text names targets in prose nothing derives, while the validation beside it reads
+ * the profiles. Asserting the set, not the sentence, leaves the wording free.
  */
 describe("translate --to help text", () => {
   it("names exactly the targets the command accepts", () => {

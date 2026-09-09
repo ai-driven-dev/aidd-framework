@@ -14,7 +14,6 @@ const PROJECT_ROOT = "/test-project";
 describe("UninstallUseCase — plugin scope", () => {
   it("removes plugin files and unregisters from manifest when --plugin <name> given", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
-    // Seed plugin fixture content so PluginDistributionReaderAdapter can read it
     const { seedFromDirectory } = await import("../../../helpers/ports/seed-from-directory.js");
     await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
 

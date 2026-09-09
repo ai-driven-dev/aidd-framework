@@ -1,21 +1,3 @@
-/**
- * Command Matrix E2E — Help & Globals surface
- * Automated counterpart of: aidd_docs/tasks/2026_05/2026_05_06-cli-v5-cleanup-command-matrix.md
- *
- * Phase 18 retired `ai`/`ide` (folded into `--tool`), `status` (folded into `doctor`),
- * `restore` (renamed `sync`) and `self-update` (renamed `update`). This file now also
- * guards the retirement itself: the old spellings must answer "unknown command", and
- * the words the old grammar reserved (`sync`, `doctor`, `update`) must resolve to their
- * new meaning rather than to Commander's unknown-command path.
- *
- * Already covered by existing E2E journeys (not duplicated here):
- *   clean.e2e.test.ts                — clean, clean --force, clean dry-run
- *   update-global.e2e.test.ts        — framework update, multi-tool update
- *   greenfield-setup.e2e.test.ts     — framework install --tool <tool> variants
- *
- * See also: command-matrix-plugin.e2e.test.ts
- */
-
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -38,10 +20,6 @@ async function seedWithClaude(projectDir: string, fakeHome: string): Promise<voi
   await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 }
 
-// ---------------------------------------------------------------------------
-// Help surface
-// ---------------------------------------------------------------------------
-
 describe.concurrent("Command Matrix: Help", () => {
   it("aidd --help exits 0 and lists top-level commands", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("help-root");
@@ -57,7 +35,7 @@ describe.concurrent("Command Matrix: Help", () => {
       expect(stdout).toContain("sync");
       expect(stdout).toContain("translate");
       expect(stdout).toContain("update");
-      // `ai`/`ide` retired behind `--tool` — regression guard for the retirement.
+      // `ai`/`ide` are retired behind `--tool`.
       expect(stdout).not.toMatch(/^\s*ai\s/m);
       expect(stdout).not.toMatch(/^\s*ide\s/m);
     } finally {
@@ -73,7 +51,7 @@ describe.concurrent("Command Matrix: Help", () => {
       expect(stdout).toContain("install");
       expect(stdout).toContain("remove");
       expect(stdout).toContain("update");
-      // `build` retired — the framework verbs are install/remove/update only.
+      // The framework verbs are install/remove/update only.
       expect(stdout).not.toMatch(/^\s*build\s/m);
     } finally {
       await cleanup();
@@ -194,8 +172,6 @@ describe.concurrent("Command Matrix: Help", () => {
   });
 
   it("aidd install --help exits 0 (Commander.js intercepts --help before unknown command check)", async () => {
-    // NOTE from matrix: `--help` on unknown command shows top-level help with exit 0.
-    // The bare `aidd install` (above) correctly exits 1.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("help-unknown-install-flag");
     try {
       const { stdout, exitCode } = await runCli(["install", "--help"], projectDir, fakeHome);
@@ -222,11 +198,6 @@ describe.concurrent("Command Matrix: Help", () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// Globals — doctor / sync / update --check
-// (framework update and clean are in update-global.e2e.test.ts and clean.e2e.test.ts)
-// ---------------------------------------------------------------------------
-
 describe.concurrent("Command Matrix: Globals", () => {
   it("doctor exits 0 and reports installation is healthy", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("global-doctor");
@@ -241,7 +212,6 @@ describe.concurrent("Command Matrix: Globals", () => {
   });
 
   it("sync exits 0 reporting nothing to restore when files unmodified", async () => {
-    // matrix row: `restore` (now `sync`) → exit 0, "Nothing to restore"
     const { projectDir, fakeHome, cleanup } = await createTestEnv("global-sync");
     try {
       await seedWithClaude(projectDir, fakeHome);

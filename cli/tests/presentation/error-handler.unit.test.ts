@@ -16,9 +16,8 @@ function createMockOutput(): CLIOutput {
 }
 
 /**
- * `process.exit` returns `never`, and so does `ErrorHandler.handle`. A double that returns
- * normally cannot honestly be typed as either, and it lets a test walk through code the
- * real process would never reach. Throwing is what "does not return" looks like in-process.
+ * `process.exit` returns `never`, and so does `ErrorHandler.handle`: a double that returns
+ * normally lets a test walk through code the real process would never reach.
  */
 class ProcessExited extends Error {
   constructor(readonly code: number | string | null | undefined) {

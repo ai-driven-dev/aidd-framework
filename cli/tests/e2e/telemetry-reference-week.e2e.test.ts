@@ -5,17 +5,8 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cliPath } from "./helpers.js";
 
-/**
- * The reference week, held to the built command.
- *
- * Every other telemetry e2e proves one axis on data written straight into the sink. This
- * one proves the axes reconcile to each other on a week produced by the shipped hook and
- * read out of each tool's own session files — capture, join and analysis in one scenario.
- *
- * The scenario itself lives in `scripts/lib/telemetry-reference-week.cjs`, shared with
- * `scripts/telemetry-reference-week.cjs`, which prints what this asserts. One builder, so
- * the demo cannot drift from the test.
- */
+// The scenario lives in `scripts/lib/telemetry-reference-week.cjs`, shared with
+// `scripts/telemetry-reference-week.cjs`, so what the demo prints cannot drift from this.
 const week = createRequire(import.meta.url)(
   "../../../scripts/lib/telemetry-reference-week.cjs"
 ) as ReferenceWeekModule;
@@ -114,12 +105,8 @@ describe("the reference week", () => {
   });
 
   it("reconciles every breakdown to that same total", () => {
-    // `by_tool` included, and its inclusion is the point: a session-total tool carries its
-    // figure in `session_totals`, a field of its own, so `totals` still sums like every
-    // other axis. Leaving it out — on the theory that Copilot's record could not belong to
-    // a request sum — would drop the one axis that catches a tool's figures being stored
-    // against another tool's sessions, which is exactly the defect this week's own harness
-    // was found to be asserting.
+    // `by_tool` included: a session-total tool carries its figure in `session_totals`, a field
+    // of its own, so `totals` still sums like every other axis.
     const breakdowns = [
       envelope.by_day,
       envelope.by_flow,
@@ -148,9 +135,8 @@ describe("the reference week", () => {
   });
 
   it("leads with the run it can name, though more of the week fell outside every flow", () => {
-    // The week's own figures make this the case that matters: 4 requests outside every flow
-    // against 3 inside the one run. Ordered by size alone the remainder led the table, while
-    // `by_task` and `by_backlog` beside it led with their largest named row.
+    // The week's own figures: 4 requests outside every flow against 3 inside the one run, so
+    // ordering by size alone would put the unnamed remainder first.
     expect(envelope.by_flow.map((row) => row.flow)).toEqual([built.expected.flow, undefined]);
   });
 
@@ -167,19 +153,15 @@ describe("the reference week", () => {
   });
 
   it("breaks the week down by task, and by the backlog item a task declared", () => {
-    // Distinct, because one task can hold two rows since `cost_report_version` 12 - one for
-    // what a declaration covered, one for what only a written file names, the same
-    // `(name x attribution)` shape `by_step` has always had. What this asserts is which
-    // tasks the week names, never how many routes named each.
+    // Distinct: one task can hold two rows — one for what a declaration covered, one for what
+    // only a written file names — so this asserts which tasks the week names, not how many.
     const tasks = [...new Set(envelope.by_task.map((row) => row.task).filter(Boolean))];
     expect(tasks.sort()).toEqual([...built.expected.tasks].sort());
 
     const declared = envelope.by_backlog.filter((row) => row.backlog !== undefined);
     expect(declared.map((row) => row.backlog)).toEqual([built.expected.backlogItem]);
-    // The task with a backlog link and the task without must not merge into one row. Three
-    // requests since version 12, not two: that session's 08:07 record precedes its own
-    // declaration at 08:12 by five minutes, its journal witnessed it, and it wrote into that
-    // one task folder and no other - so the written-file route names it too.
+    // Three requests, not two: that session's 08:07 record precedes its own declaration at
+    // 08:12, its journal witnessed it, and it wrote into that one task folder alone.
     expect(declared[0]?.totals.requests).toBe(3);
     expect(sumRequests(envelope.by_backlog)).toBe(envelope.totals.requests);
   });
@@ -215,9 +197,8 @@ describe("the reference week", () => {
   });
 
   it("names a teammate's records as an identity it cannot resolve, never as nobody", () => {
-    // The report runs on Ada's machine. Bo's identifier is real and its records are here,
-    // but nothing local maps it to a person — so it gets its own row, named for what is
-    // known. Resolving people across machines is a destination's job, not this command's.
+    // The report runs on Ada's machine: Bo's identifier is real and his records are here, but
+    // nothing local maps it to a person, so it gets its own row named for what is known.
     const resolutions = envelope.by_person.map((row) => row.resolution);
     expect(resolutions).toContain("mapped");
     expect(resolutions).toContain("unresolved");
@@ -236,15 +217,8 @@ describe("the reference week", () => {
   });
 });
 
-/**
- * The commands a person actually has to run.
- *
- * `report` reads the sink, and until this nothing filled the sink but `aidd telemetry read`.
- * Forgetting that step was answered with "nothing in this period" — the one sentence
- * indistinguishable from a week where nothing was spent. Held here against the built binary,
- * on a week whose figures are known, because the whole point is what happens when a person
- * runs one command instead of two.
- */
+// `report` reads the sink, and a week nobody ran `aidd telemetry read` over used to answer
+// "nothing in this period" — indistinguishable from a week where nothing was spent.
 describe("a report that needs no read first", () => {
   let root: string;
   let built: BuiltWeek;
@@ -274,17 +248,8 @@ describe("a report that needs no read first", () => {
   });
 });
 
-/**
- * Git exports `GIT_DIR` and its siblings into every process it spawns, so a suite run from
- * inside a hook — `pre-push` running the tests, which is how this was found — inherits a
- * pointer to the real repository. The builder's own `git init` then lands in a temp
- * directory while `git remote add origin` operates on this repository, which already has
- * one, and the whole week fails to build with `exited 3`.
- *
- * It passed by hand and failed from the hook, which is precisely the shape of that leak.
- * Asserted here rather than left to whichever runner happens to be inside git, because a
- * harness that only works outside one is a harness nobody can trust from CI either.
- */
+// Git exports `GIT_DIR` into every process it spawns, so a suite run from inside a hook inherits
+// a pointer to the real repository and the builder's own `git init` lands somewhere else.
 describe("the week builds inside a git hook's own environment", () => {
   it("ignores a leaked GIT_DIR rather than resolving the real repository", () => {
     const root = mkdtempSync(join(tmpdir(), "aidd-reference-week-gitdir-"));

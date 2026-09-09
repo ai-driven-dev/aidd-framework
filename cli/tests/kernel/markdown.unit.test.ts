@@ -111,9 +111,8 @@ describe("parseFrontmatter() — block scalars", () => {
     const { frontmatter } = parseFrontmatter(content);
     expect(frontmatter.tools).toBe("[invalid json}");
   });
-  // A Windows checkout hands the parser the same document with CRLF (#707). Pinned here
-  // rather than only on the Windows runner: the defect is a pure string transform, so a
-  // test that fails when the fix is reverted runs on any platform.
+  // A Windows checkout hands the parser the same document with CRLF, and the transform is
+  // pure string work, so this fails on any platform when the fix is reverted.
   it("parses the same document whichever way its lines end", () => {
     const lf = "---\nname: hi\nallowed_tools:\n  - Read\n  - Bash\n---\nbody\n";
     const crlf = lf.replace(/\n/g, "\r\n");
@@ -132,12 +131,8 @@ describe("parseFrontmatter() — block scalars", () => {
 });
 
 /**
- * The branches mutation found unguarded.
- *
- * Frontmatter is where every tool profile meets the content it rewrites, so a change
- * here is a change everywhere. Sixty of the kernel's surviving mutants were in this
- * module, and the clusters below are what they pointed at: the quoting decisions, the
- * delimiter checks, and the shape of an empty document.
+ * Frontmatter is where every tool profile meets the content it rewrites, so a change here is
+ * a change everywhere: the quoting decisions, the delimiter checks, an empty document.
  */
 describe("frontmatter, at the edges", () => {
   it("keeps a glob quoted so YAML cannot read it as a pattern", () => {

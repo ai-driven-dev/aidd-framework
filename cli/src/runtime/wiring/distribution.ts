@@ -41,12 +41,9 @@ export interface DistributionDeps {
   marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFrameworkUseCase;
 }
 
-/**
- * Distribution's own adapters and use cases — where content comes from and how it is
- * fetched. `marketplaceAddUseCase` is deliberately absent: it takes framework's
- * `marketplaceRemoveUseCase` (`marketplace add --overwrite` removes before it adds), so
- * it is composed in `wiring/framework.ts` instead of pulling framework in here.
- */
+/** `marketplaceAddUseCase` is deliberately absent: it takes framework's
+ * `marketplaceRemoveUseCase`, so it is composed in `wiring/framework.ts` rather than pulling
+ * framework in here. */
 export function wireDistribution(shared: DistributionWiringShared): DistributionDeps {
   const pluginCatalogRepository = new PluginCatalogRepositoryAdapter(shared.fs);
   const marketplaceCache = new MarketplaceCacheAdapter(shared.projectRoot);

@@ -117,13 +117,11 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
         acceptsMcp: true,
         translationMode: "marketplace",
-        // Claude registers its own marketplaces and enables its own plugins, both driven
-        // here. An earlier attempt drove them at project scope, where the command rewrites
-        // `.claude/settings.json` after this CLI hashed it — two writers, one recorder, and
-        // `status` reporting drift forever. `--scope local` writes `.claude/settings.local.json`
-        // instead, a file this CLI neither writes nor tracks, so nothing collides. Measured.
-        // That is what makes the verbs below safe to declare, and it is the whole of the
-        // reason: without the scope mapping they would be the second writer again.
+        // Claude registers its own marketplaces and enables its own plugins, both driven here.
+        // At project scope the command rewrites `.claude/settings.json` after this CLI hashed
+        // it — two writers, one recorder, and `status` reporting drift forever. `--scope local`
+        // writes `.claude/settings.local.json` instead, a file this CLI neither writes nor
+        // tracks, which is what makes the verbs below safe to declare.
         nativeActivation: {
           binary: "claude",
           scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },
@@ -133,28 +131,24 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           // `--yes` gates a prune confirmation these calls never request, but a headless
           // stdin has no terminal to answer any prompt at all.
           pluginArgs: ["--yes"],
-          // Root of claude's own marketplace registry — read by the sync guard that
-          // refuses a name-stealing re-add before driving `marketplace add` at all.
-          // Declared here alone: neither codex nor copilot needs it (see the field's
-          // own doc), which is what keeps that guard claude-only by declaration.
+          // Root of claude's own marketplace registry, read by the sync guard that refuses a
+          // name-stealing re-add before driving `marketplace add` at all. Declared here alone,
+          // which is what keeps that guard claude-only by declaration.
           marketplaceRegistry: (h) => join(h, ".claude", "plugins", "known_marketplaces.json"),
-          // Root of claude's own plugin cache. `clean` composes `<root>/<hostName>` and
-          // purges only once a fresh read of `marketplaceRegistry` above no longer names
-          // it — claude marks an orphaned tree `.orphaned_at` but never deletes it itself
-          // (measured against the real binary in a relocated HOME).
+          // Root of claude's own plugin cache. `clean` composes `<root>/<hostName>` and purges
+          // only once a fresh read of `marketplaceRegistry` above no longer names it — claude
+          // marks an orphaned tree `.orphaned_at` but never deletes it itself.
           pluginCacheDir: (h) => join(h, ".claude", "plugins", "cache"),
-          // Where `claude plugin install --scope user`/`marketplace add --scope user`
-          // land — measured against the real binary in a relocated HOME. Never written
-          // by aidd; named here for a diagnostic alone.
+          // Where a `--scope user` install or marketplace add lands, measured against the real
+          // binary. Never written by aidd; named here for a diagnostic alone.
           userSettingsPath: (h) => join(h, ".claude", "settings.json"),
         },
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",
           settingsKey: "extraKnownMarketplaces",
-          // The registered marketplace is the tree this CLI builds under `.aidd/cache/`,
-          // named by absolute path, so the entry describes one machine and must not be
-          // committed. Claude reads this file alongside the shared one, and it is the
-          // file `claude plugin marketplace add --scope local` writes itself.
+          // The registered marketplace is the tree this CLI builds under `.aidd/cache/`, named
+          // by absolute path, so the entry describes one machine and must not be committed. It
+          // is the file `claude plugin marketplace add --scope local` writes itself.
           marketplacesSettingsPath: ".claude/settings.local.json",
           enabledPluginsKey: "enabledPlugins",
           toEntryKey: claudeStyleMarketplaceKey,

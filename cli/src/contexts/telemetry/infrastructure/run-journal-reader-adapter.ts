@@ -11,28 +11,17 @@ import type {
   RunJournalTaskDeclared,
 } from "../domain/ports/run-journal-reader.js";
 
-/**
- * The one schema this reader knows how to read, mirroring `record.cjs`'s own
- * `SCHEMA_VERSION` — the same kind of mirror `sanitizePathSegment` above is, and pinned the
- * same way: `run-journal-reader-adapter.integration.test.ts` compares this against the
- * hook's own exported constant rather than against a second copy of the number.
- *
- * Version 1 was a mutable record, not this append-only line log, so its lines are another
- * shape entirely; a later version can change any line's shape the same way. A journal
- * stating either is refused rather than read, since reading it would mean guessing that
- * whatever lines this parser still recognises mean what they used to.
- */
+/** The one schema this reader knows, mirroring `record.cjs`'s own `SCHEMA_VERSION` and
+ * pinned against it by the integration suite. A journal stating any other version is refused
+ * rather than read, since its lines can carry another shape entirely. */
 export const READABLE_JOURNAL_SCHEMA_VERSION = 2;
 
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.cjs's own ULID_LENGTH.
 const RUN_FILE_EXTENSION = ".jsonl";
 
-// Mirrors plugins/aidd-telemetry/hooks/lib/repo.cjs's own `sanitizePathSegment`, character
-// for character, so a vendor id sanitized there on write matches what is sanitized here on
-// read. Not a shared runtime import: the hook is a zero-dependency CommonJS script the
-// framework build copies verbatim. Exported so
-// run-journal-reader-adapter.integration.test.ts can assert agreement against the hook's
-// own function directly, the same way telemetry-project-id.unit.test.ts pins its copy.
+// Mirrors the hook's own `sanitizePathSegment` character for character, so a vendor id
+// sanitized there on write matches what is sanitized here on read. Not a shared import: the
+// hook is a zero-dependency CommonJS script. Exported so a test can pin the agreement.
 export function sanitizePathSegment(segment: string): string {
   const cleaned = segment.replace(/[^\w.-]/gu, "-");
   return cleaned === "" || cleaned === "." || cleaned === ".." ? "-" : cleaned;
@@ -56,12 +45,8 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-/** Whether a journal says outright that it was written under some other schema. Absence is
- * never that statement: every journal on disk before this reader looked at the field
- * carries none, and refusing those would drop attribution this reader has always given —
- * "an unknown is never a zero", applied to the reader rather than to a figure. A value that
- * is not a finite number is read as absent for the same reason, since a torn or hand-edited
- * field states nothing either. */
+/** Absence is never that statement, and neither is a non-finite value: a field nobody wrote,
+ * or a torn one, states nothing, and refusing it would drop attribution over an unknown. */
 function statesAnotherSchema(session: RunJournalSessionStart | undefined): boolean {
   const stated = session?.schema_version;
   return stated !== undefined && stated !== READABLE_JOURNAL_SCHEMA_VERSION;
@@ -94,9 +79,8 @@ function parseLine(line: string): RawJournalLine | null {
   }
 }
 
-/** One `step_start`, `turn_end` or `step_end` line, or `null` for every other line type and every line
- * this file cannot parse — a torn final line from a session still in progress reads as
- * nothing, not as a boundary at the wrong moment. */
+/** `null` for every other line type and every unparseable line: a torn final line from a
+ * session still in progress reads as nothing, not as a boundary at the wrong moment. */
 function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   const at = asString(parsed.at);
   if (at === undefined) return null;
@@ -104,16 +88,15 @@ function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   const skill = asString(parsed.skill);
   if (skill === undefined) return null;
   // An end with no skill is dropped rather than read as a bare boundary: it would close a
-  // step it cannot name, which is the one thing `RunJournalStepEnd` exists to prevent.
+  // step it cannot name.
   if (parsed.type === "step_end") return { type: "step_end", at, skill };
   if (parsed.type !== "step_start") return null;
   const turnId = asString(parsed.turn_id);
   return { type: "step_start", at, skill, ...(turnId === undefined ? {} : { turn_id: turnId }) };
 }
 
-/** The worktree a session ran in, where the line names one. A plain checkout writes
- * neither key, and neither is read here — `asString` already rejects `""`, so a torn or
- * empty value reads as "not stated" rather than as a worktree named nothing. */
+/** A plain checkout writes neither key; `asString` rejects `""`, so a torn or empty value
+ * reads as "not stated" rather than as a worktree named nothing. */
 function parseWorktree(
   parsed: RawJournalLine
 ): Pick<RunJournalSessionStart, "worktree_id" | "worktree_repo_id"> {
@@ -125,8 +108,7 @@ function parseWorktree(
   };
 }
 
-/** The header line, or `null` when the line is not one or is missing a field a join needs.
- * `run_id`, `tool` and `vendor_id` are all required: a header naming two of the three
+/** `run_id`, `tool` and `vendor_id` are all required: a header naming two of the three
  * cannot say which session it belongs to, and a half-read header is worse than none. */
 function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | null {
   if (parsed.type !== "session_start") return null;
@@ -147,10 +129,8 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
   };
 }
 
-/** Every optional header field a journal may state, isolated from the required ones
- * `parseSessionStart` reads itself — each absent rather than defaulted, the same rule
- * `parseWorktree` above already follows: a field the writer left out is one this reader has
- * nothing to say about, and a default would be an answer nobody wrote. */
+/** Each field is absent rather than defaulted: a field the writer left out is one this
+ * reader has nothing to say about, and a default would be an answer nobody wrote. */
 function headerExtras(parsed: RawJournalLine): Partial<RunJournalSessionStart> {
   const projectId = asString(parsed.project_id);
   const projectRemote = asString(parsed.project_remote);
@@ -183,9 +163,8 @@ function parseTaskDeclared(parsed: RawJournalLine): RunJournalTaskDeclared | nul
     : { type: "task_declared", at, path: declaredPath };
 }
 
-/** One journal file's lines, sorted into their buckets as each is read - mutable so
- * `classifyLine` can fill it one line at a time without every caller threading four
- * separate arrays through. */
+/** Mutable so `classifyLine` can fill it one line at a time without every caller threading
+ * four separate arrays through. */
 interface JournalCollector {
   readonly boundaries: RunJournalBoundary[];
   readonly filesWritten: RunJournalFileWritten[];
@@ -197,9 +176,8 @@ function newJournalCollector(): JournalCollector {
   return { boundaries: [], filesWritten: [], taskDeclarations: [], session: undefined };
 }
 
-/** One parsed line, sorted into whichever bucket recognises it - the four line types this
- * port promises, tried in the order they are written most often. A line matching none of
- * them is the header, kept only the first time it is seen (see the comment below). */
+/** The four line types this port promises, tried in the order they are written most often.
+ * A line matching none of them is the header. */
 function classifyLine(collector: JournalCollector, parsed: RawJournalLine): void {
   const boundary = parseBoundary(parsed);
   if (boundary) {
@@ -216,21 +194,15 @@ function classifyLine(collector: JournalCollector, parsed: RawJournalLine): void
     collector.taskDeclarations.push(declared);
     return;
   }
-  // The header is written once, first. Keeping the first one read means a second, however
-  // it got there, never silently replaces the identity the file opened with.
+  // The header is written once, first, so keeping the first one read means a second never
+  // silently replaces the identity the file opened with.
   collector.session ??= parseSessionStart(parsed) ?? undefined;
 }
 
-/**
- * Reads a session's run journal — the one class in this path allowed to open a file
- * under `aidd_docs/runs`.
- * Never throws: no run file for this session, an unreadable runs directory, or a truncated
- * final line all answer `null` or an empty boundary list, since a missing or damaged
- * journal costs attribution, not the read itself. `AIDD_RUNS_DIR` overrides the directory
- * outright, matching the hook that writes it — resolved exactly once, in the constructor,
- * and frozen from then on: a relocation of that variable after construction can never
- * change what this instance answers.
- */
+/** Never throws: a missing run file, an unreadable runs directory or a truncated final line
+ * all answer `null` or an empty list, since a damaged journal costs attribution, not the read
+ * itself. `AIDD_RUNS_DIR` overrides the directory, resolved once in the constructor so a
+ * later relocation cannot change what this instance answers. */
 export class RunJournalReaderAdapter implements RunJournalStore {
   readonly runsDir: string;
 
@@ -280,13 +252,9 @@ export class RunJournalReaderAdapter implements RunJournalStore {
     }
   }
 
-  // `force: true`, exactly like `TelemetrySinkAdapter.deleteDayFile`: a name already gone
-  // is nothing to remove, never a failure. `dir` is never this instance's own `runsDir` —
-  // it is whatever the caller passes, which `forget-telemetry-use-case.ts` always takes
-  // from `TelemetryRemovalPreview.journal.path`, the value a person was already shown.
-  // `isBareFileName` is the actual confinement: `join` alone normalises `..` away visually
-  // but still deletes wherever the normalised path lands, so a `fileName` that is not a
-  // bare component of `dir` is refused before it ever reaches `rm`.
+  // `force: true`: a name already gone is nothing to remove, never a failure. `isBareFileName`
+  // is the confinement — `join` normalises `..` away visually but still deletes wherever the
+  // result lands, so a name that is not a bare component of `dir` never reaches `rm`.
   async deleteRunFile(dir: string, fileName: string): Promise<void> {
     if (!isBareFileName(fileName)) {
       throw new Error(`refusing to delete "${fileName}" — not a run file name inside ${dir}`);

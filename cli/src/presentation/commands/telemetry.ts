@@ -142,9 +142,8 @@ export function registerTelemetryCommand(program: Command): void {
               ...(cmdOptions.tool === undefined ? {} : { tool: cmdOptions.tool }),
             },
           });
-          // One value, three renderings. None derives a figure the others cannot see:
-          // `--json` and `--axis` both read the envelope, and the terminal rendering reads
-          // the report the envelope is built from.
+          // One value, three renderings, none deriving a figure the others cannot see: both
+          // `--json` and `--axis` read the envelope the terminal rendering is built from.
           if (cmdOptions.json) output.print(JSON.stringify(toCostReportEnvelope(report), null, 2));
           else if (cmdOptions.axis !== undefined)
             output.print(buildCostReportArtefact(toCostReportEnvelope(report), cmdOptions.axis));
@@ -203,10 +202,8 @@ export function registerTelemetryCommand(program: Command): void {
     });
 }
 
-/** Whether the measurement chain is actually recording, not merely installed — a hook
- * that fired, a session that closed, a tool's own files that can be read, and the two
- * joining. Wiring only: gathers through `deps.diagnoseTelemetryUseCase`, prints through
- * `printTelemetryCheckReport`, and every failure routes through `errorHandler.handle`. */
+/** Whether the measurement chain is actually recording, not merely installed: a hook that
+ * fired, a session that closed, a tool's own files that can be read, and the two joining. */
 function registerTelemetryCheckCommand(telemetry: Command, program: Command): void {
   telemetry
     .command("check")
@@ -232,17 +229,14 @@ function registerTelemetryCheckCommand(telemetry: Command, program: Command): vo
     });
 }
 
-/** Whether this person's own identifier is attached to what `aidd telemetry read` stores —
- * never a project's choice, and never the `telemetry on`/`off` switch beside it. Wiring
- * only: every verb reads through `deps.personIdentityUseCase`, and every failure routes
- * through `errorHandler.handle`. */
+/** Whether this person's own identifier is attached to what `aidd telemetry read` stores:
+ * never a project's choice, and never the `telemetry on`/`off` switch beside it. */
 function registerTelemetryIdentityCommand(telemetry: Command, program: Command): void {
   const identity = telemetry
     .command("identity")
     .description("Whether this person's own identifier is attached to records read locally");
-  // The bare noun answers with state rather than a help screen: `aidd telemetry identity` is
-  // a question, and a command surface that replies to it by describing itself is talking
-  // about the wrong thing. `--help` still prints the help.
+  // The bare noun is a question, so it answers with state rather than a help screen.
+  // `--help` still prints the help.
   identity.action(async () => {
     const { verbose, output, projectRoot } = parseGlobalOptions(program);
     const errorHandler = new ErrorHandler(output);

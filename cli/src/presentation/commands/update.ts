@@ -9,12 +9,9 @@ interface UpdateCmdOptions {
   force: boolean;
 }
 
-/**
- * A bare verb with no subject means "the CLI itself" — same convention Claude Code and
- * Codex use — which is what retired the old `update` (project-wide tools+plugins+
- * marketplace sweep, formerly `UpdateAllUseCase`): that entry point is gone, its pieces
- * already exist as `framework update`, `plugin update`, and `marketplace refresh`.
- */
+/** A bare verb with no subject means the CLI itself, the convention Claude Code and Codex
+ * share. The project-wide sweep lives at `framework update`, `plugin update` and
+ * `marketplace refresh`. */
 async function runUpdateAction(program: Command, cmdOptions: UpdateCmdOptions): Promise<void> {
   const { verbose, output, projectRoot } = parseGlobalOptions(program);
   const errorHandler = new ErrorHandler(output);

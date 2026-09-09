@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rewriteRelativeLinks } from "../../../src/kernel/materialization/relative-link-rewrite.js";
 
-// Stable test option used for all existing tests (the third branch is not triggered by @./ and @../).
+// One options object serves them all: the third branch is not reached by @./ or @../.
 const STABLE_OPTS = { currentFilePluginRelative: "skills/foo/SKILL.md" };
 
 // Written as split literals to avoid biome's noTemplateCurlyInString warning.
@@ -88,7 +88,6 @@ describe("rewriteRelativeLinks", () => {
     });
 
     it("handles a deep file referencing a skill in a peer skills subdirectory", () => {
-      // File at skills/aidd-test/commit/SKILL.md references root-level skills/aidd-test/SKILL.md
       const opts = { currentFilePluginRelative: "skills/aidd-test/commit/SKILL.md" };
       const input = `@${CLAUDE_ROOT}/skills/aidd-test/SKILL.md`;
       const output = rewriteRelativeLinks(input, opts);
@@ -116,9 +115,8 @@ describe("rewriteRelativeLinks", () => {
 
   describe("resolveTargetPath override", () => {
     it("uses the override to compute the link path instead of the default relative computation", () => {
-      // currentFile at "agents/reviewer.md" → dirname = "agents"
-      // resolveTargetPath returns ".github/agents/my-plugin/agents/reviewer.md"
-      // posix.relative("agents", ".github/agents/my-plugin/agents/reviewer.md") = "../.github/agents/my-plugin/agents/reviewer.md"
+      // posix.relative("agents", ".github/agents/my-plugin/agents/reviewer.md") =
+      // "../.github/agents/my-plugin/agents/reviewer.md"
       const opts = {
         currentFilePluginRelative: "agents/reviewer.md",
         resolveTargetPath: (rel: string) => `.github/agents/my-plugin/${rel}`,

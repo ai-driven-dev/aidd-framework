@@ -8,8 +8,8 @@ describe("namesTheSameSkill — one skill, two hosts, two spellings", () => {
   });
 
   it("holds when only one side carries the plugin, whichever side that is", () => {
-    // The case this exists for: Cursor and Codex open a step as `01-plan`, and the end the
-    // skill echoes always says `aidd-dev:01-plan`.
+    // Cursor and Codex open a step as `01-plan`, while the end the skill echoes always says
+    // `aidd-dev:01-plan`.
     expect(namesTheSameSkill("01-plan", "aidd-dev:01-plan")).toBe(true);
     expect(namesTheSameSkill("aidd-dev:01-plan", "01-plan")).toBe(true);
   });

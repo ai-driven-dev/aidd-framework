@@ -1,9 +1,6 @@
 /**
- * A use case that orchestrates several areas depends on their entry points, one per
- * area. A constructor listing many collaborators is the signal that the orchestration
- * reaches inside areas instead of asking them.
- *
- * See `.claude/rules/00-architecture/0-orchestration.md`.
+ * A constructor listing many collaborators is the signal that an orchestration reaches
+ * inside the areas it crosses instead of asking their entry points.
  */
 import { describe, expect, it } from "vitest";
 import { expectRatchet, read, sourceFiles } from "./helpers.js";
@@ -13,35 +10,17 @@ const MAX_INJECTED_USE_CASES = 4;
 
 /**
  * Orchestrators over the limit today, each with the count its reason was written around.
- * The list may only shrink, and a listed file may not absorb another collaborator: an entry
- * naming only the file would let one grow from five to fifteen in silence.
- *
- * This baseline was rebuilt whole once `injectedUseCaseCount` started counting every
- * constructor parameter instead of only the ones spelled or imported like a use case
- * (see that function's own doc). That widened lens surfaced 28 more files at once — not
- * new debt, debt this ratchet had never been able to see — so most entries below carry
- * only their measured count rather than a paragraph each; the three carried over from
- * before keep the reasoning already written for them.
+ * The list may only shrink, and an entry naming only the file would let one grow in silence.
  */
 const BASELINE: readonly { readonly path: string; readonly injected: number }[] = [
-  // Six checks, one per thing that can drift: tracked files, merged files, plugins,
-  // references, layout, registration. `doctor` reports on every one of them at once, so the
-  // fan-out is the feature. It resolves by giving each check a result type and asking a
-  // single `DriftReport` to collect them, not by removing a check.
+  // Six checks, one per thing that can drift, reported at once: the fan-out is the feature.
+  // It resolves by giving each check a result type, not by removing a check.
   { path: "src/contexts/framework/application/doctor/doctor-use-case.ts", injected: 7 },
-  // Eleven collaborators: the shared source-registration step
-  // (`SetupMarketplaceRegistrationUseCase`, itself extracted so this file would not
-  // carry resolve/guard/register/refresh's own collaborators directly), install tools,
-  // prompt for plugins, sync settings, current version, plus optional prompts for
-  // tools and context detection and the machine-scope handoff
-  // (`SetupMachineScopeUseCase`). `setup` is the command that brings a project from
-  // nothing to correct, so it necessarily names each stage.
+  // `setup` brings a project from nothing to correct, so it names each stage: registration,
+  // tool install, plugin prompt, settings sync, version, plus the machine-scope handoff.
   { path: "src/contexts/framework/application/setup-use-case.ts", injected: 11 },
-  // Five section generators reached via `new XUseCase(...)` inside a switch on content
-  // section name (agents, commands, rules, skills) plus the config generator called from
-  // both the IDE and AI branches, now on top of its own four constructor collaborators
-  // the old regex never looked at. It resolves by giving each section type its own
-  // registered generator instead of a switch, not by removing a section.
+  // Five section generators reached inline through a switch on section name, plus the config
+  // generator. It resolves by registering a generator per section type, not by dropping one.
   {
     path: "src/contexts/framework/application/restore/generate-tool-distribution-use-case.ts",
     injected: 9,
@@ -51,14 +30,10 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
     injected: 12,
   },
   { path: "src/contexts/framework/application/restore/restore-use-case.ts", injected: 12 },
-  // 11, one more than before: `hostPluginRegistries`, the host's own plugin registry
-  // reader per `AiToolId`, consulted before uninstalling a ref so the scope asked for
-  // is the one the host actually registered it at (see `resolveUninstallScopeOrder`).
+  // Carries `hostPluginRegistries`, the host's own registry reader per `AiToolId`, so the
+  // scope asked for when uninstalling a ref is the one the host actually registered it at.
   { path: "src/contexts/framework/application/clean-use-case.ts", injected: 11 },
-  // The machine-scope counterpart of `clean-use-case.ts`, same shape and same reason:
-  // fs, the user manifest repository, logger, the marketplace registry, the user
-  // config dir resolver, activators, host marketplace registries, homedir, the shared
-  // source references port and the prompter.
+  // The machine-scope counterpart of `clean-use-case.ts`, same shape and same reason.
   {
     path: "src/contexts/framework/application/clean/clean-user-scope-use-case.ts",
     injected: 10,
@@ -118,29 +93,14 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
     injected: 5,
   },
   { path: "src/contexts/translate/application/translate-source.ts", injected: 5 },
-  // 7: fs, manifestRepo, logger, activators, `hostPluginRegistries` (same reason
-  // `clean-use-case.ts` carries it), plus `userSourceReferences` and
-  // `marketplaceRegistry` — the shared-source guard `clean` already applies before
-  // uninstalling a ref, applied here too so `plugin remove` in one project cannot
-  // disable a plugin another project on the same machine still needs.
+  // Carries `clean`'s own shared-source guard as well, so `plugin remove` in one project
+  // cannot disable a plugin another project on the same machine still needs.
   { path: "src/contexts/framework/application/plugin/plugin-remove-use-case.ts", injected: 7 },
 ];
 
 /**
- * Constructor-injected collaborators — every one, not only a type named or imported as
- * a use case — plus the ones a method reaches for on its own via `new XUseCase(...)`.
- *
- * Counting by the `UseCase` suffix, or by a type imported from a `*-use-case.ts`
- * module, was blind twice over: naming a collaborator by the narrow interface its own
- * module exports — `PluginAdd` rather than `PluginAddUseCase` — took three
- * collaborators off `setup-use-case.ts`'s count without removing one, and a plain port
- * (`userManifestRepo?: ManifestRepository`, neither named nor imported as a use case)
- * took on a 16th collaborator there while this ratchet's own count stayed frozen at 9.
- * `0-orchestration.md`'s own rule is about what a constructor lists, not about how each
- * listed type happens to be spelled — so every constructor parameter counts, required
- * or optional, whatever its type. The two are counted separately then summed, deduped
- * by class name within each: a use case instantiated twice in two methods is still one
- * collaborator, the same way a constructor parameter is.
+ * Every constructor parameter counts, required or optional and whatever its type is named,
+ * plus each `new XUseCase(...)` a method reaches for, deduped by class name within each.
  */
 function injectedUseCaseCount(source: string): number {
   const signature = /constructor\((.*?)\)\s*\{/s.exec(source);
@@ -151,12 +111,10 @@ function injectedUseCaseCount(source: string): number {
   return paramCount + inlineNames.size;
 }
 
-/** Where a use case lives: inside a context's application layer. */
 function isUseCase(file: string): boolean {
   return /^src\/contexts\/[^/]+\/application\//.test(file);
 }
 
-/** The rule itself: does this constructor source cross the limit? */
 function overLimit(source: string): boolean {
   return injectedUseCaseCount(source) > MAX_INJECTED_USE_CASES;
 }
@@ -164,9 +122,7 @@ function overLimit(source: string): boolean {
 describe("orchestrators depend on entry points, not on parts", () => {
   it(`no use case injects more than ${MAX_INJECTED_USE_CASES} other use cases`, () => {
     const candidates = sourceFiles().filter(isUseCase);
-    // A rule that selects nothing passes forever. This one did: its filter named the
-    // flat `use-cases/` tree, and when those files moved into contexts it silently
-    // stopped applying to every one of them while reporting the baseline as fixed.
+    // A rule that selects nothing passes forever: this filter named a tree the files left.
     expect(candidates.length, "the rule selects no file — its scope is stale").toBeGreaterThan(20);
     const violations = candidates.filter((file) => overLimit(read(file)));
 
@@ -201,9 +157,6 @@ describe("orchestrators depend on entry points, not on parts", () => {
   });
 
   it("counts an optional constructor dependency, not just a required one", () => {
-    // `private readonly foo?: FooUseCase` has a `?` between the name and the colon that
-    // `\w+:` never matched, so a use case could sit at the limit on paper while carrying
-    // one more optional collaborator undetected.
     const atLimit = `constructor(
       ${Array.from({ length: MAX_INJECTED_USE_CASES }, (_, i) => `private readonly a${i}: FooUseCase,`).join("\n")}
     ) {}`;
@@ -226,11 +179,6 @@ describe("orchestrators depend on entry points, not on parts", () => {
   });
 
   it("counts a plain port too, not only a collaborator named or imported as a use case", () => {
-    // `userManifestRepo?: ManifestRepository` slipped past this ratchet unnoticed
-    // (`ManifestRepository` neither contains `UseCase` nor comes from a `*-use-case.js`
-    // module) — a real orchestrator took on a 16th collaborator while this test's own
-    // count stayed frozen at 9. Any injected collaborator is a dependency the
-    // constructor lists, whatever its own type is named or where it is declared.
     const atLimit = `constructor(
       ${Array.from({ length: MAX_INJECTED_USE_CASES }, (_, i) => `private readonly a${i}: FooUseCase,`).join("\n")}
     ) {}`;

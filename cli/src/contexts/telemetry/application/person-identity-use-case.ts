@@ -15,19 +15,11 @@ export interface PersonIdentityStatusResult {
 export interface PersonIdentityUseResult {
   readonly filePath: string;
   readonly identity: PersonIdentity;
-  /** How this machine came to carry the identifier it now carries.
-   *
-   * Three values rather than two booleans: `on` used to answer `minted: false` and `use`
-   * `alreadyInEffect: true` for the same situation, in two shapes, because they were two
-   * commands. One door needs one word, and the word has to keep `origin`'s own distinction
-   * visible — an identifier this machine created is not the same fact as one a person
-   * carried here from another machine, and no reader of this result may have to guess
-   * which. */
+  /** How this machine came to carry the identifier it now carries. Three values, not two
+   * booleans: one this machine minted is not the same fact as one carried here from another. */
   readonly outcome: "minted" | "adopted" | "unchanged";
-  /** The identifier this replaced — present only when a different one was in effect
-   * before, absent both when nothing was declared yet and when the same identifier was
-   * already in effect. Records already written keep the identifier they were written
-   * with; taking a different one never rewrites them. */
+  /** The identifier this replaced — absent both when nothing was declared yet and when the same
+   * one was already in effect. Records already written keep the identifier they carry. */
   readonly replacedPersonId?: string;
   /** The display name this call attached, when one was asked for. Absent when none was —
    * never `""`, which would read as a name someone chose to be empty. */
@@ -38,14 +30,11 @@ export interface PersonIdentityOffResult {
   readonly filePath: string;
   /** `false` when there was nothing to withdraw. */
   readonly removed: boolean;
-  /** `true` when the file existed but could not be read back, and was removed anyway —
-   * `off` is a privacy control, and it must work exactly when a damaged file would
-   * otherwise leave a person unable to withdraw. */
+  /** `true` when the file existed but could not be read back, and was removed anyway — `off`
+   * must work exactly when a damaged file would otherwise leave a person unable to withdraw. */
   readonly discardedDamaged: boolean;
-  /** How many identifiers `alsoMe` carried at the moment of withdrawal — `off` removes the
-   * whole declaration now, this one file included, so every one of them goes with it. `0`
-   * both when none were added and when a damaged file meant this call never learned how
-   * many there were. */
+  /** How many identifiers `alsoMe` carried at withdrawal — `off` removes the whole declaration.
+   * `0` both when none were added and when a damaged file hid how many there were. */
   readonly addedIdentifiersRemoved: number;
 }
 
@@ -53,9 +42,8 @@ export interface PersonIdentityLinkResult {
   readonly filePath: string;
   readonly personId: string;
   readonly identity: string;
-  /** `true` when `identity` already resolved to this same person before this call - a
-   * caller that always calls `link` first, then reports, must be able to tell a no-op
-   * apart from a fresh write. */
+  /** `true` when `identity` already resolved to this same person before this call - a caller
+   * that always links first, then reports, must tell a no-op apart from a fresh write. */
   readonly alreadyListed: boolean;
 }
 
@@ -68,20 +56,10 @@ export interface PersonIdentityUnlinkResult {
 }
 
 /**
- * What `aidd telemetry identity`'s verbs promise, all against the one file that is the
- * whole declaration of who this machine's user is.
- *
- * `status` never changes anything. `use` settles which identifier this machine carries:
- * without one it mints, reporting the same identifier on every call after; with one it
- * takes an identifier minted elsewhere, so the same person reads as one across machines
- * without a second identity ever being created for them. A display name goes on in the
- * same call, because it is a property of the identifier and not a separate act. `link` and
- * `unlink` add or withdraw an identifier this person did not choose here - a tool's own
- * pseudonymous identifier, or one kept from before a withdrawal - onto `alsoMe`. `off`
- * withdraws the whole file, added identifiers included.
- *
- * Taking or adding an identifier (`use`, `link`) is a declaration this tool cannot check -
- * it never verifies that the person running it is who they claim.
+ * Every verb acts on the one file declaring who this machine's user is: `use` mints an
+ * identifier or takes one minted elsewhere, so a person reads as one across machines;
+ * `link`/`unlink` carry identifiers chosen elsewhere on `alsoMe`; `off` withdraws the whole
+ * file. Neither `use` nor `link` can verify that the person running it is who they claim.
  */
 export class PersonIdentityUseCase {
   constructor(private readonly store: PersonIdentityStore) {}
@@ -95,14 +73,8 @@ export class PersonIdentityUseCase {
     };
   }
 
-  /**
-   * The one door to "which identifier am I": mint one, take one minted elsewhere, or attach
-   * a name to whichever stands — asked once, in the terms a person actually holds them.
-   *
-   * `identifier` absent mints; present, adopts. That is not a convenience over two verbs, it
-   * is the same question with and without an answer already in hand, and `origin` keeps the
-   * two apart on disk exactly as before.
-   */
+  /** The one door to "which identifier am I": `identifier` absent mints, present adopts — the
+   * same question with and without an answer in hand, kept apart on disk by `origin`. */
   async use(options: {
     identifier?: string;
     displayName?: string;
@@ -129,9 +101,8 @@ export class PersonIdentityUseCase {
     };
   }
 
-  /** Which identifier stands after this call, and how it got there. Split out because the
-   * display name is a second, independent decision — folding both into one body would make
-   * a rename look like a change of identity. */
+  /** Split from the display name because that is an independent decision: folding both into one
+   * body would make a rename look like a change of identity. */
   private async settleIdentifier(identifier?: string): Promise<{
     identity: PersonIdentity;
     outcome: PersonIdentityUseResult["outcome"];
@@ -169,21 +140,14 @@ export class PersonIdentityUseCase {
     return { filePath: this.store.filePath, identity, removed };
   }
 
-  /**
-   * The one verb allowed to swallow `readStrict()`'s throw. `status`, `use` and `link` are
-   * right to error on a damaged file — the contract's own "the identity
-   * file is unreadable" edge case. `off` is different: it is how a person gets out, and a
-   * file too damaged to parse is exactly the moment withdrawing must still work. A damaged
-   * file is discarded the same as a readable one, and the result says so rather than
-   * staying silent about it.
-   */
+  /** The one verb allowed to swallow `readStrict()`'s throw: `off` is how a person gets out, and
+   * a file too damaged to parse is exactly the moment withdrawing must still work. */
   async off(): Promise<PersonIdentityOffResult> {
     const filePath = this.store.filePath;
     const { existing, discardedDamaged } = await this.readForWithdrawal();
     const addedIdentifiersRemoved = existing?.alsoMe.length ?? 0;
     // Always asks the store, never decides from the read above: a file holding an empty
-    // `person_id` reads as "nobody chose" and would have been left on disk by a caller
-    // that skipped the removal whenever the read came back empty.
+    // `person_id` reads as "nobody chose" and would be left on disk.
     const removed = await this.store.forget(filePath);
     return { filePath, removed, discardedDamaged, addedIdentifiersRemoved };
   }

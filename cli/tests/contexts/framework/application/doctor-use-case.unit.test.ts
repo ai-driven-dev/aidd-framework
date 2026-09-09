@@ -97,10 +97,8 @@ describe("doctor", () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
 
-    // Corrupt manifest by replacing it in-memory with invalid JSON
-    // ManifestRepositoryAdapter uses load() — InMemoryManifestRepository just returns null or manifest
-    // We need to simulate a corrupt manifest. The doctor calls manifestRepo.load(),
-    // so we make it throw.
+    // The doctor reads through `manifestRepo.load()`, so a corrupt manifest is a load that
+    // throws — the in-memory double never does on its own.
     const corruptRepo = Object.create(deps.manifestRepo) as typeof deps.manifestRepo;
     corruptRepo.load = async () => {
       throw new Error("Manifest is corrupted");
@@ -122,7 +120,7 @@ describe("doctor", () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
 
-    // Create an orphaned .cursor/commands directory (cursor is not installed)
+    // Orphaned: cursor is not installed.
     await deps.fs.writeFile(
       join(PROJECT_ROOT, ".cursor", "commands", "plan.md"),
       "---\nname: aidd:03:plan\ndescription: Plan feature\n---\nContent here.\n"
@@ -175,7 +173,6 @@ describe("doctor", () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
 
-      // Create a .github directory with non-aidd content
       await deps.fs.writeFile(
         join(PROJECT_ROOT, ".github", "workflows", "ci.yml"),
         "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
@@ -194,7 +191,7 @@ describe("doctor", () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
 
-      // Create .github/prompts/ with an aidd-named prompt file (not tracked in manifest)
+      // An aidd-named prompt file the manifest does not track.
       await deps.fs.writeFile(
         join(PROJECT_ROOT, ".github", "prompts", "plan.prompt.md"),
         "---\nname: aidd:01:plan\ndescription: Plan feature\n---\nContent here.\n"

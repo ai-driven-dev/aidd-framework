@@ -22,7 +22,6 @@ describe("HasherAdapter", () => {
   });
 
   it("matches known MD5 value for a fixed input", () => {
-    // MD5("test") = 098f6bcd4621d373cade4e832627b4f6
     const result = hasher.hash("test");
     expect(result.value).toBe("098f6bcd4621d373cade4e832627b4f6");
   });

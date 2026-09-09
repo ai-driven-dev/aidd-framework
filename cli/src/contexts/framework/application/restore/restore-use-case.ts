@@ -33,10 +33,8 @@ import {
 } from "./restore-tool-files-use-case.js";
 
 /**
- * Where each config artifact sits in the canonical source, keyed by the same names a
- * tool's capability declares in its `consumes` list. Named through the constants rather
- * than spelled out, so restoring knows artifacts and not tools: `CONFIG_OPENCODE` is
- * the name of a file shape, and the tool that accepts it says so in its own profile.
+ * Where each config artifact sits in the canonical source, keyed by the same names a tool's
+ * capability declares in its `consumes` list — so restoring knows artifacts, not tools.
  */
 const CONFIG_REFS: readonly ConfigRef[] = [
   { name: CONFIG_MCP, path: `${FRAMEWORK_CONFIG_PREFIX}mcp.json` },
@@ -78,8 +76,8 @@ interface RestoreResult {
   totalPluginFilesRestored: number;
   restoredPluginNames: string[];
   unrestorable: string[];
-  /** AI tools this pass could not restore any plugin file for because their
-   * registration is native — see `RestoreAllPluginsUseCase`. */
+  /** AI tools this pass could not restore any plugin file for, because their registration is
+   * native. */
   nativeOnlyToolIds: AiToolId[];
 }
 

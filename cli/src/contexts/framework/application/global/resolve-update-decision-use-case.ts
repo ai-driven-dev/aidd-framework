@@ -4,10 +4,8 @@ import type { Prompter } from "../../../../kernel/ports/prompter.js";
 type BulkDecision = "overwrite-all" | "skip-all";
 
 /**
- * Shared mutable state for bulk conflict resolution within a single update run.
- * Created once per invocation in the fan-out use-case; the same reference is passed
- * to every UpdateOneToolUseCase call so that "overwrite all" / "skip all" persists
- * across tools and files.
+ * Created once per update run and passed to every per-tool call, so "overwrite all" / "skip all"
+ * persists across tools and files.
  */
 export class BulkConflictState {
   private decision: BulkDecision | null = null;
@@ -29,11 +27,9 @@ export interface ResolveUpdateDecisionOptions {
 }
 
 /**
- * Decides whether to overwrite a user-modified file during an update.
- * Returns true when the file should be written (overwrite), false when it should be kept.
- * Throws InputRequiredError when force=false and interactive=false (non-TTY, no --force).
- *
- * Unmodified files are handled by the caller — this use-case is only consulted for modified files.
+ * Returns true when the file should be overwritten, false when it should be kept; throws
+ * `InputRequiredError` for a non-interactive run without `--force`. Consulted only for a modified
+ * file — the caller handles an unmodified one.
  */
 export class ResolveUpdateDecisionUseCase {
   constructor(private readonly prompter: Prompter) {}

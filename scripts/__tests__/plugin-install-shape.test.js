@@ -24,23 +24,10 @@ function discoverScripts(skillsRoot) {
 }
 
 /**
- * This file used to build the plugin's install shape four different ways (flat,
- * hyphen-flat, native, either inside a host project declaring `type: module`), copy
- * `skills/` into each, spawn every script under it in a hermetic environment, and assert
- * each one started cleanly — because a script could reach a sibling by a relative path
- * that only resolves under one of those shapes, and that was worth proving per shape.
- *
- * 00-init (phase 3), 01-cost (phase 1) and 02-check (phase 5) each moved their script to
- * `aidd` and none of the three left one behind, so every one of those four builders,
- * `runScript`, `assertStarted`, `hermeticEnv` and the `git`-resolving `GIT_DIR` ran for
- * nothing: `discoverScripts` always found an empty list, whichever shape it was handed,
- * because the shape never changes what is inside `skills/` — only where it sits. Four
- * `describeShape` calls each asserting `scripts` is `[]` pinned the same fact five times
- * with none of the machinery around it ever exercised.
- *
- * What is still worth pinning is the fact itself: a skill in this plugin ships no script
- * of its own. If one ever does again, the shape-specific harness this replaced is
- * `git log -p -- scripts/__tests__/plugin-install-shape.test.js` from before this change.
+ * A skill in this plugin ships no script of its own, every one of them calling `aidd`
+ * instead. A harness that built the install shape four ways and ran each skill's scripts
+ * under it proved nothing once there were no scripts left to find, since the shape changes
+ * only where `skills/` sits and never what is inside it.
  */
 describe("the plugin ships no skill scripts, now that every skill calls the CLI instead", () => {
   it("no skill's scripts/ directory holds a .cjs file", () => {

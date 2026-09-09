@@ -80,8 +80,8 @@ async function sync(options: {
 }
 
 describe("the sync write path refuses to roll a host back to an older aidd-framework build", () => {
-  // Bloquant 3: the host already follows a newer build of the shared source than
-  // this run would request — writing anyway would silently repoint it backward.
+  // The host already follows a newer build of the shared source than this run would request, so
+  // writing anyway would silently repoint it backward.
   it("writes nothing and warns naming both versions and `aidd update`, when the host already follows a newer shared build", async () => {
     const { result, activator, logger } = await sync({
       requestedVersion: "1.0.0",

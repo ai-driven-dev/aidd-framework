@@ -1,9 +1,7 @@
 /**
- * Claude's ToolBuildContract: marketplace (native plugin tree) and flat
- * (direct workspace materialization) modes.
- *
- * Content transforms, path computations, and merge helpers are pure functions reused
- * from domain/formats/. The contracts themselves are thin wiring.
+ * Claude's build contracts: marketplace (a native plugin tree) and flat (direct workspace
+ * materialization). The transforms, path computations and merges are pure functions reused from
+ * `domain/formats/`; the contracts themselves are thin wiring.
  */
 
 import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
@@ -32,16 +30,15 @@ import {
 export function buildClaudeContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CLAUDE_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CLAUDE_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
   return {
     pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
         agentsField: true,
-        // Claude Code loads ./hooks/hooks.json by its own convention and, since 2.1.240,
-        // rejects the plugin outright when a manifest names it too — "Duplicate hooks file
-        // detected". The hooks fired anyway, so the plugin read as failed while working.
+        // Claude Code loads ./hooks/hooks.json by its own convention and rejects the plugin
+        // outright when a manifest names it too — "Duplicate hooks file detected". The hooks
+        // fired anyway, so the plugin read as failed while working.
         hooksField: false,
       }),
     manifestSchemaName: "plugin-manifest",
@@ -82,8 +79,6 @@ export function buildClaudeContract(): ToolBuildContract {
       buildClaudeStyleEntry(name, outDir, srcEntry, manifestRelative, fs),
   };
 }
-
-// ── Claude flat contract ───────────────────────────────────────────────────────
 
 function claudeFlatAgentPath(plugin: string, rel: string): string {
   return genericFlatAgentPath(".claude/agents/", plugin, rel.replace(/^agents\//, ""), ".md");

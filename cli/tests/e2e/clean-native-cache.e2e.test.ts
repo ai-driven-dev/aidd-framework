@@ -7,14 +7,8 @@ import { createTestEnv, runCli } from "./helpers.js";
 const AIDD_DIR = ".aidd";
 const MARKETPLACE = "aidd-e2e-cache-mkt";
 
-/**
- * A manifest as if a *previous* run, on a machine where `claude` was on PATH, had
- * already recorded a native registration for it — the only way to reach
- * `undoNativeRegistrations`'s own binary-availability branch from this sandbox, which
- * never puts a real host binary on PATH (`sandbox-reaches-no-tool-binary.e2e.test.ts`).
- * A fresh `setup`/`sync` run here would never populate `nativeRegistrations` at all,
- * since recording one requires the activation that produced it to have actually run.
- */
+/** As if a previous run, on a machine carrying `claude` on PATH, had recorded a native
+ * registration: this sandbox never puts a real host binary on PATH to produce one. */
 async function seedManifestWithClaudeNativeRegistrations(projectDir: string): Promise<void> {
   await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
   await writeFile(
@@ -40,11 +34,8 @@ async function seedManifestWithClaudeNativeRegistrations(projectDir: string): Pr
 
 describe.concurrent("E2E: aidd clean and a host's own plugin cache", () => {
   it("leaves a seeded claude cache tree in place when the claude CLI is not on PATH", async () => {
-    // This sandbox's own PATH never carries a real `claude` (see
-    // sandbox-reaches-no-tool-binary.e2e.test.ts), so this proves exactly the
-    // binary-absent branch: with nothing to call, `clean` never even purges the cache
-    // path claude's own profile declares. It is not, and cannot be, a proof that the
-    // purge itself runs against a real `claude` — that is `smoke-real.sh`'s job.
+    // This sandbox's own PATH never carries a real `claude`, so this proves the
+    // binary-absent branch alone, never that the purge runs against a real one.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-cache-binary-missing");
     try {
       await seedManifestWithClaudeNativeRegistrations(projectDir);

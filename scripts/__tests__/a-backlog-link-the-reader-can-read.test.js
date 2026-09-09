@@ -8,18 +8,13 @@ const ROOT = path.resolve(__dirname, "../..");
 
 /**
  * A task folder declares the backlog item it delivers in `backlog-link.json`, and the whole
- * `by_backlog` axis rests on that one file being readable.
+ * `by_backlog` axis rests on that one file being readable. A writer spelling the fields in
+ * camelCase while the reader looks for snake_case makes every declaration unreadable, in
+ * silence.
  *
- * Nothing checked that it was. Of the three declarations this repository held, two carried
- * `writtenAt` and `writtenBy` while `task-backlog-adapter.ts` reads `written_at` and
- * `written_by`, so the report answered `declaration: unreadable` for 130 records and named
- * the item for 4. Both were written by `aidd-orchestrator:01-sdlc`, which is told to let
- * Spec or Plan declare the item and instead wrote the file itself, taking the field names
- * from the TypeScript interface rather than from what either skill teaches.
- *
- * The reader is a `cli/` module and this is a repository script test, so the rule is
- * restated here rather than imported across that boundary — and the second case below is
- * what keeps the restatement honest.
+ * The reader is a `cli/` module and this is a repository script test, so the rule is restated
+ * here rather than imported across that boundary — and the second case below is what keeps
+ * the restatement honest.
  */
 const REQUIRED_FIELDS = ["backlog", "written_at", "written_by"];
 
@@ -80,13 +75,9 @@ describe("every backlog declaration in this repository is one the report can rea
     }
   });
 
-  /** The original bug was a writer/reader disagreement — two skills wrote `writtenAt` while
-   * the reader looked for `written_at` — and the check above only pins the writer's side.
-   * Pinning `REQUIRED_FIELDS` against what the skills teach, without ever reading the
-   * reader's own source, would have stayed green through the exact defect this file exists
-   * to catch: nothing here proves the two sides still agree, only that one side is stable.
-   * This reads `TaskBacklogAdapter.read`'s own field access, in `cli/` across the boundary
-   * this file's header explains it does not import across, and closes that gap. */
+  /** The check above pins the writer's side alone, which would stay green through a
+   * writer/reader disagreement. This reads `TaskBacklogAdapter.read`'s own field access, in
+   * `cli/` across the boundary this file's header explains it does not import across. */
   it("is the shape the reader in cli/ actually reads, not just the shape skills teach", () => {
     const READER_FILE = "cli/src/contexts/telemetry/infrastructure/task-backlog-adapter.ts";
     const text = fs.readFileSync(path.join(ROOT, READER_FILE), "utf8");

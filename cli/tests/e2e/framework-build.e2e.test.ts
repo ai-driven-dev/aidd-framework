@@ -38,7 +38,6 @@ describe.concurrent("E2E: aidd translate", () => {
       expect(build.stdout).toContain("Built");
       expect(build.stdout).toContain("files written to");
 
-      // AC #1: verify OpenPlugin layout
       const marketplacePath = join(outDir, ".plugin", "marketplace.json");
       expect(existsSync(marketplacePath)).toBe(true);
 
@@ -79,8 +78,7 @@ describe.concurrent("E2E: aidd translate", () => {
 
       const snapshot1 = await hashDirectory(outDir);
 
-      // outDir already holds run1's output: a second build now needs --force, same
-      // contract as flat mode's own re-run (see "flat AC #2 + AC #9" below).
+      // outDir already holds run1's output, so a second build needs --force.
       const run2 = await runCli(
         ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir, "--force"],
         projectDir,
@@ -107,7 +105,6 @@ describe.concurrent("E2E: aidd translate", () => {
       const sourceDir = join(tempDir, "source");
       await cp(FRAMEWORK_PATH, sourceDir, { recursive: true });
 
-      // Corrupt the plugin manifest (remove required 'name' field)
       const manifestPath = join(sourceDir, "plugins", "aidd-test", ".claude-plugin", "plugin.json");
       await mkdir(join(sourceDir, "plugins", "aidd-test", ".claude-plugin"), { recursive: true });
       await writeFile(manifestPath, JSON.stringify({ version: "1.0.0" }), "utf-8");
@@ -137,7 +134,6 @@ describe.concurrent("E2E: aidd translate", () => {
       );
       expect(build.exitCode).toBe(0);
 
-      // AC #6: agent keeps .md extension (no rename to .agent.md)
       const agentPath = join(outDir, "plugins", "aidd-test", "agents", "code-reviewer.md");
       expect(existsSync(agentPath)).toBe(true);
       const agentPathRenamed = join(
@@ -153,7 +149,7 @@ describe.concurrent("E2E: aidd translate", () => {
       expect(agentContent).toContain("name:");
       expect(agentContent).toContain("description:");
 
-      // AC #5: @./ rewritten to markdown link in skill
+      // `@./` rewritten to a markdown link in a skill.
       const skillPath = join(outDir, "plugins", "aidd-test", "skills", "hello.md");
       expect(existsSync(skillPath)).toBe(true);
       const skillContent = await readFile(skillPath, "utf-8");
@@ -225,8 +221,6 @@ describe.concurrent("E2E: aidd translate", () => {
     }
   });
 
-  // ── Flat mode (AC #1, #2, #4, #9 flat variant) ────────────────────────────
-
   it("flat AC #1: --flat writes agents, skills, hooks, mcp under canonical paths", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-tree");
     try {
@@ -253,7 +247,7 @@ describe.concurrent("E2E: aidd translate", () => {
       expect(existsSync(join(projRoot, ".vscode", "mcp.json"))).toBe(true);
       expect(existsSync(join(projRoot, ".github", "plugin", "marketplace.json"))).toBe(false);
 
-      // AC #5: agent frontmatter restricted to Copilot allowlist (name, description, model, tools, agents, argument-hint)
+      // Agent frontmatter is restricted to Copilot's own allowlist.
       const COPILOT_ALLOWED_KEYS = new Set([
         "name",
         "description",
@@ -338,7 +332,7 @@ describe.concurrent("E2E: aidd translate", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
 
-      // AC #7: pre-seed .vscode/mcp.json with a user-owned server to assert preservation
+      // Pre-seeded with a user-owned server, which the merge must preserve.
       const vscodePath = join(projRoot, ".vscode");
       await mkdir(vscodePath, { recursive: true });
       const existingMcp = {
@@ -370,21 +364,17 @@ describe.concurrent("E2E: aidd translate", () => {
 
       const mcpRaw = await readFile(join(projRoot, ".vscode", "mcp.json"), "utf-8");
       expect(mcpRaw).not.toContain(varRef);
-      // The written value is "/"-separated on purpose (see resolveClaudeRootAbsolute): a
-      // backslash-native path embedded in JSON comes back doubly escaped, and a forward
-      // slash is a valid path separator on Windows too. The claim is unchanged - the MCP
-      // command names this project root - so the expected value is spelled the way the
-      // file spells it, rather than the assertion being dropped (#707).
+      // The written value is "/"-separated on purpose: a backslash-native path embedded in
+      // JSON comes back doubly escaped, and a forward slash is valid on Windows too.
       expect(mcpRaw).toContain(projRoot.replace(/\\/g, "/"));
 
-      // AC #7: top-level key must be "servers"; plugin keys prefixed with "aidd-test-"
+      // The top-level key is "servers", and plugin keys carry the plugin's own prefix.
       const mcpParsed = JSON.parse(mcpRaw) as { servers: Record<string, unknown> };
       expect(typeof mcpParsed.servers).toBe("object");
       const serverKeys = Object.keys(mcpParsed.servers);
       const pluginKeys = serverKeys.filter((k) => k.startsWith("aidd-test-"));
       expect(pluginKeys.length).toBeGreaterThan(0);
 
-      // AC #7: user-owned server must survive
       expect(mcpParsed.servers["my-existing-server"]).toBeDefined();
     } finally {
       await cleanup();
@@ -503,8 +493,6 @@ describe.concurrent("E2E: aidd translate", () => {
     }
   });
 
-  // ── New flat targets (P4-P6) ─────────────────────────────────────────────────
-
   it("AC #2: --target claude --flat materializes .claude/skills, .claude/agents, .mcp.json", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-claude");
     try {
@@ -517,9 +505,7 @@ describe.concurrent("E2E: aidd translate", () => {
       );
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Flat-installed");
-      // flat agents are bare (no plugin segment) under .claude/agents/
       expect(existsSync(join(projRoot, ".claude", "agents"))).toBe(true);
-      // flat skills are bare (no plugin segment) under .claude/skills/
       expect(existsSync(join(projRoot, ".claude", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, ".mcp.json"))).toBe(true);
       const mcp = JSON.parse(await readFile(join(projRoot, ".mcp.json"), "utf-8")) as Record<
@@ -543,9 +529,7 @@ describe.concurrent("E2E: aidd translate", () => {
         fakeHome
       );
       expect(result.exitCode).toBe(0);
-      // flat agents are bare (no plugin segment) under .cursor/agents/
       expect(existsSync(join(projRoot, ".cursor", "agents"))).toBe(true);
-      // flat skills are bare (no plugin segment) under .cursor/skills/
       expect(existsSync(join(projRoot, ".cursor", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, ".cursor", "mcp.json"))).toBe(true);
       const agents = await readdir(join(projRoot, ".cursor", "agents"));
@@ -569,15 +553,14 @@ describe.concurrent("E2E: aidd translate", () => {
       );
       expect(result.exitCode).toBe(0);
       expect(existsSync(join(projRoot, ".codex", "agents"))).toBe(true);
-      // Codex scans .agents/skills/ for workspace skills (documented project skill root,
-      // verified live on 0.136); plugin-prefixed at one level, e.g. .agents/skills/aidd-context-00-onboard/
+      // Codex scans `.agents/skills/` for workspace skills, verified live on 0.136, and
+      // plugin-prefixed at one level - never `.codex/skills/`.
       expect(existsSync(join(projRoot, ".agents", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, ".codex", "skills"))).toBe(false);
       const config = await readFile(join(projRoot, ".codex", "config.toml"), "utf-8");
       // [[skills.config]] is intentionally NOT emitted — discovery is by placement
       expect(config).not.toContain("[[skills.config]]");
       expect(config).not.toContain("skills.config");
-      // AC #4: merges mcp_servers into config.toml
       expect(config).toContain("mcp_servers");
     } finally {
       await cleanup();
@@ -596,7 +579,6 @@ describe.concurrent("E2E: aidd translate", () => {
       );
       expect(result.exitCode).toBe(0);
       expect(existsSync(join(projRoot, ".opencode", "agents"))).toBe(true);
-      // flat skills are bare (no plugin segment) under .opencode/skills/
       expect(existsSync(join(projRoot, ".opencode", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, "opencode.json"))).toBe(true);
       const opencode = JSON.parse(

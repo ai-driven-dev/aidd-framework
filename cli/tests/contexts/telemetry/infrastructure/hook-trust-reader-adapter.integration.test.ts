@@ -5,14 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { HookTrustReaderAdapter } from "../../../../src/contexts/telemetry/infrastructure/hook-trust-reader-adapter.js";
 
 /**
- * Codex is the one host that will decline to run a hook and say nothing about it, so this
- * read is what lets `aidd telemetry check` tell "the hook is dead" apart from "the hook was
- * never approved". Both leave an empty journal; only one is something a person can fix, and
- * naming the wrong one sends them looking in the wrong place.
- *
- * Tested against a real `config.toml` rather than a double because the whole method is a
- * parse of a file Codex writes in its own shape — a double would only assert this test's
- * idea of that shape.
+ * Codex is the one host that declines to run a hook and says nothing about it, so this read
+ * is what tells "the hook is dead" apart from "the hook was never approved".
  */
 const created: string[] = [];
 const savedHome = process.env.HOME;
@@ -24,8 +18,6 @@ afterEach(() => {
   created.length = 0;
 });
 
-/** A throwaway home, with `config.toml` written into it when `content` is given and left
- * absent when it is not. */
 function codexHome(content?: string): string {
   const home = mkdtempSync(join(tmpdir(), "aidd-hook-trust-"));
   created.push(home);
@@ -80,9 +72,8 @@ describe("reading whether Codex has been told it may run the recorder's hook", (
     expect(await new HookTrustReaderAdapter().read()).toMatchObject({ trusted: false });
   });
 
-  // Unreadable is not untrusted: the first says nothing is known, the second is a fact
-  // about Codex's own state, and a check that conflated them would name a cause that was
-  // never established.
+  // Unreadable is not untrusted: the first says nothing is known, the second is a fact about
+  // Codex's own state.
   it("reads an absent config as unreadable, naming the path and the reason", async () => {
     const home = codexHome();
 

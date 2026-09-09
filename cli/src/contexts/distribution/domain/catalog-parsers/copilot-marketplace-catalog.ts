@@ -1,14 +1,7 @@
 /**
- * Copilot-native multi-plugin marketplace catalog parser — pure, no I/O.
- *
- * Parses the `.github/plugin/marketplace.json` format produced by
- * `aidd translate --to copilot`. Schema mirrors `github/awesome-copilot`:
- *   - Top-level: `name`, `metadata: { pluginRoot, ... }`, `owner`, `plugins[]`
- *   - Each plugin entry: `name`, `source` (bare subdirectory name), `description`, `version`
- *
- * Returns a `PluginCatalog` (same type as Claude marketplace). The bare `source` string
- * is combined with `metadata.pluginRoot` into a relative `{ kind: "local" }` source so
- * the adapter's existing `resolveLocalPaths` lifts it to an absolute path.
+ * Copilot-native multi-plugin marketplace catalog parser — pure, no I/O. An entry's `source` is
+ * a bare subdirectory name, combined with `metadata.pluginRoot` into a relative local source so
+ * the adapter's own `resolveLocalPaths` lifts it to an absolute path.
  */
 
 import { InvalidPluginManifestError } from "../../../../kernel/errors.js";

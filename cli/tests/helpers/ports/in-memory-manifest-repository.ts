@@ -1,14 +1,9 @@
 import type { Manifest } from "../../../src/contexts/framework/domain/manifest.js";
 import type { ManifestRepository } from "../../../src/contexts/framework/domain/ports/manifest-repository.js";
 
-/**
- * Pure in-memory implementation of the ManifestRepository port.
- * Holds a single Manifest | null — no disk I/O.
- */
 export class InMemoryManifestRepository implements ManifestRepository {
-  /** Derived from the same root the test drives the use case with, never a fixed literal:
-   * this exists so a diagnostic can name the real file, and a double naming a fictional one
-   * would let that go wrong with every test still green. */
+  /** Derived from the root the test drives the use case with, never a fixed literal: a
+   * double naming a fictional file lets a diagnostic go wrong with every test still green. */
   readonly path: string;
   private manifest: Manifest | null;
 
@@ -28,8 +23,6 @@ export class InMemoryManifestRepository implements ManifestRepository {
   async delete(): Promise<void> {
     this.manifest = null;
   }
-
-  // ── Inspection helpers ──────────────────────────────────────────────────────
 
   getCurrent(): Manifest | null {
     return this.manifest;

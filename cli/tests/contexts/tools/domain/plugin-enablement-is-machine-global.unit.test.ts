@@ -19,10 +19,8 @@ describe("pluginEnablementIsMachineGlobal", () => {
   });
 
   it("is true for a tool with no native activation at all (cursor)", () => {
-    // No `NativeActivation` declared, so `nativeActivationOf` answers `undefined` and
-    // `scopeArgs` is vacuously `undefined` too — never asked of a ref in practice,
-    // since a caller only reaches here once it already knows the ref came from a
-    // tool that has one.
+    // No `NativeActivation` declared, so `scopeArgs` is vacuously `undefined` — never asked
+    // of a ref in practice, since a caller reaches here only for a tool that has one.
     expect(pluginEnablementIsMachineGlobal("cursor")).toBe(true);
   });
 });

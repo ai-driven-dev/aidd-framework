@@ -1,10 +1,6 @@
 /**
- * Persona-driven E2E tests — deterministic, zero network, fixture-based.
- *
- * TTY scenarios (persona 1 & 5) use /usr/bin/expect to emulate a real terminal.
- * All other scenarios use runCli() (non-interactive flags, no TTY needed).
- *
- * Marketplace source: tests/fixtures/framework-real (pinned snapshot, no network).
+ * TTY scenarios use /usr/bin/expect; every other scenario uses runCli(). The marketplace
+ * source is a pinned fixture snapshot, so no scenario reaches the network.
  */
 
 import { execFile } from "node:child_process";
@@ -21,10 +17,7 @@ const REAL_FW = resolve(process.cwd(), "tests/fixtures/framework-real");
 const EXPECT_BIN = "/usr/bin/expect";
 const AIDD_DIR = ".aidd";
 
-/**
- * Runs an expect(1) script that emulates TTY interaction with the CLI.
- * The script is written to a temp file then executed via /usr/bin/expect.
- */
+/** Runs an expect(1) script that emulates TTY interaction with the CLI. */
 async function runInteractive(
   projectDir: string,
   fakeHome: string,
@@ -113,10 +106,8 @@ exit 0
       const tools = manifest.tools as Record<string, unknown>;
       expect(tools).toHaveProperty("claude");
 
-      // The framework marketplace is machine-scope, not project-scope: every project on
-      // this machine shares one registration, so it lives under the user config dir
-      // (here, the sandboxed `fakeHome/.config/aidd`), never under the project's own
-      // `.aidd/`.
+      // The framework marketplace is machine-scope: every project on this machine shares one
+      // registration, so it lives under the user config dir, never under the project's `.aidd/`.
       const mktRaw = await readFile(
         join(fakeHome, ".config", "aidd", "marketplaces.json"),
         "utf-8"
@@ -136,7 +127,6 @@ exit 0
   it("Persona 3 — setup re-run: second run with extra tool updates manifest", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("persona-rerun");
     try {
-      // First run: claude only
       const first = await runCli(
         [
           "setup",
@@ -160,7 +150,6 @@ exit 0
       expect(manifestAfterFirst.tools).toHaveProperty("claude");
       expect(manifestAfterFirst.tools).not.toHaveProperty("cursor");
 
-      // Second run: add cursor
       const second = await runCli(
         [
           "setup",
@@ -232,7 +221,6 @@ exit 0
   it("Persona 5 — returning user: aidd alone with manifest shows full menu", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("persona-returning");
     try {
-      // Seed a minimal manifest so the menu knows the project is initialized
       await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
       await writeFile(
         join(projectDir, AIDD_DIR, "manifest.json"),

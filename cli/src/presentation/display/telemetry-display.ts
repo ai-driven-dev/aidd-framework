@@ -25,11 +25,8 @@ const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
   // is wrong. Distinct from "no session found", where nothing is known and nothing is wrong.
   unreadable: "could not be read",
   "not-covered": "not covered",
-  // Never "no session found": the journal named another tool, so this reader was not run.
-  // Nothing was observed about it, and nothing is wrong. Worded to stay true at both
-  // scales — this line is printed per tool for a whole sweep, so a session-shaped label
-  // ("not this session's tool") would be a claim about one session on a line summarising
-  // several.
+  // Never "no session found": the journal named another tool, so this reader never ran.
+  // Worded for a whole sweep, where a session-shaped label would claim too much.
   "not-asked": "no session read belongs to it",
 };
 
@@ -65,9 +62,8 @@ export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCos
     output.print(`  ${result.refusedReason}`);
     return;
   }
-  // A sweep prints one line per tool, never one per tool per session: twenty sessions
-  // times five tools is a hundred lines nobody reads. How many sessions it covered is the
-  // fact that changes, so it leads.
+  // One line per tool, never one per tool per session: twenty sessions across five tools is
+  // a hundred lines nobody reads. The session count leads, being the fact that changes.
   const yielded = result.sessions.filter((session) =>
     session.toolReports.some((report) => report.recordsFound > 0)
   ).length;
@@ -115,16 +111,13 @@ export function printPersonIdentityStatus(
   }
 }
 
-/** One outcome word, three sentences — and the sentence a person needs is different for
- * each. A minted identifier is a new fact about this machine and gets the disclosure that
- * used to belong to `on`; an adopted one replaces something and has to say what happened to
- * what it replaced; an unchanged one must not claim anything was written. */
+/** One outcome word, three sentences: minted discloses what it attaches to, adopted says what
+ * happened to what it replaced, and unchanged must not claim anything was written. */
 export function printPersonIdentityUse(output: CLIOutput, result: PersonIdentityUseResult): void {
   const at = `(${result.filePath})`;
   if (result.outcome === "unchanged") {
-    // "already in effect" is true of the identifier and false of the file whenever a name
-    // came with the call: something was written, and the line a person reads first must not
-    // say otherwise.
+    // "already in effect" is true of the identifier and false of the file when a name came
+    // with the call: something was written, and the first line must not say otherwise.
     const alsoNamed = result.displayNameSet === undefined ? "" : ", display name set";
     output.success(
       `AIDD identity: ${result.identity.personId} already in effect${alsoNamed} ${at}`
@@ -194,24 +187,9 @@ export function printPersonIdentityUnlink(
   output.success(`AIDD identity: unlinked '${result.identity}' (${result.filePath})`);
 }
 
-/**
- * Says, once per command that touches the figures, that this machine locates them through a
- * variable which also moves its GitHub token.
- *
- * Not, as a first draft of this claimed, "the people who followed the plugin README when it
- * said to share `AIDD_USER_CONFIG_DIR`". That README has never been released — the whole
- * telemetry layer is absent from `main` — so outside this branch that population is empty,
- * and a warning written for nobody is the `person-mapping.json` mistake again.
- *
- * The real audience is larger and outlives the split: anyone who sets
- * `AIDD_USER_CONFIG_DIR` for the reason it has always existed — relocating a machine's aidd
- * config, which a CI job or a test harness legitimately does — and thereby moves their
- * figures into the same directory as their token without ever intending to. They are not
- * following bad advice; they are using a variable that does two things, and only this line
- * tells them the second one.
- *
- * `warn` writes to stderr, so a `--json` caller's stdout stays one parseable object.
- */
+/** Says, once per command that touches the figures, that this machine locates them through a
+ * variable which also moves its GitHub token — a second effect nothing else tells anyone
+ * about. `warn` writes to stderr, so a `--json` caller's stdout stays one parseable object. */
 export function warnIfFiguresMoveTheTokenToo(output: CLIOutput, sink: TelemetrySink): void {
   if (sink.locatedBy !== "user-config-dir") return;
   output.warn(

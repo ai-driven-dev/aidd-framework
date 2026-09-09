@@ -18,10 +18,8 @@ export interface UpdateToolsResult {
 }
 
 /**
- * Fans out an update across every installed tool of one category (AI or IDE).
- * The category is fixed by the `isTargetToolId` predicate injected at construction,
- * so subclasses only need to supply that predicate — the orchestration is identical
- * for both categories.
+ * Fans out an update across every installed tool of one category, fixed by the `isTargetToolId`
+ * predicate injected at construction: the orchestration is identical for both categories.
  */
 export class UpdateToolsUseCase<T extends ToolId> {
   constructor(
@@ -37,8 +35,8 @@ export class UpdateToolsUseCase<T extends ToolId> {
     const targetIds = this.resolveTargetIds(manifest, toolArg);
     const version = this.versionReader.get();
     const errors: GlobalExecutionError[] = [];
-    // Scoped to this invocation only: a fresh instance per execute() call, never a field,
-    // so an "overwrite all" choice cannot leak into a later, unrelated update run.
+    // Scoped to this invocation only — a fresh instance per `execute()` call, never a field, so an
+    // "overwrite all" choice cannot leak into a later, unrelated update run.
     const bulkState = new BulkConflictState();
     const updatedTools = await this.updateTargets(
       targetIds,

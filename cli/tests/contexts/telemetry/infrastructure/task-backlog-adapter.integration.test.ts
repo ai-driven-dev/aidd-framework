@@ -25,9 +25,8 @@ async function writeLink(root: string, body: string): Promise<void> {
   await writeFile(join(folder, "backlog-link.json"), body, "utf8");
 }
 
-/** Every file under `dir`, hashed by its own bytes — the whole set, not only the files a
- * caller already knows about, so a file the read path *created* is caught exactly as a
- * file it modified would be. */
+/** Every file under `dir`, hashed by its own bytes — the whole set, so a file the read path
+ * *created* is caught exactly as a file it modified would be. */
 async function snapshot(dir: string): Promise<ReadonlyMap<string, string>> {
   const files = new Map<string, string>();
   const walk = async (current: string): Promise<void> => {
@@ -95,12 +94,8 @@ describe("TaskBacklogAdapter — reads a declaration without ever writing one", 
     );
   });
 
-  // The task folder path this reader is handed is repository-relative, because the journal
-  // line it came from was written relative to the repository root. Joining it to the
-  // process working directory instead finds nothing from a subdirectory - and "nothing" is
-  // spelled `{ kind: "none" }`, "this task declares no backlog item", which is a claim about
-  // the task rather than about the read. Introduced the moment the journal reader started
-  // anchoring at the root: `by_task` names the task, `by_backlog` says it declares nothing.
+  // The path handed in is repository-relative, and joining it to the process working
+  // directory finds nothing - spelled `{ kind: "none" }`, a claim about the task, not the read.
   it("anchors at the repository root, so a subdirectory reads the same declaration", async () => {
     const root = await freshProject();
     await mkdir(join(root, ".git"), { recursive: true });

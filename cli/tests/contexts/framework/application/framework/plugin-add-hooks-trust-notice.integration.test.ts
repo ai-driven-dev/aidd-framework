@@ -1,9 +1,5 @@
-/**
- * A hook a native tool actually delivers is not a skip - it is a delivered component with
- * a precondition. Codex gates every hook behind a per-hook trust grant it can decline in
- * silence (#699); this proves PluginAddUseCase names that at install time, on the info
- * channel, and only for the tool that declares the gate.
- */
+/** A hook a native tool delivers is not a skip but a component with a precondition: Codex
+ * gates every hook behind a per-hook trust grant it can decline in silence. */
 import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { join } from "node:path";

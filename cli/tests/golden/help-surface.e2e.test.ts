@@ -1,20 +1,4 @@
-/**
- * Help surface golden — the user-visible command tree, frozen.
- *
- * Walks the command tree from the root, capturing `--help` for every command and
- * every subcommand it exposes, then compares the whole tree to a stored snapshot.
- *
- * The scenario golden (`golden-baseline`) proves behavior on one path. This proves
- * that nothing a user sees moved: a renamed flag, a reworded description, a lost
- * argument or a reordered list all fail here, naming the invocation.
- *
- * It needs no fixture project and no network, which is what makes it usable as a
- * guard while files are being moved between contexts.
- *
- * USAGE:
- *   Capture: UPDATE_HELP_GOLDEN=1 pnpm test:e2e tests/golden/help-surface.e2e.test.ts
- *   Verify:  pnpm test:e2e tests/golden/help-surface.e2e.test.ts
- */
+// Capture the snapshot by running this file with `UPDATE_HELP_GOLDEN=1`.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -32,10 +16,8 @@ interface HelpEntry {
   help: string;
 }
 
-/**
- * Strip what differs between machines and releases. The version appears in the
- * root help; absolute paths appear in default-value hints.
- */
+/** Strip what differs between machines and releases: the version in the root help, and the
+ * absolute paths in default-value hints. */
 function normalize(text: string): string {
   return text
     .replace(/\b\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?\b/g, "<VERSION>")
@@ -45,13 +27,8 @@ function normalize(text: string): string {
     .trimEnd();
 }
 
-/**
- * Commander prints subcommands under a `Commands:` heading, one per line, the name
- * first. A long description wraps onto further lines indented past the name column,
- * so only lines at the exact indentation of the first entry are commands — reading
- * a wrapped word as a command name sends the CLI to its interactive menu, which
- * waits for input forever.
- */
+/** Commander wraps a long description past the name column, so only lines at the first entry's
+ * exact indentation are commands — reading a wrapped word as one hangs on the interactive menu. */
 function subcommandsOf(help: string): string[] {
   const lines = help.split("\n");
   const start = lines.findIndex((line) => line.trim() === "Commands:");

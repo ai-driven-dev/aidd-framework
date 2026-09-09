@@ -371,10 +371,8 @@ describe("setup without TTY", () => {
       expect(userSourceReferences.added).toEqual([]);
     });
 
-    // Bloquant found in review: `references.json` is a help, not an authority — a
-    // corrupted copy must never block `setup`, which does not depend on it. The
-    // adapter's own fs is independent of the project's own `deps.fs`: what matters here
-    // is only that `references.json` itself cannot be parsed.
+    // `references.json` is a help, not an authority: a corrupted copy must never block `setup`,
+    // which does not depend on it.
     it("warns and still completes setup when references.json is corrupted", async () => {
       const logger = new CapturingLogger();
       const referencesFs = new InMemoryFileAdapter();

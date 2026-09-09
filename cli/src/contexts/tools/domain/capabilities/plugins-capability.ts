@@ -11,122 +11,50 @@ const DEFAULT_HOOKS_PATH = "hooks/hooks.json";
 const DEFAULT_HOOKS_FORMAT: HooksContentFormat = "matchers";
 
 /**
- * Declares that a tool writes its own marketplace registration, through its own CLI.
- *
- * Where a tool offers the command, driving it is preferred to writing the file: the
- * tool then owns its configuration, in the format and at the scope it decides, and
- * this CLI stops keeping a second copy of something it does not own. Declaring this
- * is what makes the marketplace sync stand back — `marketplaceSettings` still says
- * *where* the file is, for the gitignore and for `status`, but no longer *who* writes
- * it.
- *
- * The `binary` keys the matching `NativePluginActivator` in the sync registry.
+ * A tool that writes its own marketplace registration, through its own CLI: driving the
+ * command is preferred to writing the file, so the tool owns its own configuration.
+ * `binary` keys the matching `NativePluginActivator`.
  */
 export interface NativeActivation {
   binary: "claude" | "codex" | "copilot";
-  /**
-   * Arguments carrying the scope, for `plugin marketplace add` and `remove` alike.
-   * One mapping serves both so they cannot drift: a remove that omits the scope the
-   * add used would, for Claude, delete the declaration from every scope at once.
-   *
-   * A project-scoped marketplace maps to Claude's **local** scope, not its project
-   * one, and that is not an oversight. The registration names the built tree by
-   * absolute path, so it belongs to one machine; Claude's project scope writes the
-   * shared, committed settings file, where such a path is wrong for everyone else.
-   * Local scope is project-bound and machine-bound at once, which is what the content
-   * actually is.
-   *
-   * Omit for a tool whose registry has no scopes — it is global, and there is nothing
-   * to say.
-   */
+  /** One mapping serves add and remove: a remove omitting the scope the add used drops
+   * Claude's declaration from every scope at once. A project-scoped marketplace maps to
+   * Claude's *local* scope — the registration names an absolute path, wrong for everyone
+   * else in the shared project settings. Omit where the registry has no scopes. */
   scopeArgs?: Readonly<Record<"project" | "user", readonly string[]>>;
-  /**
-   * Arguments that make `plugin marketplace remove` succeed when plugins are installed
-   * from it. Declaring this permits reclaiming a name, so declare it only where the
-   * tool can also tell a dead registration from a live one — see `sourceCheckVerb`.
-   */
+  /** Arguments that make `plugin marketplace remove` succeed with plugins installed from it.
+   * Permits reclaiming a name, so declare it only alongside `sourceCheckVerb`. */
   forceRemoveArgs?: readonly string[];
-  /**
-   * Verb after `plugin marketplace` whose exit code separates a registration whose
-   * source is gone from one that resolves. Declare only where it truly discriminates:
-   * measured, copilot's `update` exits 1 on a missing local path and 0 otherwise,
-   * while codex's `upgrade` refuses every local marketplace alike and Claude's reports
-   * success on a path that does not exist.
-   */
+  /** Verb after `plugin marketplace` whose exit code separates a registration whose source
+   * is gone from one that resolves. Measured: copilot's `update` discriminates, while
+   * codex's `upgrade` refuses every local marketplace and Claude's reports success on a
+   * path that does not exist. */
   sourceCheckVerb?: string;
-  /**
-   * Verb this CLI uses to re-index its marketplaces, after `plugin marketplace`.
-   * Omit when nothing needs re-indexing because plugins are not enabled through the CLI.
-   */
+  /** Verb this CLI uses to re-index its marketplaces, after `plugin marketplace`. Omit when
+   * plugins are not enabled through the CLI. */
   upgradeVerb?: string;
-  /**
-   * Verb this CLI uses to enable a plugin, after `plugin`. Omit when the tool loads
-   * plugins from a project file this CLI writes: driving the command would then be a
-   * second way of doing the same thing, not a better one.
-   */
+  /** Verb this CLI uses to enable a plugin, after `plugin`. Omit when the tool loads plugins
+   * from a project file this CLI writes. */
   enableVerb?: string;
-  /**
-   * How the tool spells removing a plugin it installed: `remove` for codex, `uninstall` for
-   * claude and copilot. Absent for a tool whose plugins this CLI enables through a file it
-   * writes — there is nothing to ask the tool to undo.
-   */
+  /** How the tool spells removing a plugin it installed: `remove` for codex, `uninstall` for
+   * claude and copilot. Absent where this CLI enables plugins through a file it writes. */
   disableVerb?: string;
-  /**
-   * Arguments every `plugin <verb> <ref>` call carries, after the reference. Claude needs
-   * `--yes` on both install and uninstall: it gates a prune confirmation the call never
-   * requests, but a headless stdin has no terminal to answer any prompt at all.
-   */
+  /** Arguments every `plugin <verb> <ref>` call carries, after the reference. Claude needs
+   * `--yes` on install and uninstall alike: a headless stdin can answer no prompt. */
   pluginArgs?: readonly string[];
-  /**
-   * Resolver for the root of this tool's own marketplace registry, given a homedir
-   * string — a **root**, not a per-marketplace path, the same shape `userPluginsDir`
-   * already takes. Declared only where the host itself derives a marketplace's
-   * registered name from its source's own catalog and silently overwrites a
-   * same-named entry from a different source — measured against Claude Code alone:
-   * `claude plugin marketplace add <dir>` reads `name` from the source's
-   * `marketplace.json`, and re-adding the same name from elsewhere replaces
-   * `installLocation` with no prompt and no error. Codex refuses that re-add itself;
-   * Copilot refuses every re-add. Absence of this field is what keeps the sync guard
-   * that reads it claude-only, without a single `if (toolId === "claude")` anywhere
-   * in that guard.
-   */
+  /** Root of this tool's own marketplace registry, given a homedir — a root, not a
+   * per-marketplace path. Declared for Claude alone, which derives a registration's name
+   * from the source's own catalog and silently repoints a same-named entry from a different
+   * source; its absence is what keeps the guard reading it claude-only. */
   marketplaceRegistry?: (homedir: string) => string;
-  /**
-   * Resolver for the root of this tool's own plugin cache, given a homedir string — a
-   * **root**, not a per-marketplace path, the same shape `marketplaceRegistry` and
-   * `userPluginsDir` already take. Declared only where the host's own CLI is measured
-   * to leave something behind under it after `clean` has driven `uninstallPlugin` then
-   * `removeMarketplace` for every ref and marketplace it recorded:
-   *
-   * - claude leaves the built tree in full — `uninstallPlugin`/`removeMarketplace` mark
-   *   it `.orphaned_at` but never delete it (measured 2026-09-03/07, reproduced against
-   *   the real `claude` binary in a relocated `HOME`);
-   * - codex's own `plugin remove` does delete the tree's *content*, but not the empty
-   *   `cache/<hostName>/` shell left holding it — the residue that reached the real
-   *   `$HOME` on every `smoke:real` run before this field existed. Copilot never
-   *   copies anything (measured), so it declares neither this nor `marketplaceRegistry`.
-   *
-   * `clean` reads this declaration alone; it invents no path for a tool that omits it.
-   * The two hosts above differ in what proves their leftover safe to remove — see
-   * `CleanUseCase.purgeOneMarketplaceCache` — but neither is ever removed on the
-   * manifest's word alone: containment against this very root, through `realpath`, is
-   * the one check both share.
-   */
+  /** Root of this tool's own plugin cache, given a homedir. Declared only where the host's
+   * own CLI leaves something behind after `clean` drove its uninstall and remove: claude
+   * keeps the whole built tree, marked `.orphaned_at`; codex the empty `cache/<hostName>/`
+   * shell. `clean` reads this declaration alone and invents no path for a tool that omits
+   * it, and never removes without `realpath` containment against this root. */
   pluginCacheDir?: (homedir: string) => string;
-  /**
-   * Resolver for this tool's own user-scope settings/registry file — never written by
-   * aidd itself, always by the tool's own CLI, and read by nothing today but a
-   * diagnostic naming it (`aidd doctor --scope user`, `clean --scope user` once it
-   * lands). Declared only for a tool whose profile also declares `NativeActivation`:
-   * claude (`~/.claude/settings.json`), codex (`$CODEX_HOME/config.toml`, falling back
-   * to `~/.codex/config.toml` — a relocated `HOME` does not relocate a real `codex`
-   * binary once `CODEX_HOME` is set on that machine, `testing.md`'s own sandboxing
-   * gotcha) and copilot (`~/.copilot/settings.json`) — all three measured against the
-   * real binary in a relocated `HOME`. opencode and cursor declare no `NativeActivation`
-   * at all (opencode has no native marketplace concept in flat mode; cursor writes
-   * every plugin's files straight into a user-scope directory with no separate
-   * activation step), so neither gets a line here.
-   */
+  /** This tool's own user-scope settings file, never written by aidd and read by a
+   * diagnostic alone. Declared only for a tool that also declares `NativeActivation`. */
   userSettingsPath?: (homedir: string) => string;
 }
 
@@ -138,60 +66,35 @@ export interface NativePluginsParams {
   mcpRelativePath?: string;
   hooksRelativePath?: string;
   hooksContentFormat?: HooksContentFormat;
-  /**
-   * Where a delivered hook actually lands. `"plugin"` (default): under this
-   * capability's own plugin directory, at `hooksRelativePath` — read by nothing for
-   * a tool whose hooks only fire from project scope. `"project"`: merged into the
-   * project's own hooks file instead (see `mergeCursorProjectHooksJson`), the
-   * destination measured to actually fire. Declared per capability, not guessed
-   * per tool, so a tool proven to need it is the only one that sets it.
-   */
+  /** Where a delivered hook actually lands: under this capability's own plugin directory
+   * (default), or merged into the project's own hooks file — the destination measured to
+   * actually fire. Declared per capability, never guessed per tool. */
   hooksDestination?: "plugin" | "project";
-  /**
-   * Where the project-scope hooks file `hooksDestination: "project"` merges into lives,
-   * relative to the project root (e.g. `".cursor/hooks.json"` for Cursor). Required
-   * exactly when `hooksDestination` is `"project"` — nothing reads it otherwise.
-   */
+  /** Where the project-scope hooks file merges into, relative to the project root. Required
+   * exactly when `hooksDestination` is `"project"` — nothing reads it otherwise. */
   projectHooksRelativePath?: string;
   acceptsMcp?: boolean;
-  /**
-   * The variable this tool expands to the installed plugin's directory, as
-   * written in a hook or MCP command. Absent means nothing is substituted.
-   */
+  /** The variable this tool expands to the installed plugin's directory, as written in a
+   * hook or MCP command. Absent means nothing is substituted. */
   pluginRootToken?: string;
   marketplaceSettings?: MarketplaceSettings;
-  /** Enables native CLI-driven plugin activation (e.g. Codex). See {@link NativeActivation}. */
+  /** Enables native CLI-driven plugin activation. See {@link NativeActivation}. */
   nativeActivation?: NativeActivation;
-  /**
-   * Explicit translation mode for this native capability.
-   * Pass `"marketplace"` when `marketplaceSettings` is provided and Mode A routing is intended.
-   * Defaults to `null` (neutral native, no translation strategy applies).
-   */
+  /** Pass `"marketplace"` alongside `marketplaceSettings` for Mode A routing. Defaults to
+   * `null`, neutral native, where no translation strategy applies. */
   translationMode?: PluginTranslationMode;
-  /**
-   * Declare `"user"` to install plugins relative to the user home directory instead of the project root.
-   * Requires `userPluginsDir` when set to `"user"`.
-   * Defaults to `"project"` (project-root-relative install).
-   */
+  /** `"user"` installs plugins relative to the home directory and requires `userPluginsDir`;
+   * defaults to `"project"`. */
   installScope?: "project" | "user";
-  /**
-   * Resolver that returns the absolute user-scope plugins base directory given a homedir string.
-   * Required when `installScope === "user"`. Example: `(h) => join(h, ".cursor", "plugins", "local")`.
-   */
+  /** Absolute user-scope plugins base directory, given a homedir. Required when
+   * `installScope === "user"`. */
   userPluginsDir?: (homedir: string) => string;
 }
 
 /**
- * Flat mode's own hooks declaration. Unlike native mode's `hooksRelativePath` (a file
- * beside a manifest a merge writes to), a flat-mode hook lands as files an extension
- * loader scans a directory for — `flatHooksDir` names that directory, relative to the
- * project root. See {@link HooksSupport} for the shape of the "no" case.
- */
-/**
  * A generated event bridge, for a flat loader that scans no "hooks" family and reads no
- * hooks.json of its own — OpenCode today. Read by both flat-materialization routes
- * (`translate`'s `FlatBuildStrategy` and `setup`/`plugin install`'s `ContentTranslator`), so
- * one plugin looks the same on OpenCode whichever route installed it.
+ * hooks.json of its own. Both flat-materialization routes read it, so one plugin looks the
+ * same whichever route installed it.
  */
 export interface FlatHooksBridge {
   /** Raw (unrewritten) hooks.json content + plugin name -> the generated bridge module's
@@ -199,8 +102,8 @@ export interface FlatHooksBridge {
   readonly generate: (rawHooksJson: string, plugin: string) => string | null;
   /** Output path for the generated bridge module, relative to the project root. */
   readonly path: (plugin: string) => string;
-  /** A hooks/ file whose presence in this plugin's own source means it ships its own
-   * bridge already — generate nothing for it. */
+  /** A hooks/ file whose presence in this plugin's own source means it ships its own bridge
+   * already — generate nothing for it. */
   readonly skipIfSourceHas: string;
 }
 
@@ -209,14 +112,12 @@ export type FlatHooksSupport =
       acceptsHooks: true;
       flatHooksDir: string;
       /**
-       * The loader's own plugin module: one hook script that is not a script a
-       * bridge must be told to run, but the runtime the loader itself imports.
-       * Omit when a flat hooks loader has no such self-hosting convention. See
-       * {@link FlatHooksLoaderEntry}.
+       * The loader's own plugin module: the runtime the loader itself imports, not a script
+       * a bridge must be told to run. Omit where the loader has no such convention.
        */
       flatHooksLoaderEntry?: FlatHooksLoaderEntry;
-      /** See {@link FlatHooksBridge}. Omit when this loader triggers a plugin's hooks
-       * some other way. */
+      /** See {@link FlatHooksBridge}. Omit when this loader triggers a plugin's hooks some
+       * other way. */
       flatHooksBridge?: FlatHooksBridge;
     }
   | { acceptsHooks: false; hooksUnsupportedReason: string };
@@ -234,15 +135,10 @@ export interface UnsupportedPluginsParams {
 
 /**
  * Whether this tool runs the hooks a plugin ships. Stated, never defaulted: a tool nobody
- * considered loses its hooks quietly when the field falls back to `false`, and one that
- * runs none owes whoever installs a plugin a reason.
- *
- * `hooksTrustNotice` is the opposite case: the tool runs a delivered hook, but only once
- * something outside the install grants it — a per-hook trust the tool itself gates and
- * that a headless run never gets prompted for (measured on Codex: four clean `codex exec`
- * sessions wrote no journal and said nothing, until `--dangerously-bypass-hook-trust` did).
- * `null`/omitted for a tool that runs what it delivers with no such gate — told nothing,
- * same as `hooksUnsupportedReason` for a tool that never runs hooks at all.
+ * considered loses its hooks quietly when the field falls back to `false`.
+ * `hooksTrustNotice` is the opposite case — the tool runs a delivered hook, but only once a
+ * per-hook trust a headless run is never prompted for is granted (measured on Codex: four
+ * clean `codex exec` sessions wrote no journal until `--dangerously-bypass-hook-trust` did).
  */
 export type HooksSupport =
   | { acceptsHooks: true; hooksTrustNotice?: string }
@@ -261,8 +157,8 @@ export class PluginsCapability {
   readonly acceptsHooks: boolean;
   /** Why no hook is delivered, or `null` when they are. */
   readonly hooksUnsupportedReason: string | null;
-  /** What still has to happen before a delivered hook actually runs, or `null` when
-   * nothing does. See {@link HooksSupport}. */
+  /** What still has to happen before a delivered hook actually runs, or `null` when nothing
+   * does. See {@link HooksSupport}. */
   readonly hooksTrustNotice: string | null;
   readonly pluginRootToken: string | null;
   readonly acceptsMcp: boolean;
@@ -270,35 +166,18 @@ export class PluginsCapability {
   readonly hooksRelativePath: string;
   readonly hooksContentFormat: HooksContentFormat;
   readonly hooksDestination: "plugin" | "project";
-  /** Where the project-scope hooks file `hooksDestination: "project"` merges into lives,
-   * relative to the project root, or `null` when `hooksDestination` is `"plugin"`. */
+  /** Relative to the project root, or `null` when `hooksDestination` is `"plugin"`. */
   readonly projectHooksRelativePath: string | null;
   /** Where a flat-mode hook lands, relative to the project root, or `null` when this
-   * capability's `acceptsHooks` is `false`. See {@link FlatHooksSupport}. */
+   * capability accepts no hooks. */
   readonly flatHooksDir: string | null;
-  /** The flat loader's own plugin module, or `null` when this capability declares
-   * none. See {@link FlatHooksSupport.flatHooksLoaderEntry}. */
+  /** See {@link FlatHooksSupport.flatHooksLoaderEntry}. */
   readonly flatHooksLoaderEntry: FlatHooksLoaderEntry | null;
   /** See {@link FlatHooksBridge}, or `null` when this capability declares none. */
   readonly flatHooksBridge: FlatHooksBridge | null;
   readonly marketplaceSettings: MarketplaceSettings | null;
-  /** Native CLI-driven plugin activation declaration, or `null` when not applicable. */
   readonly nativeActivation: NativeActivation | null;
-  /**
-   * Explicit declaration of the plugin translation strategy for this capability.
-   * - `"marketplace"`: Mode A — register plugin reference in the tool's native config (no file materialization).
-   * - `"flat"`: Mode B — materialize plugin content as files on disk.
-   * - `null`: no translation strategy applies (neutral native or unsupported).
-   *
-   * Set explicitly via `NativePluginsParams.translationMode` for native tools that use Mode A.
-   * Flat mode always resolves to `"flat"` automatically; unsupported always resolves to `null`.
-   */
   readonly translationMode: PluginTranslationMode | null;
-  /**
-   * Scope for plugin installation.
-   * - `"project"` (default): plugins are installed relative to the project root.
-   * - `"user"`: plugins are installed relative to the user home directory via `resolvePluginsBaseDir`.
-   */
   readonly installScope: "project" | "user";
 
   private readonly _userPluginsDir?: (homedir: string) => string;
@@ -373,11 +252,6 @@ export class PluginsCapability {
     }
   }
 
-  /**
-   * Resolves the absolute base directory for plugin file writes.
-   * - For `installScope === "project"`: returns `projectRoot`.
-   * - For `installScope === "user"`: returns the user-scope plugins dir resolved from `homedir`.
-   */
   resolvePluginsBaseDir(projectRoot: string, homedir: string): string {
     if (this.installScope === "user" && this._userPluginsDir !== undefined) {
       return this._userPluginsDir(homedir);
@@ -385,10 +259,9 @@ export class PluginsCapability {
     return projectRoot;
   }
 
-  /** The absolute user-scope plugins directory this capability declares, or `null` when
-   * it declares none — independent of this capability's own `installScope`. A caller
-   * resolving a *recorded* scope (which may disagree with the profile's current
-   * `installScope`) still needs the directory that scope means. */
+  /** The absolute user-scope plugins directory this capability declares, or `null`. Read
+   * independently of this capability's own `installScope`: a caller resolving a *recorded*
+   * scope still needs the directory that scope means. */
   userPluginsBaseDir(homedir: string): string | null {
     return this._userPluginsDir?.(homedir) ?? null;
   }

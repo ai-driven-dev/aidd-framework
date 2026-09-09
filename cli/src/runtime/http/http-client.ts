@@ -19,7 +19,6 @@ export interface HttpResponse {
   contentType: string;
 }
 
-/** One GET over HTTP, as the adapters that fetch releases and catalogs need it. */
 export interface HttpGet {
   get(url: string, options?: HttpGetOptions): Promise<HttpResponse>;
 }
@@ -73,9 +72,9 @@ export class HttpClient implements HttpGet {
       if (!location) {
         throw new HttpRedirectError(url);
       }
-      // Consume the body to free the socket
+      // Consume the body to free the socket.
       await collectBuffer(response);
-      // Do not forward token or accept: redirect targets (S3/CDN) use signed URLs
+      // Neither token nor accept is forwarded: a redirect target is a signed URL.
       const redirected = await doGet(location, undefined, undefined);
       return this.parseResponse(redirected, location);
     }

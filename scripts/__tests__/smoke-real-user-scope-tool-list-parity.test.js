@@ -6,18 +6,13 @@ const { describe, it } = require("node:test");
 const ROOT = path.resolve(__dirname, "../..");
 
 /**
- * `setup --scope user` refuses an AI tool that declares no machine-wide activation at
- * all: `registry.ts`'s `supportsUserScopeActivation` asks each profile's plugins
- * capability for a `nativeActivation` or an `installScope: "user"`, and `SetupFlow`
- * throws `UserScopeUnsupportedAiToolsError` before writing anything when one is
- * missing. `smoke-real.sh` cannot call into the built CLI to ask that question — there
- * is no command that prints it — so its `user_ai_list` names the answer as a bash
- * literal instead. That is a second home of the same fact, and the failure mode is
- * quiet in exactly the wrong direction: a sixth tool gaining machine-wide activation
- * leaves the script measuring one tool fewer than the CLI supports, and a tool losing
- * it turns every `--scope user` phase into an exit-1 nobody expected. This reads the
- * profiles and pins the two together, the same way
- * `smoke-real-plugin-cache-path-parity.test.js` pins the cache paths.
+ * `setup --scope user` refuses an AI tool declaring no machine-wide activation, and
+ * `smoke-real.sh` cannot call into the built CLI to ask which those are, so its
+ * `user_ai_list` names the answer as a bash literal — a second home of the same fact.
+ *
+ * The failure mode is quiet in both directions: a tool gaining machine-wide activation
+ * leaves the script measuring one tool fewer than the CLI supports, and one losing it turns
+ * every `--scope user` phase into an unexpected exit 1.
  */
 
 function aiToolIds() {

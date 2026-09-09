@@ -146,10 +146,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("does not rebuild a published source when the sentinel matches (cliVer:catalogVer)", async () => {
-    // resolve(), matching what EnsureBuiltMarketplaceUseCase.execute() itself computes
-    // for builtDir (see its own comment): on win32 a drive-less PROJECT would otherwise
-    // seed a key the in-memory fs never looks up under, since the code's own builtDir is
-    // resolved with a drive letter.
+    // resolve(): a drive-less PROJECT would seed a key the in-memory fs never looks up under,
+    // since the code's own builtDir is resolved with a drive letter.
     const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
@@ -270,7 +268,6 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
     });
     expect(r.builtDir).toBe(resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex")));
     expect(fs.getFile(join(r.builtDir, "plugins/aidd-vcs/SKILL.md"))).toBe("built content");
-    // temp dir cleaned up
     expect(fs.listUnder(tmpdir()).length).toBe(0);
   });
 
@@ -294,18 +291,15 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 });
 
-// outDir here is always builtMarketplaceDir() — an aidd-owned disposable cache, never a
-// user directory — so a collision just means "a previous build is still there" and must be
-// overwritten. Uses a real FlatBuildStrategy rather than the fake buildFor stub above, so it
-// fails if force is flipped to false or outDir stops being cache-only.
+// outDir here is always builtMarketplaceDir(), an aidd-owned disposable cache, so a collision
+// only means a previous build is still there. A real FlatBuildStrategy catches force flipping.
 describe("force behavior at the cache-rebuild path", () => {
   it("overwrites a colliding file already present in the build cache instead of throwing FlatTargetExistsError", async () => {
     const memFs = new InMemoryFileAdapter();
     await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
 
-    // resolve(): the seeded "stale cache" file must sit at the same key
-    // EnsureBuiltMarketplaceUseCase's own resolved builtDir will pass as outDir, or the
-    // in-memory fs's own `isDirectory`/`fileExists` prefix check never finds it on win32.
+    // resolve(): the seeded "stale cache" file must sit at the same key the resolved builtDir is
+    // passed as outDir, or the in-memory fs's prefix check never finds it on win32.
     const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "copilot"));
     const agentPath = `${builtDir}/.github/agents/${PLUGIN}-code-reviewer.agent.md`;
     memFs.setFile(agentPath, "stale cache content from a previous build");
@@ -352,13 +346,8 @@ describe("force behavior at the cache-rebuild path", () => {
   });
 });
 
-// The "force behavior" suite above proves the collision-bypass fires. It does not prove
-// the bypass only ever fires against an aidd-owned directory — that guarantee lives in
-// which outDir runBuild() is called with, both for a direct build (build()) and a build
-// routed through a temp dir first (buildViaTemp(), used when the cache nests under the
-// source). This pins that outDir, whichever path is taken, never leaves the build cache
-// or the OS temp dir — so a future change that points either call site at a live user
-// directory (e.g. a tool's real config dir) fails here, not in someone's project.
+// Which outDir runBuild() is called with is what keeps the collision bypass aimed at an
+// aidd-owned directory, on the direct path and on the temp-dir path alike.
 describe("outDir invariant for the cache-rebuild build path", () => {
   it("only ever builds into the aidd build cache or the OS temp dir, never a user directory", async () => {
     const memFs = new InMemoryFileAdapter();
@@ -388,8 +377,8 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       mode: "marketplace",
     });
 
-    // Dogfood path: source is the project root, so builtDir nests under it → buildViaTemp()
-    // routes the same call through a temp dir instead (see the "builds via a temp dir" test above).
+    // Dogfood path: source is the project root, so builtDir nests under it and buildViaTemp()
+    // routes the same call through a temp dir instead.
     const dogfood = new EnsureBuiltMarketplaceUseCase(
       memFs,
       fakeResolve(PROJECT, "1.0.0"),
@@ -418,9 +407,8 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}${sep}`)).toBe(true);
   });
 
-  // A user-scope marketplace is declared once for every project, so building it inside
-  // whichever project happened to register it would tie that declaration to the life of
-  // one of them: delete that project and the registration points at nothing.
+  // A user-scope marketplace is declared once for every project, so building it inside whichever
+  // project registered it would leave the registration pointing at nothing once that one is gone.
   it("builds a user-scope marketplace outside the project", async () => {
     const memFs = new InMemoryFileAdapter();
     const built: string[] = [];
@@ -454,9 +442,8 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     expect(result.builtDir).toContain(`${sep}5.0.0${sep}`);
   });
 
-  // The shared source is one per CLI version: a purge of one version must never take
-  // another version's registration with it. Two projects on two different CLI
-  // versions building the same user-scope marketplace must land in disjoint trees.
+  // The shared source is one per CLI version: two projects on two CLI versions building the same
+  // user-scope marketplace must land in disjoint trees, so a purge cannot take the other's.
   it("builds two different CLI versions of a user-scope marketplace into disjoint directories", async () => {
     const memFs = new InMemoryFileAdapter();
     const capturing: FrameworkBuildFor = (_t, _m, outDir) =>

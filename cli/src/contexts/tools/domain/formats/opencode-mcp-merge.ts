@@ -9,16 +9,11 @@ const MCP_COLLISION_REASON =
   "server already exists in opencode.json (user-owned); plugin entry skipped";
 
 /**
- * Merges incoming OpenCode-format MCP servers (already transformed via transformMcpToOpencode)
- * into the existing opencode.json content.
+ * Merges incoming OpenCode-format MCP servers into the existing opencode.json.
  *
- * - Strips keys previously contributed by this plugin (previousEntriesForThisPlugin) before merging.
- * - Preserves user-owned servers (keys not in previousEntriesForThisPlugin and not in incoming).
- * - Incoming servers replace previous entries owned by this plugin (idempotent re-install).
- * - Incoming servers that collide with user-owned keys are skipped and returned as collisions.
- *
- * Both `existingContent` and `incomingTransformed` must be valid JSON strings produced by
- * `JSON.stringify(_, null, 2)` (the same serialization as transformMcpToOpencode).
+ * Keys this plugin contributed before are stripped first, so a re-install is idempotent; a
+ * user-owned server is preserved, and an incoming server colliding with one is skipped and
+ * returned as a collision. Both inputs must be JSON serialized with a two-space indent.
  */
 export function mergeOpencodeMcp(
   existingContent: string | null,
@@ -37,25 +32,13 @@ export function mergeOpencodeMcp(
 }
 
 /**
- * Builds the opencode.json emitted by the flat framework build.
+ * Builds the opencode.json the flat framework build emits — written even with zero MCP servers,
+ * so the archive always ships a config, matching every sibling flat target.
  *
- * Written unconditionally (even with zero MCP servers), so the archive always
- * ships a config — matching every sibling flat target (codex config.toml,
- * claude settings.json).
- *
- * The framework-owned keys ($schema, instructions) come from `baseConfig`: the
- * same bundled `assets/configs/opencode/opencode.json` the install path writes,
- * so both paths emit an identical shape from a single source of truth.
- *
- * - `baseConfig` keys are framework-owned and win over stale existing copies.
- * - Any other top-level keys in an existing config are preserved (user-owned).
- * - Incoming prefixed MCP servers merge into `mcp` (incoming wins); the `mcp`
- *   key is omitted entirely when neither existing nor incoming contribute one.
- * - Malformed `existing` content throws — no silent discard.
- *
- * @param baseConfig - Canonical base config (bundled opencode.json asset), as JSON
- * @param existing   - Raw content of the existing opencode.json (or null if absent)
- * @param incoming   - Already-prefixed MCP server entries to merge in
+ * The framework-owned keys come from `baseConfig`, the same bundled asset the install path
+ * writes, and win over a stale existing copy; any other top-level key is preserved. `mcp` is
+ * omitted entirely when neither side contributes one, and malformed `existing` content throws
+ * rather than being silently discarded.
  */
 export function buildOpencodeFlatConfig(
   baseConfig: string,
@@ -74,10 +57,8 @@ export function buildOpencodeFlatConfig(
   return JSON.stringify(result, null, 2);
 }
 
-/**
- * Removes servers previously contributed by a plugin from the opencode.json mcp section.
- * Keys not present in `entries` are preserved untouched.
- */
+/** Removes servers previously contributed by a plugin from opencode.json's mcp section. A key
+ * absent from `entries` is left untouched. */
 export function unmergeOpencodeMcp(
   existingContent: string,
   entries: ReadonlyMap<string, string>
@@ -89,8 +70,6 @@ export function unmergeOpencodeMcp(
   }
   return JSON.stringify({ ...parsed, mcp }, null, 2);
 }
-
-// ── Private helpers ──────────────────────────────────────────────────────────
 
 function parseExisting(content: string | null): {
   full: Record<string, unknown>;

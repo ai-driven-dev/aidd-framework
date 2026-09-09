@@ -105,7 +105,7 @@ describe.concurrent("E2E: issue-271 — setup cache resolution and propagation v
     try {
       await seedManifest(projectDir);
 
-      // Install claude with aidd-dev plugin from local fixture (catalog version 1.0.0)
+      // The local fixture's catalog declares aidd-dev 1.0.0.
       await runCli(
         [
           "setup",
@@ -123,7 +123,6 @@ describe.concurrent("E2E: issue-271 — setup cache resolution and propagation v
         fakeHome
       );
 
-      // Drift the aidd-dev version in the manifest to simulate an older pinned version
       const manifestBefore = await readManifest(projectDir);
       const tools = manifestBefore.tools as Record<
         string,
@@ -139,7 +138,6 @@ describe.concurrent("E2E: issue-271 — setup cache resolution and propagation v
         "utf-8"
       );
 
-      // Install cursor — this triggers plugin propagation with prefer-catalog policy
       const { exitCode, stdout, stderr } = await runCli(
         ["framework", "install", "--tool", "cursor"],
         projectDir,
@@ -170,14 +168,12 @@ describe.concurrent("E2E: issue-271 — setup cache resolution and propagation v
       await seedManifest(projectDir);
       await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
-      // Register local marketplace so aidd-dev is resolvable (catalog version 1.0.0)
       await runCli(
         ["marketplace", "add", "fixture-market", FRAMEWORK_REAL_PATH, "--yes"],
         projectDir,
         fakeHome
       );
 
-      // plugin install aidd-dev@0.9.0 — catalog says 1.0.0, strict mode should reject
       const { exitCode, stderr } = await runCli(
         ["plugin", "install", "aidd-dev@0.9.0", "--tool", "claude"],
         projectDir,

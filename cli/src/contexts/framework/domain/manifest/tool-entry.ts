@@ -28,10 +28,6 @@ import {
   toTrackedFiles,
 } from "./tracked-files.js";
 
-// ── ToolEntry ────────────────────────────────────────────────────────────────
-// One tool's slice of the record: what it wrote, what it co-owns, what it excluded,
-// and which plugins it carries.
-
 export interface ToolEntry {
   readonly toolId: ToolId;
   readonly version: string;

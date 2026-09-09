@@ -140,8 +140,8 @@ describe("mergeOpencodeMcp", () => {
 });
 
 describe("tolerates a JSONC user-owned opencode.json", () => {
-  // Regression for #295: a user opencode.json with comments / trailing commas
-  // crashed `aidd setup` with "Expected double-quoted property name in JSON".
+  // A user opencode.json may carry comments and trailing commas, which a strict `JSON.parse`
+  // refuses with "Expected double-quoted property name in JSON".
   const JSONC_EXISTING = `{
   "$schema": "https://opencode.ai/config.json",
   // user-authored comment

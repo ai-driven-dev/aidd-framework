@@ -66,7 +66,6 @@ export class InitUseCase {
     return { manifest };
   }
 
-  /** Saves manifest and conditionally adds gitignore entry. */
   private async persistInit(
     manifest: Manifest,
     projectRoot: string,

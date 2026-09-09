@@ -40,12 +40,10 @@ export async function deleteOldFiles(
 }
 
 /**
- * Deletes a plugin's tracked files from the base directory its manifest entry actually
- * recorded — `projectRoot` for a project-scope entry, the resolved user-scope plugins
- * dir (e.g. `~/.cursor/plugins/local`) otherwise. Every plugin-file removal path
- * (`clean`, `plugin remove`, `uninstall`, `marketplace remove`) must resolve the base
- * dir this way, or a user-scope tool's files are never actually removed and instead a
- * path under `projectRoot` that was never written gets asked to delete nothing.
+ * Deletes a plugin's tracked files from the base directory its manifest entry actually recorded —
+ * `projectRoot` for a project-scope entry, the resolved user-scope plugins dir otherwise. Every
+ * plugin-file removal path must resolve the base dir this way, or a user-scope tool's files are
+ * never removed and a path under `projectRoot` that was never written is asked to delete nothing.
  */
 export async function deletePluginFilesForTool(
   files: ReadonlyMap<string, string>,
@@ -65,8 +63,8 @@ export async function deletePluginFilesForTool(
   return deleted;
 }
 
-/** Whether the file already on disk matches the content we would write, so a
- * caller can skip the write and, more importantly, not count it as restored. */
+/** Whether the file already on disk matches the content we would write, so a caller can skip the
+ * write and, more importantly, not count it as restored. */
 export async function isPluginFileAtDesiredState(
   fs: FileReader,
   hasher: Hasher,
@@ -79,17 +77,12 @@ export async function isPluginFileAtDesiredState(
 }
 
 /**
- * Re-registers a marketplace-sourced plugin through its resolved translator: drops the
- * existing manifest entry and lets the translator re-add it, so update and restore both
- * end up with the same single entry an install would have produced. Works for either
- * translation strategy — materializing tools (cursor/opencode) re-copy the BUILT tree;
- * Mode A marketplace tools (claude/codex/copilot) register the plugin reference without
- * writing any files, matching what install does for them.
+ * Re-registers a marketplace-sourced plugin through its resolved translator: drops the existing
+ * manifest entry and lets the translator re-add it, so update and restore both end with the same
+ * single entry an install would have produced.
  *
- * Returns how many files the translator actually (re)wrote — not the plugin's total
- * file count — so a no-op restore reports zero instead of claiming everything changed.
- * `written` is undefined for translators that don't track counts (Mode A never writes
- * files; the rare built-tree fallback where the marketplace can't be resolved); that
+ * Returns how many files the translator actually (re)wrote — not the plugin's total file count — so
+ * a no-op restore reports zero. `written` is undefined for a translator that writes no files, and
  * is reported as 0 rather than guessed.
  */
 export async function materializeViaTranslator(

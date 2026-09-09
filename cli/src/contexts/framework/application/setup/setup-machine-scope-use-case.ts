@@ -11,25 +11,14 @@ import type { SetupMarketplaceRegistrationUseCase } from "../shared/setup-market
 import type { SetupToolsResult } from "./setup-tools-use-case.js";
 
 /**
- * `--scope user`: registers the shared framework source and drives native activation
- * machine-wide, writing nothing under `flow.projectRoot` at all. No tool content
- * install (there is no project tree to install into), no plugin prompt (`SetupFlow`
- * itself refuses `--plugins` at this scope — no manifest entry exists yet to enable one
- * against), and no project-context detection (nothing here reads a project's own files
- * to decide anything).
+ * `--scope user`: registers the shared framework source and drives native activation machine-wide,
+ * writing nothing under `flow.projectRoot` at all — no tool content install, no plugin prompt, no
+ * project-context detection.
  *
- * Extracted out of `SetupUseCase` rather than kept as one more private method there: a
- * project-scope run and a machine-scope run share only source resolution and
- * registration (`SetupMarketplaceRegistrationUseCase`), never the rest of their own
- * sequence, so folding both into one constructor was accumulating collaborators neither
- * path used on its own.
- *
- * Records no shared-source reference: `references.json` tracks which *project* still
- * claims the shared source so a later project-scope `clean` knows whether to drop it —
- * a `--scope user` run has no project-scope manifest for a later `clean` to ever read
- * that claim back from, so a reference recorded here could never be decremented by
- * anything. Absence is the honest state until `clean --scope user` (not yet built)
- * purges the shared source unconditionally regardless.
+ * Records no shared-source reference: `references.json` tracks which *project* still claims the
+ * shared source, and a `--scope user` run has no project-scope manifest for a later `clean` to read
+ * that claim back from, so one recorded here could never be decremented. Absence is the honest
+ * state until `clean --scope user` purges the source unconditionally regardless.
  */
 export class SetupMachineScopeUseCase {
   constructor(
@@ -63,12 +52,9 @@ export class SetupMachineScopeUseCase {
     return true;
   }
 
-  /** Every requested AI tool gets a manifest entry with no files at all — the honest
-   * record of "this tool is registered at user scope, nothing installed under any
-   * project" — so `MarketplaceSyncSettingsUseCase.selectToolIds` has something to
-   * iterate. A tool already present (a second `setup --scope user` run) is left alone
-   * rather than reset, the same idempotence project-scope `setup` gives an
-   * already-installed tool. */
+  /** Every requested AI tool gets a manifest entry with no files at all — the honest record of
+   * "registered at user scope, nothing installed under any project" — so tool selection has
+   * something to iterate. A tool already present is left alone rather than reset. */
   private async registerUserScopeTools(flow: SetupFlow): Promise<void> {
     const manifest = await this.userManifestRepo.load();
     if (manifest === null) return;

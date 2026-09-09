@@ -30,11 +30,9 @@ describe("post-install pipeline", () => {
       manifest,
     });
 
-    // manifest saved
     const reloaded = await deps.manifestRepo.load();
     expect(reloaded).not.toBeNull();
 
-    // gitignore updated
     const gitignorePath = join(PROJECT_ROOT, ".gitignore");
     expect(deps.fs.has(gitignorePath)).toBe(true);
     const gitignoreContent = deps.fs.getFile(gitignorePath) ?? "";

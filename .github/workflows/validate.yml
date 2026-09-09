@@ -1,11 +1,8 @@
 name: Validate
 
-# Runs the framework's pre-commit hooks against the full tree on every push
-# and pull request, so contributions that bypass lefthook locally
-# (--no-verify, fork PRs, web edits) are still gated by the same logic. The
-# generator hooks (catalogs, prompts doc, README counts) `git add` what they
-# regenerate instead of failing on drift, so a step below re-checks their
-# output against HEAD explicitly.
+# Runs the pre-commit hooks against the full tree on every push and pull request, so work
+# that bypassed lefthook locally is gated by the same logic. The generator hooks `git add`
+# what they regenerate instead of failing on drift, so a step below re-checks against HEAD.
 
 on:
   push:
@@ -23,20 +20,11 @@ jobs:
     env:
       LEFTHOOK_CHILD: "1"
       CI: "true"
-      # cli-ci.yml already owns these three as its cli-lint, cli-typecheck and
-      # cli-architecture jobs. Running them again here doubles cli lint/typecheck/
-      # architecture cost on every PR for no extra coverage — cli-ci.yml's jobs are
-      # unconditional, not bypassable the way local lefthook is, so nothing goes
-      # unguarded by dropping them from this invocation. cli-type-honesty is deliberately
-      # NOT excluded: cli-ci.yml runs no job for it, so this is its only CI coverage —
-      # excluding it here would silently stop gating any PR that skips local lefthook
-      # (--no-verify, a fork PR, a web edit), which is exactly what this workflow exists
-      # to catch. Everything else pre-commit owns stays too, including cli-knip/cli-test
-      # (pre-push commands, never part of this `pre-commit` invocation regardless).
-      # This exclusion is also why no `cli/` install runs below: the three hooks that need
-      # cli/node_modules are the three dropped here, and every hook that stays — including
-      # cli-type-honesty and the scripts suite — reads `cli/` as text from the repository
-      # root, on the root install alone.
+      # cli-ci.yml owns these three unconditionally, so running them again buys no coverage.
+      # cli-type-honesty is deliberately NOT excluded: no cli-ci.yml job runs it, making this
+      # its only CI coverage. The exclusion is also why no `cli/` install runs below — the
+      # three hooks needing cli/node_modules are the three dropped, and every hook that stays
+      # reads `cli/` as text from the repository root.
       LEFTHOOK_EXCLUDE: "cli-biome,cli-architecture,cli-typecheck"
     steps:
       - name: Checkout
@@ -63,12 +51,9 @@ jobs:
       - name: Run pre-commit hooks against the full tree
         run: pnpm exec lefthook run pre-commit --all-files --force
 
-      # summarize-plugin-catalogs, summarize-telemetry-prompts-doc and sync-readme-counts
-      # regenerate their target file and `git add` it, but never fail on drift — a stale
-      # CATALOG.md, docs/prompts-documentation.md or README.md count passed the step above
-      # in silence. Comparing against HEAD, not the index: the generators already staged
-      # their output, so a plain `git diff` (worktree vs index) is empty even when the
-      # regenerated content differs from what is committed.
+      # The generator hooks `git add` their output and never fail on drift, so a stale
+      # CATALOG.md, prompts doc or README count passes the step above in silence. Against
+      # HEAD, not the index: the generators already staged, so a plain `git diff` is empty.
       - name: Fail if a generated file drifted from what pre-commit regenerated
         run: |
           if ! git diff --exit-code HEAD -- 'plugins/*/CATALOG.md' docs/prompts-documentation.md README.md; then

@@ -133,12 +133,8 @@ describe("DetectPluginDriftUseCase — the manifest's recorded scope wins over t
     expect(checkedPaths.some((p) => p.includes(".cursor"))).toBe(false);
   });
 
-  // The `notInstalledOnMachine` collapse exists for a user-scope tool's plugin directory,
-  // which a fresh machine simply has not populated yet — not for a project-scope one,
-  // where every file missing is ordinary drift a person can act on file by file. A
-  // cursor entry recorded `scope: "project"` must read as the second case, even though
-  // cursor's own profile says "user": the manifest's own record is what "not on this
-  // machine" is measuring.
+  // The `notInstalledOnMachine` collapse exists for a user-scope directory a fresh machine
+  // has not populated; what it measures is the manifest's recorded scope, not the profile's.
   it("reports real per-file drift, not a collapsed not-installed entry, for a cursor plugin recorded scope: project", async () => {
     const manifest = Manifest.create();
     manifest.addTool("cursor", "1.0.0", []);

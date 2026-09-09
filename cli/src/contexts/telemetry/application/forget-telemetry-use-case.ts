@@ -30,32 +30,16 @@ export interface TelemetryRemovalResult {
   readonly journal: TelemetryRemovalOutcome;
   readonly sink: TelemetryRemovalOutcome;
   readonly identity: TelemetryRemovalOutcome;
-  /** Repeated from the preview, unchanged by removing everything else — history does not
-   * become reachable by having removed the rest, so this is the exact same reading, not a
-   * fresh one. */
+  /** Repeated from the preview: history does not become reachable by having removed the rest,
+   * so this is the exact same reading, not a fresh one. */
   readonly history: TelemetryHistoryReading;
 }
 
 /**
- * Shows, then removes, what this tool measured about one person — never both in the same
- * call, and never from the same resolution twice.
- *
- * `preview()` alone resolves every location; `remove()` takes exactly the value `preview()`
- * produced and never resolves a location of its own — it calls no path resolver, and it
- * lists no directory. Every name it deletes came from the preview a person already saw.
- * Two computations that happen to agree today (this machine's sink directory, a relocated
- * `AIDD_USER_CONFIG_DIR`, a file that appears between the two calls) can disagree
- * tomorrow, and the failure that produces is deleting something nobody was shown. Passing
- * the preview through, rather than re-deriving inside `remove()`, is what makes that
- * failure inexpressible rather than merely untested — see `telemetry-removal.ts`'s module
- * doc for the same guarantee stated from the value's side.
- *
- * Confirmation is not this use case's concern: whether to call `remove()` at all is the
- * command layer's decision, from `--yes`. A refusal is simply never calling it — never a
- * throw, since a person who looked and decided not to is not an error.
- *
- * The telemetry switch (`.aidd/config.json`) is never touched here — this use case holds
- * no dependency capable of writing it, so that is true by construction, not by care.
+ * Shows, then removes, what this tool measured about one person, never both in the same call.
+ * `preview()` alone resolves every location; `remove()` takes exactly that value and resolves
+ * none of its own, so deleting something nobody was shown is inexpressible, not merely untested.
+ * Whether to call `remove()` at all is the command layer's decision; a refusal is never a throw.
  */
 export class ForgetTelemetryUseCase {
   constructor(
@@ -97,9 +81,8 @@ export class ForgetTelemetryUseCase {
       : { certainty: "staged", files: tracked };
   }
 
-  /** Removes exactly what `preview` resolved — see the class doc for why this must never
-   * resolve a location of its own. Every location is attempted, whatever the others did:
-   * one failure never spares or stops the rest. */
+  /** Removes exactly what `preview` resolved, never a location of its own. Every location is
+   * attempted whatever the others did: one failure never spares or stops the rest. */
   async remove(preview: TelemetryRemovalPreview): Promise<TelemetryRemovalResult> {
     const [journal, sink, identity] = await Promise.all([
       this.removeJournal(preview.journal),
@@ -110,8 +93,7 @@ export class ForgetTelemetryUseCase {
   }
 
   // `readStrict()` throwing is the file existing but being unreadable - exactly the file a
-  // person most needs named as present. `null` is the ordinary "nobody opted in" case, and
-  // an identity object is presence with nothing wrong.
+  // person most needs named as present. `null` is the ordinary "nobody opted in" case.
   private async identityState(): Promise<{ present: boolean; unreadable: boolean }> {
     try {
       return { present: (await this.identity.readStrict()) !== null, unreadable: false };
@@ -120,9 +102,8 @@ export class ForgetTelemetryUseCase {
     }
   }
 
-  // `journal.path` — never `this.runJournalReader.runsDir` re-read here — is what makes
-  // this act on the same value a person was shown; see the class doc and
-  // `telemetry-removal.ts`'s own doc for why that must hold by construction.
+  // `journal.path`, never `this.runJournalReader.runsDir` re-read here: this must act on the
+  // same value a person was shown.
   private async removeJournal(
     journal: TelemetryProjectJournalRemoval
   ): Promise<TelemetryRemovalOutcome> {
@@ -139,10 +120,8 @@ export class ForgetTelemetryUseCase {
     return { removed, failed };
   }
 
-  // `sink.path`, for the same reason `removeJournal` uses `journal.path` rather than
-  // `this.sink.rootDir` — the sink already froze `rootDir` at construction, so the two
-  // happen to agree today, but this removes the second computation rather than trusting
-  // that agreement to hold.
+  // `sink.path`, for the same reason `removeJournal` uses `journal.path`: the two agree today,
+  // but a second computation here would be free to disagree tomorrow.
   private async removeSink(sink: TelemetryMachineSinkRemoval): Promise<TelemetryRemovalOutcome> {
     const failed: TelemetryRemovalFailure[] = [];
     let removed = 0;
@@ -157,10 +136,8 @@ export class ForgetTelemetryUseCase {
     return { removed, failed };
   }
 
-  // Gated on `identity.present`, the preview's own answer — never the filesystem's answer
-  // at removal time. Without this gate, a file that appeared *after* a preview said
-  // "nothing to remove" would still be deleted and counted, which is exactly the removal
-  // reaching past what was shown that this whole design exists to make impossible.
+  // Gated on the preview's own `identity.present`, never the filesystem at removal time: a file
+  // that appeared after a preview said "nothing to remove" must not be deleted and counted.
   private async removeIdentity(
     identity: TelemetryMachineIdentityRemoval
   ): Promise<TelemetryRemovalOutcome> {

@@ -23,9 +23,8 @@ import {
 
 export interface TelemetryOnOptions {
   readonly projectRoot: string;
-  /** Same consequence as `endpoint --scope project`: `.aidd/config.json` is a git-tracked
-   * file, deliberately un-ignored so a fresh clone inherits the project's decision. Refusing
-   * without this is the whole reason a person is ever asked at all. */
+  /** `.aidd/config.json` is git-tracked, so a fresh clone inherits the project's decision —
+   * which is why anyone is asked at all. */
   readonly confirmed: boolean;
 }
 
@@ -34,11 +33,9 @@ export interface TelemetryOnResult {
   readonly switchChanged: boolean;
 }
 
-/** Owns the AIDD telemetry switch alone: flips `.aidd/config.json`'s `telemetry.enabled`
- * and git-ignores the run journal. Never touches a tool's own settings file — arming a
- * tool to export and recording locally are two different promises, and no command in this
- * system writes the former any more. Any `endpoint` already recorded in the switch file is
- * preserved untouched — see its declaration in `telemetry-switch.ts` for why. */
+/** Owns the AIDD telemetry switch alone: flips `.aidd/config.json`'s `telemetry.enabled` and
+ * git-ignores the run journal. Never touches a tool's own settings file — arming a tool to
+ * export and recording locally are two different promises. Any `endpoint` there is preserved. */
 export class TelemetryOnUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,
@@ -51,25 +48,20 @@ export class TelemetryOnUseCase {
   async execute(options: TelemetryOnOptions): Promise<TelemetryOnResult> {
     const switchPath = telemetryConfigPath(options.projectRoot);
     this.guardConfirmed(options);
-    // Before the switch, not after: turning measurement on is the one moment a person is
-    // asking for it, and so the moment to say it cannot be stored. `appendRecord` creates
-    // the directory itself, so without this the first failure lands at the first record —
-    // long after the decision, and on whoever runs `read` rather than whoever turned it on.
+    // Before the switch, not after: `appendRecord` creates the directory itself, so without this
+    // the first failure lands at the first record, on whoever reads rather than whoever turned on.
     await this.sink.ensureWritable();
     this.logger.info(`AIDD telemetry switch -> ${switchPath}`);
-    // Written last, once everything the switch promises is actually in place: a failure
-    // partway through must never leave `enabled: true` describing a setup that stopped
-    // short of it.
+    // The switch is written last, once everything it promises is in place: a failure partway
+    // through must never leave `enabled: true` describing a setup that stopped short of it.
     await this.protectRunsDir(options.projectRoot);
     await this.makeCommitsJoinable(options.projectRoot);
     const switchChanged = await this.writeSwitch(switchPath);
     return { switchPath, switchChanged };
   }
 
-  // `.aidd/config.json` is deliberately git-tracked — un-ignored so a fresh clone inherits
-  // the project's decision — which is exactly the consequence `endpoint --scope project`
-  // already refuses without `--yes`. Same consequence, same sentence, same error: fires
-  // unconditionally, whatever the switch's current state, the same way that guard does.
+  // `.aidd/config.json` is git-tracked, the consequence `endpoint --scope project` already
+  // refuses without `--yes`. Fires unconditionally, whatever the switch's current state.
   private guardConfirmed(options: TelemetryOnOptions): void {
     if (options.confirmed) return;
     throw new TelemetryProjectScopeRequiresYesError(
@@ -78,10 +70,8 @@ export class TelemetryOnUseCase {
     );
   }
 
-  // Every successful `on` re-checks this, switch newly written or not — the rule the
-  // plugin's own switch script followed before the CLI took it over, and the reason: a project
-  // turned on before this existed must still get caught up on ignoring the journal and on
-  // naming anything git already tracks, without a person having to turn it off and on again.
+  // Re-checked on every successful `on`, switch newly written or not: a project turned on before
+  // this existed still gets the journal ignored, without turning telemetry off and on again.
   private async protectRunsDir(projectRoot: string): Promise<void> {
     const added = await this.gitignore.execute(projectRoot, [RUNS_ENTRY]);
     if (added) {
@@ -101,15 +91,8 @@ export class TelemetryOnUseCase {
   }
 
   /** Re-run on every successful `on`, switch newly written or not, for the same reason
-   * `protectRunsDir` is: a project turned on before this existed has to be caught up
-   * without anyone turning it off and on again.
-   *
-   * What it buys is the one link the chain was missing. A record already names its turn,
-   * its session and the task folder that session declared; nothing named the commit, so
-   * "what did this backlog item cost" could be answered and "what did this commit cost"
-   * could not. Announced rather than done quietly: this writes into commit messages a team
-   * will read, and a person who did not expect it must be able to find the sentence that
-   * told them, and the command that undoes it. */
+   * `protectRunsDir` is. Announced rather than done quietly: it writes into commit messages a
+   * team will read, so the sentence saying so and the command undoing it must be findable. */
   private async makeCommitsJoinable(projectRoot: string): Promise<void> {
     const install = await this.git.installCommitMessageDelegate(
       projectRoot,
@@ -128,15 +111,10 @@ export class TelemetryOnUseCase {
     );
   }
 
-  /** `prepare-commit-msg` here is committed, shared config a manager owns, not a file this
-   * CLI may append to — an automatic append would reach every clone through a commit nobody
-   * reviewed. Lefthook is observed to regenerate it from that config on every install
-   * (this repository's own `lefthook.yml` documents it); husky, believed to do the same for
-   * the same reason, is not separately measured. Either way nothing is appended, and nothing
-   * is promised until the printed job is added by hand. Already wired through the manager is
-   * reported nowhere here on purpose: the ordinary trailer promise above already covers that
-   * outcome, and printing a second sentence for a chain that already works would be news
-   * about nothing. */
+  /** `prepare-commit-msg` under a manager is committed, shared config this CLI may not append
+   * to — an append would reach every clone through a commit nobody reviewed — and lefthook
+   * regenerates it from that config anyway. A chain already wired prints nothing: the ordinary
+   * trailer promise above already covers it. */
   private reportManagedHook(manager: HookManager, wired: boolean): void {
     if (wired) return;
     const { targetFile, snippet } = sessionTrailerManagerSnippet(

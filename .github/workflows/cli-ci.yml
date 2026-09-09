@@ -1,16 +1,11 @@
 name: cli CI
 
-# Every push and pull_request triggers this workflow unconditionally — no `paths:`
-# filter — because a `paths:`-filtered workflow that isn't triggered still leaves its
-# required checks "expected" on GitHub's side, which blocks merge on a PR that never
-# touches this scope. The `changes` job below decides, in bash, whether the rest of
-# this workflow has anything to do; every other job is gated on its `relevant` output,
-# and `gate` reports green when nothing was relevant, so a PR outside this scope is
-# never blocked waiting for jobs that skipped on purpose.
+# No `paths:` filter, deliberately: a filtered workflow that is not triggered still leaves
+# its required checks "expected" on GitHub's side, blocking merge on a PR outside its scope.
+# The `changes` job decides in bash instead, every other job is gated on its `relevant`
+# output, and `gate` reports green when nothing was relevant.
 #
-# kanban/ has its own job and its own dependencies. The CLI no longer type-checks
-# or bundles it: the `aidd kanban` command was unwired, so no CLI job needs
-# kanban's node_modules to resolve modules.
+# kanban/ has its own job and its own dependencies; no CLI job needs its node_modules.
 
 on:
   push:
@@ -39,23 +34,8 @@ jobs:
         id: filter
         run: |
           set -euo pipefail
-          # The scope this workflow's jobs actually exercise, replacing the old
-          # top-level `paths:` filter (kept here, not there, so a skip still lets
-          # every job run and `gate` still report green):
-          #   cli/**, kanban/**            - what the jobs below type-check, lint,
-          #                                  test, and build
-          #   plugins/aidd-telemetry/**    - the hooks and skills the Windows job
-          #                                  drives, except its own prose: that is
-          #                                  asserted by scripts/__tests__, which
-          #                                  validate.yml already runs on every push
-          #                                  and pull request, unfiltered and required
-          #                                  -- indirectly, through its `pnpm exec
-          #                                  lefthook run pre-commit` step, whose
-          #                                  `scripts-tests` hook is the one that
-          #                                  actually invokes `node --test`
-          #   scripts/__tests__/**         - the plugin suite the Windows job runs
-          #   README.md                    - its coverage table, which
-          #                                  scripts/__tests__ asserts
+          # The scope the jobs below actually exercise. The telemetry plugin's own prose is
+          # excluded because validate.yml already asserts it on every push and pull request.
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE="${{ github.event.pull_request.base.sha }}"
             HEAD="${{ github.event.pull_request.head.sha }}"
@@ -64,9 +44,8 @@ jobs:
             HEAD="${{ github.sha }}"
           fi
 
-          # A brand-new branch or a force-push gives `before` as the all-zero SHA —
-          # there is no base to diff against, so treat that as relevant rather than
-          # letting `git diff` error into a skip that reads as "nothing changed".
+          # A new branch or a force-push gives an all-zero `before`: with no base to diff
+          # against, `git diff` would error into a skip reading as "nothing changed".
           if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
             echo "no usable base SHA (new branch or force-push) - treating as relevant"
             echo "relevant=true" >> "$GITHUB_OUTPUT"
@@ -80,10 +59,8 @@ jobs:
               cli/*|kanban/*|scripts/__tests__/*|README.md)
                 relevant=true
                 ;;
-              # This file. A change to how the suite runs - a worker pool, an exclusion, a
-              # step order - is a change nothing else here matches, so without this the
-              # workflow that decides whether the suite passes never runs on the commit
-              # that changed it, and lands unverified.
+              # This file: a change to how the suite runs matches nothing else here, so the
+              # workflow deciding whether the suite passes would land unverified.
               .github/workflows/cli-ci.yml)
                 relevant=true
                 ;;
@@ -162,9 +139,8 @@ jobs:
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test:arch
 
-  # Runs every tier once, instrumented for coverage — `cli-test` used to run the
-  # same four projects again with no instrumentation, a second 208s run that
-  # proved nothing this one does not. Coverage is the test run now.
+  # Every tier once, instrumented: coverage is the test run, and a second uninstrumented
+  # pass would prove nothing this one does not.
   cli-coverage:
     name: cli / Test & Coverage thresholds
     needs: [changes]
@@ -274,14 +250,12 @@ jobs:
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
       # The probe drives the real tool, so the real tool has to be here. No credentials are
-      # configured and none are needed: it points Claude Code at a dead address with a fake
-      # key, and the session id is minted before any of that matters.
+      # needed: it points Claude Code at a dead address, and the session id is minted first.
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code # floats on purpose, declared in scripts/__tests__/workflows-pin-global-installs.test.js
-      # Re-checks what #632 measured once, by running a session: that the identifier a hook
-      # receives is the one the export carries. Everything in this layer joins on that, and a
-      # tool update can break it with nothing else turning red. Exit 2 means the probe could
-      # not form an opinion and says so rather than blaming the tool.
+      # Everything in this layer joins on the identifier a hook receives being the one the
+      # export carries, and a tool update can break it with nothing else turning red. Exit 2
+      # means the probe could not form an opinion, rather than blaming the tool.
       - name: Probe the identifier join
         run: node scripts/probe-identifier-join.cjs
 
@@ -331,13 +305,8 @@ jobs:
 
   windows:
     # Runs under bash (Git Bash, bundled on windows-latest) so every command is the one the
-    # Linux jobs run, not a PowerShell rewrite of it.
-    #
-    # No pnpm store cache here: the store's default path differs by platform (this cache
-    # model assumes `~/.local/share/pnpm/store`, a POSIX path, which is where the Linux
-    # jobs' installs land — not where a native Windows pnpm resolves its store), and this
-    # job's dominant cost is the global CLI install, build, and e2e suite below, not the
-    # `pnpm install` steps a cache would shorten.
+    # Linux jobs run, not a PowerShell rewrite of it. No pnpm store cache: the store path in
+    # the Linux jobs' cache key is POSIX, not where a native Windows pnpm resolves its store.
     name: cli / Windows
     needs: [changes]
     if: needs.changes.outputs.relevant == 'true'
@@ -354,32 +323,25 @@ jobs:
           node-version: "22"
 
       # The WRITE path, on the platform where a home directory, a line ending and an absolute
-      # path all resolve differently than they do on the Linux jobs above. It runs before the
-      # CLI is built, on purpose: recording is supposed to need nothing installed, and this is
-      # where that claim is exercised. Reading is the CLI's now, and the e2e project below
-      # covers it on this same runner.
+      # path all resolve differently. It runs before the CLI is built on purpose: recording is
+      # supposed to need nothing installed, and this is where that claim is exercised.
       - name: Chain - allow measurement, with nothing installed
         run: |
-          # Written directly rather than through a command: the switch is a file, the hooks
-          # read it fresh at every write, and no binary has to exist for that to work.
+          # Written directly rather than through a command: the switch is a file the hooks
+          # read fresh at every write, so no binary has to exist for it to work.
           mkdir -p .aidd
           node -e "require('fs').writeFileSync('.aidd/config.json', JSON.stringify({ telemetry: { enabled: true } }, null, 2) + '\n');"
       - name: Chain - journal a captured payload
         run: |
-          # The fixture's own cwd is a path from whatever machine captured it - rewritten to
-          # this checkout's real path so getRepoRoot resolves a repository that exists here.
+          # The fixture's cwd came off whatever machine captured it: rewritten so getRepoRoot
+          # resolves a repository that exists here.
           node -e "const p=require('./scripts/__tests__/fixtures/claude-code-session-start.json'); p.cwd=process.cwd(); require('fs').writeFileSync('payload.json', JSON.stringify(p));"
           node plugins/aidd-telemetry/hooks/journal.cjs session-start < payload.json
           node plugins/aidd-telemetry/hooks/journal.cjs turn-end < payload.json
-      # `aidd telemetry check`'s "tool files readable" claim reads `sessionFound: false` as
-      # a fact worth failing on (see telemetry-claim.ts), and nothing in this chain has ever
-      # placed a transcript for the session the step above just journalled - the claude
-      # reader (`claude-transcript-location.ts`) has nowhere to find `ffde6fda-…`. Copied
-      # from an existing local-cost fixture with its own session id rewritten to match, into
-      # the exact directory `CLAUDE_CODE_TRANSCRIPT_LOCATION.root` declares under this
-      # process's own home: `resolveHomeDir()` reads `$HOME` first, which Git Bash on this
-      # runner already sets, so reading it here mirrors the read path instead of guessing at
-      # `$USERPROFILE`.
+      # `telemetry check` fails on `sessionFound: false`, and nothing in this chain places a
+      # transcript for the session just journalled. Copied from a local-cost fixture with its
+      # session id rewritten, under `$HOME` — which is what the read path itself resolves
+      # first, and which Git Bash sets on this runner.
       - name: Chain - place the transcript where claude keeps it
         run: |
           node -e "const fs=require('fs'),os=require('os'),path=require('path');const homeDir=process.env.HOME||os.homedir();const sessionId='ffde6fda-14a8-4b32-8110-be1f1d13eebf';const src='cli/tests/fixtures/local-cost/.claude/projects/fake-project/22222222-2222-4222-8222-222222222222.jsonl';const dir=path.join(homeDir,'.claude','projects','fake-project');fs.mkdirSync(dir,{recursive:true});const content=fs.readFileSync(src,'utf8').split('22222222-2222-4222-8222-222222222222').join(sessionId);fs.writeFileSync(path.join(dir,sessionId+'.jsonl'),content);"
@@ -388,86 +350,60 @@ jobs:
           git add -A
           git status --porcelain >/dev/null
 
-      # Wrapped, because a suite that writes into this repository's own .git/hooks passes
-      # every assertion and destroys an install nothing can restore — `.git` is in no
-      # history. The wrapper passes the suite's own exit code through untouched, the same
-      # guard lefthook.yml's `scripts-tests` hook runs locally.
-      # The suite itself reads workflow and manifest YAML through the repository's own
-      # devDependencies (`js-yaml`), so the root install has to precede it; the chain
-      # steps above stay ahead of any install on purpose.
+      # Wrapped: a suite writing into this repository's own .git/hooks passes every assertion
+      # and destroys an install nothing can restore. The suite reads YAML through the root
+      # devDependencies, so the install has to precede it — and the chain steps above stay
+      # ahead of any install on purpose.
       - run: pnpm install --frozen-lockfile
       - name: Plugin suite
         run: node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/**/*.test.js'
 
       - run: cd cli && pnpm install --frozen-lockfile
-      # A real global install, not `node dist/cli.js` by path: build, pack, and
-      # `npm install -g` the tarball — the same shim generation a person's own
-      # `npm install -g @ai-driven-dev/cli` produces. Every suite below invokes the built
-      # file directly and proves nothing about whether `aidd` actually resolves on this
-      # platform's PATH — Windows is where that kind of assumption has broken silently
-      # before (`os.homedir()` never reading `$HOME` here). Built here, ahead of the
-      # unit/integration/e2e suites below, so this is the only build this job needs.
+      # A real global install, not `node dist/cli.js` by path: nothing else proves `aidd`
+      # resolves on this platform's PATH. Built here, ahead of the suites below, so this is
+      # the only build the job needs.
       #
-      # Inlined rather than `pnpm run install:local` (the equivalent script this package
-      # already ships): a package.json script runs through pnpm's own configured shell,
-      # `cmd.exe` on Windows unless `script-shell` says otherwise, which this repository
-      # never sets — its `$(node -p ...)` command substitution is bash syntax and would
-      # not survive that. This step's own `run:` block is guaranteed bash by the job's
-      # `defaults.run.shell` above, so the same two commands run here directly instead,
-      # with a glob standing in for the version substitution.
+      # Inlined rather than `pnpm run install:local`: a package.json script runs through
+      # pnpm's configured shell, `cmd.exe` on Windows, where that script's `$(node -p ...)`
+      # is not valid syntax. This block is bash by the job's `defaults.run.shell`.
       - name: Install the built CLI globally, the way a person actually would
         run: |
           cd cli
           pnpm build
           pnpm pack --pack-destination ./dist
           npm install -g ./dist/ai-driven-dev-cli-*.tgz --force
-      # `02-check` diagnoses the chain above through this exact command, lifted from its
-      # own markdown — not a script beside it, the same move `00-init`'s own chain step
-      # made for the switch. `aidd --version` is the same command every skill's own locate
-      # step runs first; failing here means the CLI could not be resolved on the PATH.
+      # The exact command `02-check`'s own markdown names, not a script beside it. Failing
+      # `aidd --version` means the CLI could not be resolved on the PATH.
       - name: Chain - diagnose, through the command every skill's own markdown names
         run: |
           aidd --version
-          # This step's whole value depends on `telemetry check` exiting non-zero on FAIL.
-          # A gated run (measurement off, no repository) judges nothing and exits 0, so the
-          # one row the chain above exists to make true is asserted too: the transcript
-          # placed for the journalled session was actually read.
+          # A gated run judges nothing and exits 0, so the one row the chain exists to make
+          # true is asserted separately: the transcript placed for the session was read.
           aidd telemetry check | tee telemetry-check.out
           grep -E "tool files readable +ok" telemetry-check.out
       - run: cd cli && pnpm test:unit
       - run: cd cli && pnpm test:integration
-      # Every e2e but the two named below — and one of them is why this step matters most:
-      # `telemetry-commit-trailer.e2e.test.ts` makes real commits and reads their messages
-      # back, which is the only thing that proves the `prepare-commit-msg` hook this build
-      # installs is reachable by the shell Git for Windows ships. A path written with
-      # backslashes is not, and nothing but this catches it. Exclude it only for a reason as
-      # concrete as the two below.
+      # Every e2e but the two named below. `telemetry-commit-trailer.e2e.test.ts` is why the
+      # step matters most: it is the only thing proving the `prepare-commit-msg` hook is
+      # reachable by the shell Git for Windows ships, which a backslash path is not.
       - name: cli e2e
-        # `--max-workers=2`, and only here. Vitest transforms modules on its own main
-        # thread while every worker calls back into it (`onTaskUpdate` after each test),
-        # and that call has a fixed 60 s timeout no configuration exposes. On this runner
-        # - a slower filesystem than the Linux jobs, and an e2e test that spawns `node
-        # dist/cli.js` inside every worker - the default pool (one fork per CPU but one)
-        # queued that main thread past 60 s, and the step failed with `[vitest-worker]:
-        # Timeout calling "onTaskUpdate"` while every test passed: 39 files, 279 tests, 0
-        # failures, exit 1. Measured on five runs between 2026-09-02 and 2026-09-04,
-        # including three plain merges to `next` and one re-run of the same commit, so it
-        # is neither a branch nor a one-off. A fixed pool of two caps the transform
-        # requests competing for that thread whatever the runner's core count - a figure
-        # the job log does not state, so nothing here assumes one. The Linux jobs keep the
-        # default: they have never produced this, and slowing them down would buy nothing.
+        # `--max-workers=2`, and only here. Vitest transforms modules on its own main thread
+        # while every worker calls back into it, and that call has a fixed 60 s timeout no
+        # configuration exposes: on this runner the default pool queued it past 60 s and
+        # failed with `Timeout calling "onTaskUpdate"` while every test passed. A fixed pool
+        # of two caps the competing requests whatever the runner's core count.
         run: |
           cd cli
           pnpm exec vitest run --project=e2e --max-workers=2 \
             --exclude "tests/e2e/persona.e2e.test.ts" \
             --exclude "tests/e2e/telemetry-multi-tool.e2e.test.ts"
-        # persona.e2e.test.ts hardcodes /usr/bin/expect for TTY emulation, which windows-latest
-        # does not carry. telemetry-multi-tool.e2e.test.ts puts a `#!/bin/sh` stand-in binary
-        # with no extension on PATH; Windows resolves an executable by PATHEXT, never a shebang.
+        # persona.e2e.test.ts needs /usr/bin/expect, which windows-latest does not carry;
+        # telemetry-multi-tool.e2e.test.ts relies on a shebang, and Windows resolves an
+        # executable by PATHEXT.
 
-  # Fan-in: every job above either ran and passed, or was correctly skipped because
-  # `changes` found nothing relevant. This is the one check the branch rulesets require —
-  # #757 and #759 both merged with the real jobs above red because nothing named them.
+  # Fan-in: every job above either ran and passed, or was skipped because `changes` found
+  # nothing relevant. The one check the branch rulesets require — without it a pull request
+  # merges with the real jobs red, because nothing names them.
   gate:
     name: cli / gate
     runs-on: ubuntu-latest

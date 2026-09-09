@@ -34,7 +34,6 @@ describe("uninstall", () => {
     await initProject(deps, PROJECT_ROOT);
     await installTool(deps, PROJECT_ROOT, "claude" as ToolId);
 
-    // Delete .claude/ files from in-memory FS
     const claudeFiles = deps.fs.listUnder(join(PROJECT_ROOT, ".claude"));
     for (const f of claudeFiles) {
       await deps.fs.deleteFile(f);

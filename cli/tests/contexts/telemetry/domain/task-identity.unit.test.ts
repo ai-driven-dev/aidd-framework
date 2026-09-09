@@ -55,9 +55,8 @@ describe("taskIdentityFromWrittenPath", () => {
   });
 
   it("resolves a task name that merely contains '..' as text, never mistaking it for a climb", () => {
-    // "2026_02_10_a..b" is a name, not a path segment of exactly "..": it climbs nothing, and
-    // both `file-writes.cjs` and `task-declared.cjs` journal it. Rejecting it on a bare
-    // substring check would read a real, journalled declaration as though none existed.
+    // "2026_02_10_a..b" is a name, not a segment of exactly "..": it climbs nothing, and both
+    // `file-writes.cjs` and `task-declared.cjs` journal it.
     expect(taskIdentityFromWrittenPath("aidd_docs/tasks/2026_02/2026_02_10_a..b/spec.md")).toBe(
       "2026_02/2026_02_10_a..b"
     );
@@ -98,10 +97,8 @@ describe("taskIdentitiesFromWrittenPaths", () => {
   });
 
   it("names a task for exactly the paths the hook journals, and for no others", () => {
-    // The two live apart - hooks/ is copied verbatim by the framework build and can import
-    // nothing from cli/ - so they are pinned to each other here. A derivation stricter than
-    // the writer's gate would leave journalled lines resolving to nothing; a looser one
-    // would invent a task from a path no session was ever recorded as writing.
+    // `hooks/` is copied verbatim by the build and can import nothing from `cli/`, so the
+    // writer's gate and this derivation are pinned to each other here.
     const CANDIDATES = [
       "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md",
       "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter.md",

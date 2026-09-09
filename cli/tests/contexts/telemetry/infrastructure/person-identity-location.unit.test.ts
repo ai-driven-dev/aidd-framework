@@ -4,17 +4,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PersonIdentityAdapter } from "../../../../src/contexts/telemetry/infrastructure/person-identity-adapter.js";
 
-/**
- * Where a person's own identity file lands, pinned on any platform rather than only on a
- * Windows runner — the same reason `telemetry-sink-location.unit.test.ts` exists for the
- * sink. `identityDir()` is private to the adapter, so this drives it through the one public
- * surface that exposes it: `filePath`.
- *
- * Also pins the rule that gives this file its whole reason to exist as its own port rather
- * than reusing the sink's: `AIDD_USER_CONFIG_DIR` is a location a repository, a team, or a
- * CI can point at, and reaching an identity through it would not be this person's own
- * choice — unlike the sink, which honours it deliberately.
- */
+/** `identityDir()` is private to the adapter, so this drives it through `filePath` on every
+ * platform. An identity reached through a location a team or a CI points at is not one's own. */
 function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   const original = Object.getOwnPropertyDescriptor(process, "platform");
   Object.defineProperty(process, "platform", { value: platform, configurable: true });

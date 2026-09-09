@@ -18,13 +18,9 @@ interface SyncCmdOptions {
   scope?: string;
 }
 
-/**
- * `--scope user` has no project-scope tracked files to restore — a user-scope install
- * writes nothing under any project — so this skips `restoreAllUseCase` entirely and
- * drives only what a user-scope install actually has: the shared marketplace's own
- * native activation, read from and written to `deps.userManifestRepo`, never this
- * project's own `.aidd/manifest.json`.
- */
+/** A user-scope install writes nothing under any project, so this skips `restoreAllUseCase`
+ * and drives only native activation, through `deps.userManifestRepo` and never this
+ * project's own manifest. */
 async function runUserScopeSync(
   deps: Awaited<ReturnType<typeof createDeps>>,
   output: CLIOutput,
@@ -32,9 +28,8 @@ async function runUserScopeSync(
   fileArgs: string[],
   cmdOptions: SyncCmdOptions
 ): Promise<void> {
-  // Neither has a user-scope counterpart: no plugin is tracked there yet, and a
-  // user-scope manifest entry carries no files to narrow by name. Refused rather than
-  // silently read and discarded.
+  // Neither has a user-scope counterpart, so both are refused rather than read and
+  // silently discarded.
   if (cmdOptions.plugin !== undefined) {
     throw new UserScopeFilterUnsupportedError("--plugin", "sync --plugin <name>");
   }
@@ -103,10 +98,8 @@ async function runSyncAction(
       printUnrestorable(output, result.unrestorable);
     }
 
-    // After restoration, never before: activation drives the same host CLI that writes
-    // into the settings file restoration just regenerated, and `sync` needs the
-    // regenerated file on disk before that CLI touches it, not a file restoration is
-    // about to overwrite underneath it.
+    // After restoration, never before: activation drives the host CLI that writes into the
+    // settings file restoration regenerates, which must be on disk before that CLI runs.
     const activation = await deps.marketplaceSyncSettingsUseCase.execute({
       projectRoot,
       recreateFrameworkIfMissing: true,
@@ -114,9 +107,8 @@ async function runSyncAction(
     printNativeActivation(output, activation.binaryMissing);
     for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
 
-    // A run that errored synced nothing for that scope, and reporting success would call
-    // that the healthy state. `errorHandler` is what turns this into a non-zero exit; the
-    // detail already reached the user through the warnings above.
+    // A run that errored synced nothing for that scope, so reporting success would name the
+    // unhealthy state healthy. `errorHandler` turns this into the non-zero exit.
     const errors = [...result.errors, ...activation.errors];
     if (errors.length > 0) throw new SyncFailedError(errors);
   } catch (error) {
@@ -155,9 +147,8 @@ async function runScopedSync(
     printUnrestorable(output, result.unrestorable);
   }
 
-  // Same order as the full sync: restore this tool's files first, only then drive its
-  // own CLI — narrowed to this one tool, so fixing it does not silently re-drive every
-  // other installed tool's activation too.
+  // Same order as the full sync, narrowed to this one tool so fixing it re-drives no other
+  // installed tool's activation.
   const activation = await deps.marketplaceSyncSettingsUseCase.execute({
     projectRoot,
     toolIds: [toolId],

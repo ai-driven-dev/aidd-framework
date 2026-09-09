@@ -13,14 +13,9 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value : undefined;
 }
 
-/** `null` for anything this file cannot be read as — JSON that will not parse, a shape
- * missing `backlog`, `written_at` or `written_by`, or either provenance field present but
- * not a non-empty string. Deliberately stricter than `PersonIdentityAdapter.read`'s own
- * precedent, which reads a wrong-shaped-but-parseable file as "no identity" rather than
- * "unreadable": this file's own contract requires distinguishing "declared nothing" from
- * "could not be read" (see the port), and a file that exists with a broken shape is
- * evidence of a declaration someone attempted, not one that was never made — so it must
- * surface as damage, never silently read the same as an absent file. */
+/** `null` for anything this file cannot be read as: a broken shape is evidence of a
+ * declaration someone attempted, so it must surface as damage rather than read the same as
+ * an absent file. */
 function parseLink(raw: string): TaskBacklogLink | null {
   const parsed = asPlainObjectOrEmpty(JSON.parse(raw));
   const backlog = nonEmptyString(parsed.backlog);
@@ -30,19 +25,13 @@ function parseLink(raw: string): TaskBacklogLink | null {
   return { backlog, writtenAt, writtenBy };
 }
 
-/**
- * Reads one task folder's `backlog-link.json` — see `TaskBacklogReader` for the contract
- * this promises: never throws, and never writes. `read()` performs no write of any kind,
- * on any path, in any circumstance — the property that lets a report run against a
- * checkout someone else owns without ever risking the work it is describing.
- */
+/** Never throws and never writes, on any path: that is what lets a report run against a
+ * checkout someone else owns without risking the work it describes. */
 export class TaskBacklogAdapter implements TaskBacklogReader {
   private readonly repositoryRoot: string;
 
-  // Resolved once, at construction, for the same reason `RunJournalReaderAdapter` freezes
-  // its own directory there: a relocation after construction can never change what this
-  // instance answers. A task folder path arrives repository-relative, because the journal
-  // line it came from was written that way.
+  // Resolved once, at construction, so a relocation afterwards cannot change what this
+  // instance answers. A task folder path arrives repository-relative, as the journal wrote it.
   constructor(projectRoot: string) {
     this.repositoryRoot = repositoryRootAbove(projectRoot);
   }

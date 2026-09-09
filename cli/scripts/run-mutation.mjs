@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 /**
- * Runs one mutation scope and files its report under that scope's own name.
- *
- * Stryker writes its html and json reports to one path from the config, so five scopes
- * run in sequence would leave only the last score behind. Moving each report into
- * reports/mutation/<scope>/ is what makes the numbers comparable after the fact — and
- * what makes a figure quoted in a document something a command can reproduce.
- *
- * The scope list lives in mutation-scopes.json, which the architecture test reads too.
- * Two lists disagree eventually; one cannot.
+ * Stryker writes its reports to one path from the config, so scopes run in sequence would
+ * leave only the last score behind; each is filed under `reports/mutation/<scope>/` instead.
+ * The scope list lives in `mutation-scopes.json`, which the architecture test reads too.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
@@ -38,8 +32,8 @@ const result = spawnSync(
   { cwd: CLI_ROOT, stdio: "inherit" }
 );
 
-// Sandboxes survive an interrupted run, and 100 MB of them has blocked a commit hook here
-// before. Removed whether the run passed or not.
+// A sandbox survives an interrupted run and they grow to hundreds of megabytes, so they go
+// whether the run passed or not.
 rmSync(join(CLI_ROOT, ".stryker-tmp"), { recursive: true, force: true });
 
 const scopeDir = join(REPORT_ROOT, scope);

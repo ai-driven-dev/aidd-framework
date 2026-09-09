@@ -1,13 +1,8 @@
 #!/usr/bin/env node
-// aidd-telemetry-journal-perf-harness.js - measures journal.cjs's in-process
-// turn-end and file-written latency; run as a child process of the p95 tests
-// in aidd-telemetry-journal.test.js. Not itself a *.test.js file, so node
-// --test does not pick it up.
-//
-// Spawned as a separate process so the parent test can enforce a hard
-// wall-clock timeout with a real kill: node:test's own per-test timeout does
-// not interrupt a blocking synchronous call (confirmed empirically - a
-// `while (true) {}` test body with `{ timeout: 1000 }` does not stop at 1s).
+// Measures journal.cjs's in-process turn-end and file-written latency, run as a child of the
+// p95 tests. Not a *.test.js file, so node --test does not pick it up, and a separate process
+// so the parent can enforce a wall-clock timeout with a real kill: node:test's own timeout
+// does not interrupt a blocking synchronous call.
 
 const fs = require("node:fs");
 const os = require("node:os");

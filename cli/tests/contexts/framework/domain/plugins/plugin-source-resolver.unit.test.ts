@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-// Simulates node:path's relative() the way it behaves on Windows: real POSIX-computed
-// segments, but "\"-joined. The suite runs on POSIX, so this is the only way to prove
-// the resolver's own output is always "/"-joined without an actual Windows runner.
+// Simulates node:path's relative() as it behaves on Windows: real POSIX-computed segments,
+// but "\"-joined. The suite runs on POSIX, the only way to prove the output is "/"-joined.
 vi.mock("node:path", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:path")>();
   return {
@@ -128,9 +127,8 @@ describe("resolvePluginSourceFromMarketplace", () => {
       expect(result).toEqual({
         kind: "git-subdir",
         url: "https://github.com/ai-driven-dev/framework.git",
-        // The resolver must always hand git sparse-checkout a "/"-separated path, even
-        // when node:path's relative() (used here for a pre-resolved absolute path)
-        // would have returned "\"-joined segments on Windows.
+        // The resolver must always hand git sparse-checkout a "/"-separated path, even where
+        // node:path's relative() would have returned "\"-joined segments on Windows.
         path: "plugins/aidd-context",
         ref: "v4.1.0-beta.14",
       });

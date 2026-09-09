@@ -67,8 +67,6 @@ function seedCache(store: Map<string, string>, latest: string, ageMs = 0): void 
   );
 }
 
-// ---- SWR matrix ----
-
 describe("SWR matrix: printFromCacheOnly", () => {
   it("fresh cache (<24h) → shows notice, no network call", async () => {
     const { logger, warns } = makeLogger();

@@ -15,12 +15,8 @@ import { getAiToolConfig } from "../../../../src/contexts/tools/domain/registry.
 import type { TelemetryRouteSupply } from "../../../../src/kernel/measurement.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../../src/kernel/tool.js";
 
-/** Everything the local-read route was measured to produce, from the captures this
- * repository holds. A declaration is checked against these rather than against the
- * documentation, so a route claiming an amount its reader never sets fails here rather
- * than downstream. Local read is the only route this system still reads — the export
- * route (and its own declaration) was deleted in "one route, and every sentence about it
- * true" (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/). */
+/** A declaration is checked against what the captures measured, never the documentation, so
+ * a route claiming an amount its reader never sets fails here. Local read is the only route. */
 type Route = "local";
 
 function fixture(relativePath: string): string {
@@ -55,9 +51,8 @@ function observe(records: readonly Partial<TelemetrySinkRecord>[]): TelemetryRou
 
 const CAPTURES: ReadonlyMap<string, () => TelemetryRouteSupply> = new Map([
   [
-    // Both files, because both are this session's local read: the adapter walks the main
-    // transcript and the subagent's own file, and only the second carries the field the
-    // tool uses to name the running skill.
+    // Both files, because both are this session's local read, and only the subagent's own
+    // carries the field the tool uses to name the running skill.
     "claude:local",
     () =>
       observe([
@@ -118,9 +113,8 @@ describe("what a route declares it supplies, against what its reader actually pr
 
     if (!capture) {
       it(`${tool} declares a ${route} route with no capture, so it may claim nothing`, () => {
-        // A declared route nobody ever captured has been measured to carry an identifier
-        // and nothing else. Letting it claim a capability would be documenting a guess as
-        // a fact, which is the one thing this layer exists to prevent.
+        // A declared route nobody ever captured carries an identifier and nothing else;
+        // letting it claim a capability would document a guess as a fact.
         expect(declaration.supplies).toEqual({
           tokenCounters: false,
           amount: false,
@@ -136,10 +130,8 @@ describe("what a route declares it supplies, against what its reader actually pr
     });
   }
 
-  // `TelemetryLocalRead` used to carry a third variant, "unmeasured" — no reader wired yet
-  // — that no profile ever produced (`AI_TOOL_IDS.every` below is exhaustive: five tools,
-  // each declaring one of the two kinds that remain). Removed rather than left as a branch
-  // nothing could reach; this pins the union at exactly the two kinds a profile can state.
+  // Pins `TelemetryLocalRead` at exactly the two kinds a profile can state, so a third
+  // variant no profile ever produces cannot survive as a branch nothing reaches.
   it("declares only 'declared' or 'unsupported' — a route never left unmeasured", () => {
     for (const tool of AI_TOOL_IDS) {
       expect(declarationOf(tool).kind).toMatch(/^(declared|unsupported)$/u);

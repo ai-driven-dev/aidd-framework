@@ -45,12 +45,8 @@ interface SyncSetup {
   readonly failOnPlugins?: readonly string[];
 }
 
-/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
- * "claude" to — a real build always leaves one there, so a fixture standing in for one
- * must too, now that an unreadable catalog is a hard failure (`UnreadableBuiltCatalogError`)
- * rather than a silent fall back to this project's own local alias. Every marketplace this
- * file registers shares the one physical built dir the default resolver gives "claude",
- * so one seeded catalog, named for whichever marketplace a case cares about, covers them. */
+/** A real build always leaves a catalog where `fakeEnsureBuiltMarketplace()` resolves
+ * "claude", and an unreadable one is a hard failure, so the fixture must leave one too. */
 function seededBuiltCatalog(name = "aidd-framework"): InMemoryFileAdapter {
   return new InMemoryFileAdapter({
     "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
@@ -114,14 +110,8 @@ async function sync(setup: SyncSetup = {}) {
   return { written, logger, fs, activator, result };
 }
 
-/**
- * The settings file the CLI shares with the tool, and with whoever edits it by hand.
- *
- * This flow writes into a file it does not own. Its own comment states the contract — "a
- * trailing comma must not take the whole sync down with it" — and the mutation report said
- * three of nineteen mutants in `loadSettings` were killed, so the contract was mostly a
- * sentence. Every case below names what a user loses if it stops holding.
- */
+/** This flow writes into a file it does not own: whatever a person put there survives, and a
+ * trailing comma they left behind must not take the whole sync down with it. */
 describe("the settings file a user also edits", () => {
   it("writes the enabled plugin into a file that did not exist", async () => {
     const { written } = await sync();
@@ -183,11 +173,8 @@ describe("the settings file a user also edits", () => {
   });
 });
 
-/**
- * Building the marketplace tree happens for every tool, before the branch that decides who
- * writes the registration down — so a build that fails is on the path of every sync.
- * `buildAllForTool` — `builtSourcesForTool` when this was written — had seven mutants and no test killed one.
- */
+/** The build runs for every tool, before the branch that decides who writes the registration
+ * down, so a build that fails is on the path of every sync. */
 describe("a marketplace that will not build", () => {
   const failingBuild = (failFor: string): EnsureBuiltMarketplace => ({
     execute: async (options) => {
@@ -218,15 +205,8 @@ describe("a marketplace that will not build", () => {
   });
 });
 
-/**
- * The build runs before the branch that decides who writes the registration down, and
- * that position is the whole reason it survived the registration cleanup.
- *
- * Every known marketplace is registered, whether or not a plugin was installed from it
- * (see the comment on `activateTool`), so a marketplace with no installed plugin still
- * needs its tree built here. Deleting the call would have left it unbuilt, and the
- * registration the tool's own CLI writes would point at a directory that does not exist.
- */
+/** Every known marketplace is registered whether or not a plugin was installed from it, so
+ * one no plugin points at still needs its tree built or the registration points at nothing. */
 describe("a marketplace no plugin points at", () => {
   it("is still built", async () => {
     const built: string[] = [];
@@ -247,12 +227,8 @@ describe("a marketplace no plugin points at", () => {
     expect(built).toContain("unused");
   });
   it("is registered anyway, whether or not the tool enables its own plugins", async () => {
-    // Declaring a marketplace and installing a plugin from it are two acts, and a person
-    // does the first alone all the time. Reading `enableVerb` as "this tool learns its
-    // marketplaces while enabling a plugin" left a marketplace nobody had installed from
-    // unknown to the tool — measured against the real `claude` binary by
-    // `scripts/smoke-tools.sh` ("claude declares the project marketplace at local scope"),
-    // which found it told about neither of the two the project had registered.
+    // Declaring a marketplace and installing a plugin from it are two acts, and a person does
+    // the first alone all the time; measured, the real binary knew of neither registered one.
     const { activator } = await sync({
       marketplaceNames: ["aidd-framework", "unused"],
       enablesPlugins: true,
@@ -271,10 +247,6 @@ describe("a marketplace no plugin points at", () => {
   });
 });
 
-/**
- * `execute` used to return `void`: `sync` had no way to tell what activation actually
- * did, so it never called it at all (#lot-2). This is the return `sync` now reads.
- */
 describe("what execute reports about activation", () => {
   it("names the tool whose CLI actually ran, in `activated`", async () => {
     const { result } = await sync();
@@ -299,10 +271,8 @@ describe("what execute reports about activation", () => {
     expect(result.warnings.some((w) => w.includes("aidd-context@aidd-framework"))).toBe(true);
   });
 
-  // The one failure shape a real adapter never produces (see `crashOnAddMarketplace`'s own
-  // doc): activation must not swallow it as best-effort, but `execute` must not throw it
-  // either — that decision belongs to whoever calls `execute` (`sync.ts`), the same split
-  // `restoreAllUseCase` already holds for a restore failure.
+  // A failure shape a real adapter never produces: activation must not swallow it as
+  // best-effort, and the decision to throw belongs to whoever calls `execute`.
   it("carries a hard, unexpected activator failure in `errors` rather than throwing", async () => {
     const { result } = await sync({ crashOnAddMarketplace: true });
 

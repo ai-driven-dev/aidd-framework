@@ -130,8 +130,6 @@ describe("claude", () => {
       );
     });
 
-    // The unit-level pinning codex's own nativeActivation already gets — claude's was
-    // covered only indirectly, by the `join` an integration test recomposes.
     it("declares its own marketplace registry and plugin cache root, for clean's own purge", () => {
       const activation = claude.capabilities.plugins.nativeActivation;
       expect(activation?.marketplaceRegistry?.("/home/tester")).toBe(

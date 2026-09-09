@@ -6,10 +6,8 @@ import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
 
 type Deps = Awaited<ReturnType<typeof createDeps>>;
-// Derived from the wired use case's own return type rather than importing its module
-// directly: `clean-user-scope-use-case.ts` is framework's own interior, undeclared
-// public (`context-boundary.arch.test.ts`), and this presentation-layer file has no
-// standing to reach it — the composition root (`Deps`) is the one door it may use.
+// Derived from the wired use case's return type: `clean-user-scope-use-case.ts` is
+// framework's interior, and the composition root is the one door presentation may use.
 type CleanUserScopeResult = Awaited<ReturnType<Deps["cleanUserScopeUseCase"]["execute"]>>;
 
 interface CleanCmdOptions {
@@ -67,9 +65,8 @@ async function runProjectScopeClean(
   output.success(`Cleaned all AIDD files (${result.fileCount} files removed)`);
 }
 
-/** Names, before anything is removed, exactly what `--scope user` is about to purge —
- * the shared source's own versions and the projects `references.json` still names as
- * referencing it, existing paths only (see `UserSourceReferences.listAllReferencingProjects`). */
+/** Names what `--scope user` is about to purge before anything is removed: the shared
+ * source's versions and the projects `references.json` names, existing paths only. */
 function printUserScopePreview(output: CLIOutput, result: CleanUserScopeResult): void {
   const { preview } = result;
   output.print("The following will be removed for this machine:");
@@ -109,9 +106,8 @@ async function runUserScopeClean(
   }
 
   if (!result.manifestFound) {
-    // The use case itself already logged why: no user-scope manifest existed, so no
-    // host registration was there to undo — this only names what the whitelist purge
-    // above it just did.
+    // The use case already logged that no user-scope manifest existed, so no host
+    // registration was there to undo; this names the whitelist purge alone.
     output.success(`Purged the shared ${FRAMEWORK_MARKETPLACE_NAME} source's machine-local state`);
     return;
   }

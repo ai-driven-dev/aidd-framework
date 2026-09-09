@@ -1,20 +1,15 @@
 import type { AiToolId } from "../../../../kernel/tool.js";
 
-/** One plugin, as measurement needs it: a name to report and the marketplace it came from,
- * which is what a host's own registry is keyed by. Nothing else about a plugin is a fact
- * `telemetry check` states, so nothing else crosses. */
+/** One plugin, as measurement needs it: a name to report and the marketplace a host's own
+ * registry is keyed by. Nothing else is a fact `telemetry check` states. */
 export interface InstalledPluginRef {
   readonly name: string;
   readonly marketplace: string | undefined;
 }
 
 /**
- * What this project recorded as installed, per tool.
- *
- * Telemetry asks one question of the installation record — "which plugins should this host
- * be loading?" — and that question is narrower than the record itself. Declared here, as a
- * port telemetry owns, so measurement never reaches into the context that keeps the record:
- * the composition root satisfies it from whatever holds one.
+ * What this project recorded as installed, per tool. A port telemetry owns, so measurement
+ * never reaches into the context that keeps the record.
  */
 export interface InstalledPluginsReader {
   /** The file the record lives in, so an unreadable one can be reported by name. */

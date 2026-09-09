@@ -10,10 +10,8 @@ import { HasherAdapter } from "../../../../../src/runtime/filesystem/hasher-adap
 let root: string;
 
 beforeEach(async () => {
-  // realpath'd once here for the same reason host-marketplace-registry-reader-adapter's
-  // own suite does: macOS aliases its own tmpdir under a symlink itself
-  // (`/var` -> `/private/var`), so a fixture built under an unresolved `root` would
-  // disagree with itself before the function under test ever runs.
+  // macOS aliases its own tmpdir under a symlink (`/var` -> `/private/var`), so a fixture
+  // built under an unresolved `root` would disagree with itself.
   root = await realpath(await mkdtemp(join(tmpdir(), "aidd-shared-source-reference-")));
 });
 

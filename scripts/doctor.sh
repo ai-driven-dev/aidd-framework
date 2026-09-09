@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# aidd-framework doctor
-#
-# Diagnostic preflight for users (install the marketplace) and contributors
-# (work on the marketplace). Prints OK / WARN / FAIL per check and a final
-# verdict.
+# Diagnostic preflight for users installing the marketplace and for contributors working
+# on it. Prints OK / WARN / FAIL per check, then a verdict.
 
 set -uo pipefail
 
@@ -15,8 +12,6 @@ FAIL=0
 MODE="${1:-all}"   # all | user | contributor
 
 print_section() { printf "\n\033[1m%s\033[0m\n" "$1"; }
-
-# --- user-mode checks --------------------------------------------------------
 
 if [ "$MODE" = "all" ] || [ "$MODE" = "user" ]; then
   print_section "Claude Code"
@@ -57,8 +52,6 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "user" ]; then
   fi
 fi
 
-# --- contributor-mode checks -------------------------------------------------
-
 if [ "$MODE" = "all" ] || [ "$MODE" = "contributor" ]; then
   print_section "Node + pnpm"
   if command -v node >/dev/null 2>&1; then
@@ -91,8 +84,6 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "contributor" ]; then
     fi
   fi
 fi
-
-# --- verdict ----------------------------------------------------------------
 
 print_section "Verdict"
 if [ "$FAIL" -eq 0 ]; then

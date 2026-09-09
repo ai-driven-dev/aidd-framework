@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 // Side-effect imports: the use-case resolves every AI tool's local-read declaration from
-// the registry (it loops all of them, not just "claude"), so every tool must be registered
-// for the local-read worked example to run at all.
+// the registry, so every tool must be registered for the worked example to run at all.
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
@@ -16,8 +15,7 @@ import { NULL_RUN_JOURNAL_READER } from "../../../helpers/ports/in-memory-run-jo
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
-// This test is the honesty check the contract document promises its own readers: it never
-// trusts a hand-maintained list of fields on either side, only the record's own interface
+// Trusts no hand-maintained list of fields on either side: only the record's own interface
 // text and the document's own prose, both read fresh off disk.
 
 const RECORD_MODEL_URL = new URL(
@@ -32,9 +30,8 @@ function readTextFile(url: URL): string {
   return readFileSync(fileURLToPath(url), "utf8");
 }
 
-/** Every field name on `TelemetrySinkRecord`, read straight off the interface's own text —
- * never a hand-copied list, so an added or removed field is seen here without this file
- * being told about it. */
+/** Every field name on `TelemetrySinkRecord`, read straight off the interface's own text,
+ * so an added or removed field is seen here without this file being told about it. */
 function recordFieldNames(): readonly string[] {
   const source = readTextFile(RECORD_MODEL_URL);
   const start = source.indexOf("export interface TelemetrySinkRecord {");

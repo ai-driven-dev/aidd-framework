@@ -29,9 +29,8 @@ describe("E2E: setup --scope user writes nothing under the project", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("scope-user-setup");
     try {
       await gitInit(projectDir);
-      // A commit so `git status --porcelain` starts clean — otherwise every file in a
-      // freshly `git init`ed, never-committed directory reads as untracked regardless
-      // of what `setup` did or did not write.
+      // A commit so `git status --porcelain` starts clean: in a freshly `git init`ed directory
+      // every file reads as untracked regardless of what `setup` wrote.
       await execFileAsync("git", [...GIT_TEST_IDENTITY, "commit", "--allow-empty", "-m", "empty"], {
         cwd: projectDir,
         env: environmentWithoutGitVariables(process.env),
@@ -57,9 +56,8 @@ describe("E2E: setup --scope user writes nothing under the project", () => {
       );
       expect(setupResult.exitCode).toBe(0);
 
-      // The load-bearing assertion: a full-repository delta, not a list of paths this
-      // test happens to think of. `setup --scope user`'s whole point is that nothing
-      // lands under the project at all.
+      // A full-repository delta, not a list of paths this test happens to think of:
+      // `setup --scope user` must land nothing under the project.
       expect(await gitStatusPorcelain(projectDir)).toBe("");
 
       const manifest = await readJson(join(fakeHome, ".config", "aidd", "manifest.json"));
@@ -70,22 +68,16 @@ describe("E2E: setup --scope user writes nothing under the project", () => {
       const names = (marketplaces.marketplaces as Array<{ name: string }>).map((m) => m.name);
       expect(names).toContain("aidd-framework");
 
-      // No references.json entry: --scope user records no shared-source claim (see
-      // setup-use-case.ts's own doc comment) — asserted as absence-or-empty rather
-      // than a hard "file does not exist", since another project on the same fakeHome
-      // could in principle have written one first, which this test's own fakeHome never has.
+      // `--scope user` records no shared-source claim; asserted as absence-or-empty since another
+      // project on the same fakeHome could in principle have written one.
       const references = await readJson(join(fakeHome, ".config", "aidd", "references.json")).catch(
         () => ({})
       );
       const allProjectRoots = Object.values(references).flat() as string[];
       expect(allProjectRoots).toEqual([]);
 
-      // This sandbox has no `claude`/`codex`/`copilot` binary on PATH (see
-      // sandbox-reaches-no-tool-binary.e2e.test.ts) — so these two prove only that the
-      // commands resolve the user manifest and exit cleanly when native activation
-      // cannot run, the same "unanswerable, not unhealthy" contract doctor already
-      // holds for the project-scope path, never that a real host actually registered
-      // anything. That is exactly what `smoke:real` is for.
+      // This sandbox has no `claude`/`codex`/`copilot` binary on PATH, so these two prove only
+      // that the commands resolve the user manifest and exit cleanly with native activation unrun.
       const doctorResult = await runCli(["doctor", "--scope", "user"], projectDir, fakeHome);
       expect(doctorResult.exitCode).toBe(0);
 

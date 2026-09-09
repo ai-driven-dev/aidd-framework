@@ -88,17 +88,14 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
 
     expect(fs.getFile(`${PROJECT_ROOT}/.opencode/skills/aidd-vcs/01-commit/SKILL.md`)).toBe(skill);
     expect(fs.getFile(`${PROJECT_ROOT}/.opencode/agents/aidd-vcs-helper.md`)).toBe("agent body");
-    // Other plugin's files and the sentinel are NOT installed.
     expect(fs.has(`${PROJECT_ROOT}/.opencode/skills/aidd-dev/00-sdlc/SKILL.md`)).toBe(false);
     expect(fs.has(`${PROJECT_ROOT}/.build-version`)).toBe(false);
     const installed = manifest.getPlugins("opencode").find((p) => p.name === "aidd-vcs");
     expect(installed?.files.size).toBe(2);
   });
 
-  // Hooks land under .opencode/hooks/<plugin>/, and the one script that is OpenCode's own
-  // runtime module goes to .opencode/plugin/<plugin>.js: neither follows the "<plugin>-"
-  // naming convention belongsToPlugin reads for agents and skills, so this plugin's hook
-  // paths are computed from its own distribution and matched by path instead.
+  // Hook paths follow none of the "<plugin>-" naming `belongsToPlugin` reads, so they are
+  // computed from the plugin's own distribution and matched by path.
   it("copies this plugin's flat hooks by their computed paths, not by naming convention", async () => {
     const fs = new InMemoryFileAdapter();
     fs.setFile(`${BUILT}/.opencode/hooks/aidd-vcs/journal.cjs`, "// journal");

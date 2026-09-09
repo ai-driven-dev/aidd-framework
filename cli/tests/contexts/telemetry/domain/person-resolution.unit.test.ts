@@ -6,11 +6,6 @@ import {
 } from "../../../../src/contexts/telemetry/domain/person-resolution.js";
 import type { PersonIdentity } from "../../../../src/contexts/telemetry/domain/ports/person-identity-reader.js";
 
-/**
- * One machine's own identity, carrying a display name and two identifiers it did not
- * choose here — the Test Scope's own setup, reused across every case below rather than
- * rebuilt per test.
- */
 function identityWithAlsoMe(): PersonIdentity {
   return {
     personId: "person-a",
@@ -44,11 +39,8 @@ describe("resolvePerson", () => {
     expect(resolved.identities).toEqual(["nobody-claimed-this"]);
   });
 
-  // The determinism fix. `person_id` is stamped when a record is stored, so whether a
-  // record carries one depends on when the identity was declared relative to when that
-  // record was read - not on the work. The sink has exactly one writer and every line in it
-  // is `local-read`, so a record that named nobody was read by this machine's own reader,
-  // and this machine has said who that is.
+  // `person_id` is stamped when a record is stored, so whether a record carries one depends on
+  // when the identity was declared. Every sink line is `local-read`, by this machine's reader.
   it("names an unstamped record after this machine's own declared identity", () => {
     const resolved = resolvePerson(identityWithAlsoMe(), undefined);
 
@@ -147,12 +139,8 @@ describe("resolvePerson", () => {
     expect(bare.alsoMe).toEqual([]);
   });
 
-  // A second person is not a value this shape can carry — the proof belongs to the
-  // compiler rather than to a run: `PersonIdentity` has no field for a second, distinct
-  // person's claim, so the attempt below does not compile. `@ts-expect-error` inverts
-  // that into an assertion: the day a roster field is added back, the directive has
-  // nothing to suppress and `tsc` fails on it. There is nothing here for a runtime check
-  // to guard, because there is no shape in which the failure could be constructed.
+  // The proof belongs to the compiler: `PersonIdentity` has no field for a second person's
+  // claim, and the day a roster field returns the directive below has nothing to suppress.
   it("admits no second person's claim, at compile time", () => {
     const identity: PersonIdentity = {
       personId: "person-a",
@@ -165,9 +153,8 @@ describe("resolvePerson", () => {
     expect(identity).toBeDefined();
   });
 
-  // The sequence three supported verbs allow: add an identifier, later adopt it as your
-  // own. Before the invariant moved into the writers, `also_me` kept the newly canonical
-  // identifier and one row named it twice as its own evidence.
+  // Add an identifier, then adopt it: before the invariant moved into the writers, `also_me`
+  // kept the newly canonical identifier and one row named it twice as its own evidence.
   it("adopting an identifier already added onto this person does not list it as added onto them", () => {
     const linked = withAlsoMeAdded(
       { personId: "machine-a", origin: "minted", alsoMe: [] },

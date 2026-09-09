@@ -22,10 +22,8 @@ import type {
 import { getAiToolConfig } from "../../contexts/tools/domain/registry.js";
 import type { CLIOutput } from "../output.js";
 
-/** What each strength of attribution is called where a person reads it. `unattributed`
- * says nothing could attribute this, and deliberately not that the work ran outside every
- * step: on at least one measured tool the two are indistinguishable, and the stronger
- * reading would be a fact this layer invented. */
+/** `unattributed` says nothing could attribute this, never that the work ran outside every
+ * step: on at least one measured tool the two are indistinguishable. */
 export const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
   "tool-stated": "stated by the tool",
   "prompt-matched": "matched on the prompt",
@@ -38,21 +36,12 @@ export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
   inferred: "inferred from a written file",
 };
 
-/** What each reason a record fell in no declared interval is called where a person reads
- * it - never one label standing in for all of them, which is the fault this breakdown
- * exists to avoid (see `CostReportTaskRow`).
- *
- * The first names a fact about the read, the second a fact about the record's own age, the
- * rest facts about how the work behaved, and the wording keeps all three apart: "no usable
- * run journal" says this layer never had a journal it could attach to this session - none
- * read, or one read whose header was torn - where "no usable task declaration" says it had
- * one and found no declaration in it.
- *
- * The second is worded as a fact about the record's age, not about declaring, because that
- * is what it is: a resumed transcript's inherited turns were billed before the session that
- * read them ever opened a journal. Saying "before this session declared a task" of them -
- * which this breakdown did until 2026-09-04, for 96.2% of a real period - reads as a
- * complaint about the flow. */
+/** One label per reason, never one standing in for all of them. The wording keeps three kinds
+ * apart: a fact about the read ("no usable run journal", meaning none was attachable at all,
+ * against "no usable task declaration", meaning one was read and named nothing), a fact about
+ * a record's own age, and facts about how the work behaved. A resumed transcript's inherited
+ * turns were billed before this session opened a journal, so their row is worded as age and
+ * never as a complaint about declaring. */
 export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = {
   "no-journal": "no usable run journal for this session",
   "precedes-journal": "older than anything this session's journal witnessed",
@@ -61,42 +50,31 @@ export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = 
   "journal-silent": "the journal falls silent before this record",
 };
 
-/** What a known task's own two non-item states are called where a person reads them -
- * distinct from `TASK_UNATTRIBUTED_LABELS`, which names why a record belongs to no task at
- * all. Both of these are about a task that *is* known, whose folder either names nothing or
- * whose declaration could not be parsed. */
+/** A known task that names no item or whose declaration could not be parsed — distinct from
+ * `TASK_UNATTRIBUTED_LABELS`, which is about belonging to no task at all. */
 export const BACKLOG_DECLARATION_LABELS: Record<"none" | "unreadable", string> = {
   none: "this task declares no backlog item",
   unreadable: "this task's backlog declaration could not be read",
 };
 
-/** Printed where a figure is genuinely not known, never as `$0.00`. A tool whose own files
- * carry no amount has an unknown cost, not a free one. Exported so another renderer of the
- * same report — the interactive telemetry screen — prints the identical words rather than
- * a second literal that could drift from this one. */
+/** Never `$0.00`: a tool whose own files carry no amount has an unknown cost, not a free one.
+ * Exported so a second renderer prints the identical words. */
 export const UNKNOWN_AMOUNT = "amount unknown";
-/** A covered tool with no records, and a wholly unfiltered period with none at all.
- * Distinct from both an unknown amount and a zero: this one really did measure nothing,
- * and saying so is the only reading the records support. Not exported: every reader outside
- * this module reaches this string through `nothingLabel`, which decides between this and
- * `NOTHING_IN_SELECTION` — never through the literal itself. */
+/** Distinct from an unknown amount and from a zero: this one really did measure nothing. Not
+ * exported — outside readers go through `nothingLabel`, which picks between the two. */
 const NOTHING_MEASURED = "nothing in this period";
-/** The same zero, under a selection narrower than the whole period. `task` and every
- * generic filter already narrow the record set before any breakdown is computed, so a
- * zero row under either is caused by the selection, not by real idleness - saying
- * "period" there would be a false statement about time. */
+/** The same zero under a narrowing selection: `task` and every filter cut the record set
+ * before any breakdown runs, so saying "period" there would be false about time. */
 const NOTHING_IN_SELECTION = "nothing in this selection";
-/** What a tool's `sessionTotals` figure is called wherever it is printed - never merged
- * into the request-based figure beside it, and never called "cost" or "requests" since it
- * is neither. */
+/** Never merged into the request-based figure beside it, and never called "cost" or
+ * "requests", being neither. */
 const SESSION_TOTAL_LABEL = "session total, not requests";
 const LABEL_WIDTH = 26;
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
 // Not "no agent": the main thread is where a session starts, not an absence.
 const MAIN_THREAD = "the main thread";
-// And not the main thread either: a tool that never names an agent has said nothing about
-// which one ran, so a row labelled "the main thread" would state a fact nothing observed.
+// Nor the main thread: a tool that names no agent has said nothing about which one ran.
 const AGENT_NOT_STATED = "the tool names no agent";
 
 /** What a row that names no agent is called, by which of the two silences it is. */
@@ -105,27 +83,20 @@ export function agentRowLabel(row: CostReport["byAgents"][number]): string {
   return row.attribution === "main-thread" ? MAIN_THREAD : AGENT_NOT_STATED;
 }
 
-// A prompt id is a uuid, wider than `LABEL_WIDTH`, and `padTo` never truncates - so the
-// column is its own width rather than colliding with the one every named label shares.
+// A prompt id is a uuid, wider than `LABEL_WIDTH`, and `padTo` never truncates.
 const PROMPT_WIDTH = 38;
 const NO_PROMPT = "no prompt named";
-// One row per turn, unbounded where every other axis has a small vocabulary: 12 on one
-// session, 31,435 over the measured history. Truncated rather than suppressed the way
-// `printDays` suppresses - a partial series is a lie about continuity, a top N of a ranking
-// is not, and the line below says how many it withheld. The envelope still carries them all.
+// One row per turn, unbounded where every other axis has a small vocabulary. Truncated
+// rather than suppressed the way `printDays` suppresses: a top N of a ranking is honest
+// where a partial series is not, and the line below says how many were withheld.
 const MAX_PRINTED_PROMPTS = 10;
 
-// A year asked for by day is 365 rows - the envelope always carries every one of them, but
-// a terminal is not the place to read that many. Above this, the text rendering names the
-// count and points at --json rather than printing a screen nobody can scan. This used to
-// carry a second sentence pinning it to a plugin script's own copy of the number, held
-// equal by a byte-compare e2e test; both went when the CLI took the read path, so this is
-// the only place the limit lives.
+// A year by day is 365 rows: above this the text rendering names the count and points at
+// --json rather than printing a screen nobody can scan. The envelope still carries them all.
 const MAX_PRINTED_DAYS = 31;
 
-/** Exported alongside `formatAmount` and `totalTokens` so the interactive telemetry screen
- * renders the same figures this text report does, rather than a second formatting routine
- * that could read a count differently from this one. */
+/** Exported alongside `formatAmount` and `totalTokens` so a second renderer formats the same
+ * figures through the same routine. */
 export function formatCount(value: number): string {
   return value.toLocaleString("en-US");
 }
@@ -134,9 +105,8 @@ export function formatAmount(microUsd: number): string {
   return `$${fromMicroUsd(microUsd).toFixed(2)}`;
 }
 
-/** Every token a record counted, across the four disjoint counters — a tool's `input` is
- * exclusive of its cache figures on every reader here, so adding them counts nothing
- * twice. Exported for the same reason `formatCount` is. */
+/** The four counters are disjoint on every reader here — `input` excludes the cache figures —
+ * so adding them counts nothing twice. */
 export function totalTokens(totals: CostTotals): number {
   return (
     (totals.inputTokens ?? 0) +
@@ -146,12 +116,8 @@ export function totalTokens(totals: CostTotals): number {
   );
 }
 
-/** What a share is taken of. Cost where the period has one, tokens where it does not — a
- * period made only of tools that carry no amount still breaks down, by the quantity it
- * does have. Named in the output so nobody has to guess which. Exported so the interactive
- * telemetry screen takes a row's share by the identical rule this text report already
- * applies to every breakdown, rather than a second percentage rule that could drift from
- * this one. */
+/** Cost where the period has one, tokens where it does not, so a period of tools that carry
+ * no amount still breaks down. Named in the output, so nobody has to guess which. */
 export function shareBasis(totals: CostTotals): { readonly label: string; readonly of: number } {
   return totals.costMicroUsd === undefined
     ? { label: "of tokens", of: totalTokens(totals) }
@@ -167,15 +133,9 @@ export function shareOf(totals: CostTotals, basis: number, useCost: boolean): st
     .padStart(3)}%`;
 }
 
-/** A label, in a column of `width` — and always followed by something.
- *
- * `padEnd` returns a longer string unchanged, so a label wider than the column would run
- * straight into whatever comes after it: a real project id is the repository's own remote,
- * and `git@github.com:…/framework.git` printed as `…framework.git100%`. Measured on a live
- * report; no fixture had ever carried an identifier that long. Exported so every
- * column-padded reader of a label — this file's own `pad`, and the interactive telemetry
- * screen's row list, whose own attribution-carrying labels (F2) are wider still — shares
- * this one guarantee rather than each risking the same collision at its own width. */
+/** `padEnd` returns a longer string unchanged, so a label wider than the column runs straight
+ * into what follows it — a project id is a whole git remote. Exported so every column-padded
+ * reader of a label shares the one guarantee rather than each risking that collision. */
 export function padTo(label: string, width: number): string {
   return label.length >= width ? `${label} ` : label.padEnd(width);
 }
@@ -184,35 +144,27 @@ function pad(label: string): string {
   return padTo(label, LABEL_WIDTH);
 }
 
-/** `task` and the four generic filters both narrow the record set before any breakdown
- * runs, so either one - alone or together - means every zero downstream is the selection
- * talking, not the period. Every row measured against this reads unambiguously: nothing
- * a filter can produce here escapes being counted as in-scope or out, so there is no row
- * this call cannot decide for. */
+/** `task` and the generic filters both narrow the record set before any breakdown runs, so
+ * either one means every zero downstream is the selection talking, not the period. */
 function hasSelection(report: Pick<CostReport, "task" | "filters">): boolean {
   return report.task !== undefined || report.filters !== undefined;
 }
 
-/** Never a bare `0` and never `NOTHING_MEASURED` under a selection: `task` and the four
- * generic filters both narrow the record set before any breakdown runs, so a zero under
- * either reads as the selection's own doing, not the period's. Exported so the interactive
- * telemetry screen tells the two absences apart the identical way this text report already
- * does, rather than a second rule that could drift from this one. */
+/** Never a bare `0`, and never `NOTHING_MEASURED` under a selection, whose own narrowing is
+ * what emptied it. Exported so a second renderer tells the two absences apart the same way. */
 export function nothingLabel(report: Pick<CostReport, "task" | "filters">): string {
   return hasSelection(report) ? NOTHING_IN_SELECTION : NOTHING_MEASURED;
 }
 
-/** `name=value` for every active generic filter, in the fixed order `cost-report.ts`
- * gives them - empty for an unfiltered period. */
+/** In the fixed order `cost-report.ts` gives them; empty for an unfiltered period. */
 function filtersSuffix(filters: CostReportFilters | undefined): string {
   if (!filters) return "";
   const parts = Object.entries(filters).map(([name, value]) => `${name}=${value}`);
   return parts.length === 0 ? "" : `    filters: ${parts.join(", ")}`;
 }
 
-// What "never known" means differs by filter: `task` and `tool` are checked against
-// journals and a declared list, never against a record, so saying "no record" for either
-// would claim a check this layer never ran.
+// `task` and `tool` are checked against journals and a declared list, never against a record,
+// so "no record" would claim a check this layer never ran.
 const UNKNOWN_REASON: Partial<Record<CostReportFilterName, string>> = {
   task: "no journal has ever declared it or written into it",
   tool: "it is not one of the tools this build knows",
@@ -222,11 +174,8 @@ function unknownReason(filter: CostReportFilterName): string {
   return UNKNOWN_REASON[filter] ?? `no record has ever named this ${filter}`;
 }
 
-/** What a filter matching nothing says, told apart from a period that genuinely holds no
- * work: that case never reaches here, since the report only ever carries an
- * `emptySelection` when a filter - not the period itself - is what emptied it. Exported so
- * the interactive telemetry screen names the same culprit in the same words, rather than a
- * second rendering of `CostReportEmptySelection` that could disagree with this one. */
+/** A period that genuinely holds no work never reaches here: an `emptySelection` is carried
+ * only when a filter, never the period, is what emptied it. */
 export function emptySelectionMessage({
   filter,
   value,
@@ -239,20 +188,14 @@ export function emptySelectionMessage({
   return `  ${filter} '${value}' matched nothing in this selection — known, but no work here`;
 }
 
-/** Never a bare `0`: a period nothing was measured in reads as "nothing in this period"
- * (or selection), the same refusal `requests` already makes below - a session count is no
- * less a claim about what was measured than a request count is. Exported for the same
- * reason `formatCount` is. */
+/** Never a bare `0`, the same refusal `requests` makes below: a session count is no less a
+ * claim about what was measured. */
 export function sessionsFigure(report: CostReport): string {
   return report.sessions === 0 ? nothingLabel(report) : formatCount(report.sessions);
 }
 
-/** Cache reads' share of `tokens`, rounded to a whole percent - `0` when there are no
- * tokens to divide, never `NaN`. `tokens` arrives as a parameter rather than being
- * recomputed here: every caller already has its own `totalTokens(totals)` at hand, and
- * this stays the one place the rounding happens rather than a formula copied at each call
- * site. Exported so the interactive telemetry screen reads the same figure through this one
- * function rather than a second copy that could drift from it. */
+/** `0` where there are no tokens to divide, never `NaN`. `tokens` is a parameter because
+ * every caller already holds it, and this stays the one place the rounding happens. */
 export function cacheReadSharePercent(totals: CostTotals, tokens: number): number {
   return tokens === 0 ? 0 : Math.round(((totals.cacheReadTokens ?? 0) / tokens) * 100);
 }
@@ -313,9 +256,8 @@ function printAttributionRows(
   }
 }
 
-/** Every declared tool, including the ones that can say nothing. A tool missing from this
- * list is a tool a reader takes for one that did nothing, and for an unreadable one that
- * is the false zero this whole layer exists to prevent. */
+/** Every declared tool, including the ones that can say nothing: a tool missing from the list
+ * reads as one that did nothing, which for an unreadable tool is a false zero. */
 function printToolRows(
   output: CLIOutput,
   rows: readonly CostReportToolRow[],
@@ -358,17 +300,15 @@ function printCaveats(output: CLIOutput, report: CostReport): void {
   }
 }
 
-/** A breakdown reads as a group: a blank line, a heading naming what its shares are taken
- * of, then its rows. Empty groups print nothing at all rather than a heading over silence. */
+/** An empty group prints nothing at all, never a heading over silence. */
 interface Basis {
   readonly label: string;
   readonly of: number;
   readonly useCost: boolean;
 }
 
-/** Only where `--task` narrowed the report - a session without one carries no per-record
- * task identity to break down (see metrics-contract.md), so there is nothing here to print
- * for the unfiltered period. */
+/** Only where `--task` narrowed the report: without one there is no per-record task identity
+ * to break down. */
 function printTaskAttribution(output: CLIOutput, report: CostReport, basis: Basis): void {
   if (report.taskAttributionMix === undefined) return;
   output.print("");
@@ -399,9 +339,8 @@ function printStepsAndAttribution(output: CLIOutput, report: CostReport, basis: 
   printAttributionRows(output, report.attributionMix, basis.of, basis.useCost);
 }
 
-/** Printed straight after the steps, because it answers what they cannot: on a session that
- * delegates, the step axis names a few percent and this one names the rest. Measured — ten
- * subagent files held 432M of a live session's 466M tokens. */
+/** Straight after the steps, because it answers what they cannot: on a session that
+ * delegates, the step axis names a few percent and this one names the rest. */
 function printAgents(output: CLIOutput, report: CostReport, basis: Basis): void {
   if (report.byAgents.length === 0) return;
   output.print("");
@@ -459,12 +398,9 @@ function printProjects(
   }
 }
 
-/** One row per task a record's own moment fell inside, plus up to four rows for what fell
- * in none - one per reason present, always after every named task and in
- * `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same placement `byPeople` gives its own
- * no-identifier row. Carries the attribution beside a named row for the same reason
- * `printStepRows` does: a figure that rests on a closed interval says so next to the
- * number, not only in a document elsewhere. */
+/** One row per task a record's moment fell inside, then one per reason present, in
+ * `TASK_UNATTRIBUTED_REASONS`' fixed order after every named task. The attribution sits beside
+ * a named row for the same reason `printStepRows` puts it there. */
 function printTasks(output: CLIOutput, rows: readonly CostReportTaskRow[], basis: Basis): void {
   if (rows.length === 0) return;
   output.print("");
@@ -479,10 +415,9 @@ function printTasks(output: CLIOutput, rows: readonly CostReportTaskRow[], basis
   }
 }
 
-/** One row per backlog item a task in the period declared, plus the two rows for a known
- * task that named none or could not be read, plus up to four reason rows for a record in
- * no task at all - the same tail order `printTasks` gives its own remainder. No attribution
- * column: unlike a task's closed interval, a backlog row rests on one route only. */
+/** Named items, then the two rows for a known task that named none or could not be read, then
+ * the reason rows — the tail order `printTasks` uses. No attribution column: a backlog row
+ * rests on one route only. */
 function printBacklog(
   output: CLIOutput,
   rows: readonly CostReportBacklogRow[],
@@ -505,10 +440,9 @@ function printBacklog(
   }
 }
 
-/** Chronological, never sorted by size: a series read out of order is not a series. Above
- * `MAX_PRINTED_DAYS`, a person reads a count and where to get the rest - the envelope
- * still carries every day, since suppressing a row there would be the same false
- * continuity this layer refuses everywhere else. */
+/** Chronological, never sorted by size: a series read out of order is not a series. Past
+ * `MAX_PRINTED_DAYS` a count replaces the rows, since dropping some would be false
+ * continuity. */
 function printDays(
   output: CLIOutput,
   rows: readonly CostReportDayRow[],
@@ -536,31 +470,15 @@ function printDays(
   }
 }
 
-/**
- * One period's cost, as a person reads it.
- *
- * Prints no amount it was not given: the rates live outside this repository, so a tool
- * whose files carry none says so rather than showing zero. Prints every declared tool,
- * including the ones nothing here can read, with the reason from their own declaration.
- * Carries no prompt, code, diff or file path - a task appears by its identity, never by
- * the paths it was derived from.
- */
+/** Prints no amount it was not given — the rates live outside this repository — and no
+ * prompt, code, diff or file path: a task appears by its identity alone. */
 function printHeader(output: CLIOutput, report: CostReport): void {
   const scope = report.task === undefined ? "period" : `task ${report.task}`;
   output.print(`${scope}    ${report.fromDay} to ${report.toDay}${filtersSuffix(report.filters)}`);
-  // Only the off state is worth a line: a person reading a report with the switch on
-  // already sees it working, in every figure below - stating "measurement is on" beside
-  // them would be the same noise `identityUnusableCause` avoids by never printing on the
-  // ordinary path. What this refuses is the false continuity of showing a stale or empty
-  // period with no word that nothing new can be recorded right now.
-  //
-  // Named for what it is, not "measurement is off for this project": the sink this report
-  // reads is scoped to this person, not to this project, so the figures below can be real
-  // work from anywhere the switch was ever on - the category error a person ran into
-  // reading a genuine count under a sentence claiming nothing was measured. This says
-  // exactly what the switch and the figures each actually are, so neither reads as
-  // contradicting the other (review.md, "one route, and every sentence about it true",
-  // finding 2).
+  // Only the off state is worth a line: with the switch on, every figure below already shows
+  // it working. Never worded "measurement is off for this project" — the sink is scoped to
+  // this person, so the figures can be real work from anywhere the switch was ever on, and a
+  // sentence claiming nothing was measured would contradict a genuine count beside it.
   if (!report.measurementEnabled) {
     output.print(
       "this project's own switch is off — the figures below are not scoped to it, they are " +
@@ -574,8 +492,8 @@ function printHeader(output: CLIOutput, report: CostReport): void {
   }
 }
 
-// A filter-emptied selection has nothing under any breakdown to show - every row would
-// read "nothing in this period", which is exactly the false zero this layer refuses.
+// A filter-emptied selection has nothing to break down: every row would read "nothing in this
+// period", the false zero this layer refuses.
 function printBreakdowns(output: CLIOutput, report: CostReport): void {
   const basis: Basis = {
     ...shareBasis(report.totals),

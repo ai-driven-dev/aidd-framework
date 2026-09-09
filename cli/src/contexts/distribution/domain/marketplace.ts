@@ -23,11 +23,9 @@ export interface MarketplaceData {
   version?: string;
 }
 
-/**
- * A marketplace record as it comes off disk: `scope` is whatever the file said, which is
- * exactly why fromJSON checks it. Saying so lets a caller hand over an unchecked value
- * without pretending it is already one of the two the domain accepts.
- */
+/** A marketplace record as it comes off disk: `scope` is whatever the file said, which is
+ * exactly why `fromJSON` checks it. Saying so lets a caller hand over an unchecked value
+ * without pretending it is already one of the two the domain accepts. */
 export type StoredMarketplaceData = Omit<MarketplaceData, "scope"> & { scope: string };
 
 function isMarketplaceScope(value: string): value is MarketplaceScope {

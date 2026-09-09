@@ -7,9 +7,8 @@ import { describe, expect, it } from "vitest";
 // later by this test's own module or by a future tool reader is covered automatically.
 const FIXTURES_DIR = fileURLToPath(new URL("../../../../fixtures/local-cost", import.meta.url));
 
-// Keys no counter-bearing line ever needs: every one of these carried a real prompt, file
-// path, credential-adjacent detail, or system-prompt-sized blob in the transcripts these
-// fixtures were excerpted from.
+// Keys no counter-bearing line ever needs: each carried a real prompt, file path,
+// credential-adjacent detail or system-prompt-sized blob in the transcripts excerpted here.
 const FORBIDDEN_KEYS = [
   "cwd",
   "workspace_roots",

@@ -15,9 +15,8 @@ import { PluginDistribution } from "../../../../src/contexts/translate/domain/pl
 import { FileHash } from "../../../../src/kernel/file.js";
 
 /**
- * A hook command that points at nothing installs clean, reports success, and does nothing.
- * Every failure in this ticket had that shape, so this reads the command back out of what
- * was installed and asks whether the file it names is there.
+ * A hook command pointing at nothing installs clean and does nothing, so the command is read
+ * back out of what was installed and the file it names is looked for.
  */
 
 const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };

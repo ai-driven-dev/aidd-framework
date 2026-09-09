@@ -5,19 +5,12 @@ import type { MarketplaceCatalogIdentity } from "../../../tools/domain/marketpla
 import { getAiToolConfig } from "../../../tools/domain/registry.js";
 
 /**
- * What a directory's own catalog declares about itself — `name` and the plugin
- * names its `plugins` array carries, never `version` (see `MarketplaceCatalogIdentity`'s
- * own doc for why) — read from the same relative file a tool's own
- * `distributionProbes.marketplace` names, so this agrees with whatever that tool
- * would actually read there. `undefined` when the directory carries no readable
- * catalog at that path, or the JSON found there names nothing: silence, not a fact
- * to invent, which is what lets a dead registry entry or an unbuilt tree answer "no
- * fact" instead of a false "different catalog".
- *
- * Shared by `MarketplaceSyncSettingsUseCase` (`flows/`) and `DoctorRegistrationUseCase`
- * (`doctor/`) — both need the identical read, one at sync time, one at doctor time,
- * over the same two directories: this project's own built tree, and wherever a host's
- * registry currently resolves the same name to.
+ * What a directory's own catalog declares about itself — `name` and its plugin names, never
+ * `version` — read from the same relative file a tool's own `distributionProbes.marketplace` names,
+ * so this agrees with whatever that tool would actually read there. `undefined` when the directory
+ * carries no readable catalog at that path, or the JSON found there names nothing: silence, not a
+ * fact to invent, which is what lets a dead registry entry or an unbuilt tree answer "no fact"
+ * instead of a false "different catalog".
  */
 export async function readMarketplaceCatalogIdentity(
   fs: FileReader,
@@ -38,11 +31,10 @@ export async function readMarketplaceCatalogIdentity(
   }
 }
 
-/** The exact path {@link readMarketplaceCatalogIdentity} reads, named so a caller whose
- * read came back `undefined` can report *which file* it found nothing readable at,
- * rather than only that the read failed. `undefined` for the same reason the read
- * itself would answer nothing: not an AI tool, or one whose profile declares no
- * `distributionProbes.marketplace` at all. */
+/** The exact path {@link readMarketplaceCatalogIdentity} reads, named so a caller whose read came
+ * back `undefined` can report *which file* it found nothing readable at. `undefined` for the same
+ * reason the read would answer nothing: not an AI tool, or one whose profile declares no
+ * `distributionProbes.marketplace`. */
 export function marketplaceCatalogProbePath(toolId: ToolId, dir: string): string | undefined {
   if (!isAiToolId(toolId)) return undefined;
   const catalogRelative = getAiToolConfig(toolId).distributionProbes?.marketplace?.[0];

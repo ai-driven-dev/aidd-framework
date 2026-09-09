@@ -14,7 +14,7 @@ import type { FrameworkBuildMode } from "../../../tools/domain/registry.js";
 import type { FrameworkBuild } from "../../../translate/application/translate-source.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
 
-/** Builds a framework build for a target/mode writing to outDir, or undefined when unsupported. */
+/** `undefined` when the target/mode pair has no build. */
 export type FrameworkBuildFor = (
   target: FrameworkBuildTarget,
   mode: FrameworkBuildMode,
@@ -39,12 +39,10 @@ const SENTINEL_FILE = ".build-version";
 const UNVERSIONED = "unversioned";
 
 /**
- * Guarantees a per-target built tree exists in cache for a marketplace, so install
- * consumers read the SAME transformed content `framework build` produces. Build is
- * the single source of truth; this owns source resolution, staleness, and the
- * guard-safe outDir (build to temp then copy when the cache nests under the source).
+ * Guarantees a per-target built tree exists in cache, so install consumers read the same
+ * transformed content a build produces. Owns source resolution, staleness, and the guard-safe
+ * outDir: build to temp then copy when the cache nests under the source.
  */
-/** Getting a built tree for a target, as its callers need it. */
 export interface EnsureBuiltMarketplace {
   execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult>;
 }
@@ -58,20 +56,17 @@ export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
     private readonly buildFor: FrameworkBuildFor,
     private readonly version: VersionReader,
     /**
-     * Where a user-scope marketplace's built tree belongs. Building it under the
-     * project that happened to register it would tie a declaration meant for every
-     * project to the life of one of them: delete that project and the global
-     * registration points at nothing.
+     * Where a user-scope marketplace's built tree belongs. Building it under the project that
+     * happened to register it would tie a declaration meant for every project to the life of one
+     * of them: delete that project and the global registration points at nothing.
      */
     private readonly userCacheRoot: () => string
   ) {}
 
   async execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult> {
-    // resolve(), matching sourceDir below: builtMarketplaceDir() joins with the platform
-    // separator, and on Windows a drive-less projectRoot yields a drive-less builtDir here
-    // while FrameworkBuildUseCase.execute() resolves its own outDir copy for validation only
-    // — leaving FlatBuildStrategy's write target (captured unresolved at construction) to
-    // diverge from the path that gets checked. Both scopes need it, not just the project one.
+    // `resolve()`, matching `sourceDir` below: on Windows a drive-less `projectRoot` yields a
+    // drive-less `builtDir` here while the build resolves its own outDir copy for validation only,
+    // leaving the write target diverging from the path that gets checked. Both scopes need it.
     const builtDir = resolve(
       options.marketplace.scope === "user"
         ? userBuiltMarketplaceDir(
@@ -107,16 +102,13 @@ export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
   }
 
   /**
-   * Whether the catalog version can be believed when it says nothing changed.
+   * Whether the catalog version can be believed when it says nothing changed. For a published
+   * source it can: different content carries a different version. For a directory on this machine
+   * it cannot — someone edits a file and the version stays put, which is the whole of framework
+   * development — and an explicit refresh asks for the source to be re-read.
    *
-   * For a published source it can: a different content carries a different version.
-   * For a directory on this machine it cannot — someone edits a file and the version
-   * stays put, which is the whole of framework development. And an explicit refresh
-   * asks for the source to be re-read, so believing a cached answer would answer a
-   * different question than the one asked.
-   *
-   * Rebuilding costs about two tenths of a second for the real framework, 434 files,
-   * so the safe answer is also the cheap one.
+   * Rebuilding the real framework costs about two tenths of a second, so the safe answer is also
+   * the cheap one.
    */
   private versionIsTrustworthy(options: EnsureBuiltMarketplaceOptions): boolean {
     if (options.forceRefresh === true) return false;
@@ -178,9 +170,9 @@ export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
     await this.fs.deleteDirectory(temp);
   }
 
-  // Every outDir reaching this method (see build() and buildViaTemp() above) is either
-  // builtMarketplaceDir() or a temp dir this class just deleteDirectory'd — an aidd-owned
-  // cache, never a user directory — so a collision here is stale-cache reuse, not data loss.
+  // Every outDir reaching this method is either `builtMarketplaceDir()` or a temp dir this class
+  // just deleted — an aidd-owned cache, never a user directory — so a collision here is stale-cache
+  // reuse, not data loss.
   private async runBuild(
     target: FrameworkBuildTarget,
     mode: FrameworkBuildMode,

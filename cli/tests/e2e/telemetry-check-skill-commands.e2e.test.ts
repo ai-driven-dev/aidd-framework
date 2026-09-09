@@ -4,16 +4,8 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
- * What `02-check` promises, held to what the CLI actually accepts — the same guard
- * `telemetry-init-skill-commands.e2e.test.ts` and `telemetry-cost-skill-commands.e2e.test.ts`
- * run for `00-init` and `01-cost`. The failure this guards against is exactly what deleting
- * `02-check/scripts/` puts at risk: a command the skill's markdown names that the CLI never
- * accepts, which the plugin script used to make impossible by construction — the skill and
- * the script shipped together.
- *
- * `telemetry-check.e2e.test.ts` pins the command's *behaviour* on fixed fixtures; it never
- * reads `02-check`'s own markdown, so it cannot catch the markdown naming a command the CLI
- * does not have. This is the guard that reads the markdown.
+ * Holds `02-check`'s own markdown to what the CLI accepts: nothing else reads that markdown,
+ * so a command it names that the CLI does not have would ship unnoticed.
  */
 const REPO_ROOT = resolve(process.cwd(), "..");
 const SKILL_DIR = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills", "02-check");

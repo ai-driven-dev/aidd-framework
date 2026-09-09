@@ -22,12 +22,6 @@ const SETUP_ARGS = [
   "--yes",
 ] as const;
 
-/**
- * The defect this closes: `aidd setup` installing the telemetry plugin wrote exactly one
- * gitignore entry, `.aidd/cache/`, and left `aidd_docs/runs/` offered to `git status` the
- * moment a session journalled into it. Proven end to end, through `git status` itself,
- * because reading the use-case is not the proof the task asked for.
- */
 describe("aidd setup never offers the run journal to a commit", () => {
   let projectDir: string;
   let fakeHome: string;

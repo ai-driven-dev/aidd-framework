@@ -55,10 +55,8 @@ function sumOf(rows: readonly { readonly totals: CostTotals }[]): CostTotals {
   );
 }
 
-// Four tasks declared in sequence by one session, each closed the moment the next opens -
-// two declaring the same backlog item (the merge this axis exists for), one declaring
-// none, one whose declaration could not be read. A fifth record precedes the first
-// declaration, landing in the axis' own pass-through reason row.
+// Four tasks declared in sequence, two naming the same backlog item (the merge this axis
+// exists for), one naming none, one unreadable; a fifth record precedes them all.
 const ITEM_TASK_A = "2026_08/item-task-a";
 const ITEM_TASK_B = "2026_08/item-task-b";
 const NONE_TASK = "2026_08/none-task";
@@ -206,10 +204,8 @@ describe("buildCostReport — by_backlog regroups tasks by what their folder dec
   });
 
   it("a task with no entry in the resolved declarations still counts, defaulting to none rather than dropping the record", () => {
-    // The map a report is actually handed always resolves every task identity its own
-    // journals can name (ReportCostUseCase's job) - this proves the domain does not
-    // silently lose a record's figures were that ever not true, the same defensive
-    // default `taskRowOf`'s own fallback documents.
+    // A real report always resolves every task identity its journals name, so this pins
+    // the defensive default `taskRowOf` falls back to were that ever not true.
     const built = report({
       records: RECORDS,
       journals: JOURNALS,
@@ -222,10 +218,8 @@ describe("buildCostReport — by_backlog regroups tasks by what their folder dec
   });
 
   it("mutation proof: a task declaring no item is never silently merged into one that declared", () => {
-    // Mutating the fixture to make the "none" task declare the same item the merge test
-    // uses would move its record into the named row - the guard this test exists to prove
-    // never happens on its own: the none row and the named row must stay disjoint unless a
-    // declaration is actually changed.
+    // The none row and the named row must stay disjoint unless a declaration is actually
+    // changed: making "none" declare the merge test's item would move its record over.
     const built = report({
       records: RECORDS,
       journals: JOURNALS,

@@ -28,8 +28,8 @@ describe("BundledAssetProviderAdapter.loadConfigAsset", () => {
       expect(typeof asset).toBe("string");
     });
 
-    // #700: a pinned "gpt-5" was rejected by ChatGPT-account Codex sessions.
-    // Model choice is owned by the account, not this repo — Codex's own default applies.
+    // Model choice is owned by the account, not this repo: a pinned "gpt-5" is rejected by
+    // ChatGPT-account Codex sessions, so Codex's own default applies.
     it("writes no model — the account decides which one it can use", () => {
       const asset = provider.loadConfigAsset("codex", "config.toml") as string;
       const parsed = parseToml(asset);

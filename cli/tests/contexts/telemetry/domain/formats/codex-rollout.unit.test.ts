@@ -12,10 +12,8 @@ import { journalRecord } from "../../../../helpers/telemetry-journal-hook.js";
 const TARGET_ID = "019fae6f-2009-7cd3-86b2-b8f83481b160";
 const TARGET_PARENT = "019f69d0-9e1f-7951-86c9-ddb23cfd51f4";
 
-// Both fixtures are real, redacted rollout excerpts captured 2026-08-20 on Codex CLI
-// 0.145.0-alpha.27 — target.jsonl is a resumed session (session_meta.id !== session_id),
-// parent.jsonl is that resumed session's own parent (a fresh session, where the two agree).
-// See codex-rollout.ts's header comment for the full measurement.
+// Real, redacted rollout excerpts: target.jsonl is a resumed session (session_meta.id !==
+// session_id), parent.jsonl its own parent, a fresh session where the two agree.
 function loadFixture(relativePath: string): string {
   const url = new URL(`../../../../fixtures/local-cost/${relativePath}`, import.meta.url);
   return readFileSync(fileURLToPath(url), "utf8");
@@ -28,10 +26,8 @@ describe("mapCodexRolloutToSinkRecords", () => {
   it("yields one record per turn, its counters summed from the increments, never the totals", () => {
     const records = mapCodexRolloutToSinkRecords(loadFixture(TARGET_PATH));
 
-    // Real captured `last_token_usage` events for this turn: {22229,20224,0,231},
-    // {24692,21248,0,206}, {27769,24320,0,390} (input, cached, cache_write, output).
-    // Summing `total_token_usage` instead (22229 → 46921 → 74690) would give an
-    // input figure over 8x too large for this one turn.
+    // Real captured `last_token_usage` increments for this turn; summing `total_token_usage`
+    // instead would give an input figure over 8x too large.
     expect(records).toHaveLength(2);
     expect(records[0]).toEqual({
       kind: "request",
@@ -71,18 +67,16 @@ describe("mapCodexRolloutToSinkRecords", () => {
   });
 
   it("carries the model and effort from turn_context, not from the counted event", () => {
-    // token_count's own `info` has no model and no effort at all — if the mapper read
-    // either from there, this fixture (which never puts them there) would leave them
-    // undefined instead of "gpt-5.6-sol" / "high".
+    // `token_count`'s own `info` carries no model and no effort, so a mapper reading either
+    // from there would leave them undefined on this fixture.
     const records = mapCodexRolloutToSinkRecords(loadFixture(TARGET_PATH));
 
     expect(records.every((r) => r.model === "gpt-5.6-sol" && r.effort === "high")).toBe(true);
   });
 
   it("omits a counter never observed in any event of the turn, rather than summing a zero", () => {
-    // The parent fixture's events never carry cache_write_input_tokens at all (a real,
-    // older-CLI shape) — the resulting record must have no cache_creation_tokens key,
-    // not a fabricated 0.
+    // The parent fixture's events never carry cache_write_input_tokens at all, a real
+    // older-CLI shape: the record must have no key rather than a fabricated 0.
     const [record] = mapCodexRolloutToSinkRecords(loadFixture(PARENT_PATH));
 
     expect(record).toEqual({
@@ -107,9 +101,8 @@ describe("mapCodexRolloutToSinkRecords", () => {
     expect(mapCodexRolloutToSinkRecords(moved)).toHaveLength(0);
   });
 
-  // Without a moment, a Codex record cannot fall inside any step interval, so the journal
-  // — the only step source Codex has — could never attribute it. The rollout carries the
-  // moment on the `turn_context` line; taking it is what makes the fallback reachable.
+  // Without a moment a Codex record falls inside no step interval, and the journal is the
+  // only step source Codex has; the rollout carries that moment on its `turn_context` line.
   it("carries the turn's own start, so a journal interval can reach it", () => {
     const records = mapCodexRolloutToSinkRecords(loadFixture(TARGET_PATH));
 
@@ -148,11 +141,8 @@ describe("createCodexRolloutAccumulator", () => {
 
 describe("CODEX_ROLLOUT_LOCATION", () => {
   it("accepts a rollout for the id the journal hook derives from the same path", () => {
-    // The hook writes vendor_id; this location resolves the file to read. They agree only
-    // if both read the rollout's own id off the filename, and they live apart because
-    // hooks/ is copied verbatim by the framework build and can import nothing from cli/.
-    // Pinned here so a drift in either one turns this red rather than silently dropping
-    // every resumed session's figures from a report.
+    // The hook writes vendor_id and this location resolves the file to read; they agree only
+    // if both take the rollout's own id off the filename, and they can share no code.
     for (const path of [TARGET_PATH, PARENT_PATH]) {
       const derived = journalRecord.codexSessionIdFromTranscriptPath(path);
 
@@ -164,9 +154,8 @@ describe("CODEX_ROLLOUT_LOCATION", () => {
   });
 
   it("derives the resumed rollout's own id, never its parent's", () => {
-    // The trap: on a resumed session `session_meta.session_id` holds the parent's id, and a
-    // vendor_id written from it joins to nothing. 124 of 330 rollouts measured on one
-    // machine are resumed, so this is 38% of Codex sessions, not an edge case.
+    // On a resumed session `session_meta.session_id` holds the parent's id, so a vendor_id
+    // written from it joins to nothing — 38% of measured Codex sessions are resumed.
     expect(journalRecord.codexSessionIdFromTranscriptPath(TARGET_PATH)).toBe(TARGET_ID);
     expect(journalRecord.codexSessionIdFromTranscriptPath(TARGET_PATH)).not.toBe(TARGET_PARENT);
   });
@@ -190,13 +179,8 @@ describe("CODEX_ROLLOUT_LOCATION", () => {
   });
 });
 
-// Measured on 400 real rollouts in ~/.codex/sessions on 2026-08-26: the last `token_count`
-// of a turn is sometimes re-emitted verbatim — the same `last_token_usage` arrives twice
-// while `total_token_usage` does not move. 291 of 16,415 events (1.8%) across 38 of the 400
-// rollouts. Summing every increment therefore over-counted this tool by ~0.9% on input and
-// cache-read and ~1.2% on output. Reproduced from
-// rollout-2026-08-05T09-42-34-019fd0df-c784-7c31-b470, whose shape this fixture reproduces:
-// last=45800 / total=121055 arrives, then arrives again unchanged.
+// Measured on real rollouts: the last `token_count` of a turn is sometimes re-emitted
+// verbatim, the same `last_token_usage` twice while `total_token_usage` does not move.
 describe("a token_count re-emitted with an unmoved cumulative", () => {
   const usage = (input: number, cached: number, output: number) => ({
     input_tokens: input,

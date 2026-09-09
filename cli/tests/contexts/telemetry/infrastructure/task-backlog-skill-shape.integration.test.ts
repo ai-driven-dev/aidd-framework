@@ -5,16 +5,8 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { TaskBacklogAdapter } from "../../../../src/contexts/telemetry/infrastructure/task-backlog-adapter.js";
 
-/**
- * What `aidd-pm:04-spec` and `aidd-dev:01-plan` say they write into `backlog-link.json`,
- * held to what `TaskBacklogAdapter` actually accepts — the same family
- * `telemetry-check-skill-commands.e2e.test.ts` and its siblings run for a skill's account
- * of a CLI command, extended here to a file's shape instead of a command line. Each
- * skill's own fenced example is fed through the real adapter, over a real temp folder,
- * never a stand-in parser: a doc renaming a field, or the adapter expecting a different
- * one, fails this the same way a skill naming a command the CLI does not accept fails
- * those.
- */
+/** Each skill's own fenced example is fed through the real adapter over a real temp folder,
+ * never a stand-in parser, so a field renamed on either side fails here. */
 const REPO_ROOT = resolve(process.cwd(), "..");
 const SPEC_SKILL_MD = join(
   REPO_ROOT,
@@ -35,11 +27,8 @@ const PLAN_SKILL_MD = join(
   "04-plan.md"
 );
 
-/** The first fenced ```json block in a skill's own markdown - the literal example it tells
- * an agent to write. Tolerant of the block sitting inside a numbered-list item's own
- * indentation, which is where both skills place theirs. `null` when none is found, which
- * the tests below refuse to pass on silently (a closure test over an empty extraction
- * passes vacuously). */
+/** The first fenced json block: the literal example a skill tells an agent to write,
+ * tolerant of a numbered-list item's own indentation. `null` when none is found. */
 function fencedJsonExample(markdown: string): string | null {
   const match = /^[ \t]*```json\r?\n([\s\S]*?)\r?\n[ \t]*```/mu.exec(markdown);
   return match?.[1] ?? null;

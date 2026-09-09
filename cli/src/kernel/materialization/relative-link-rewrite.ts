@@ -1,37 +1,27 @@
 import { basename, dirname, posix } from "node:path";
 
-// Matches the same non-whitespace, non-quote, non-bracket character class used
-// in copilot.ts::rewriteCopilotContent for consistency.
+// The same character class `rewriteCopilotContent` uses, so both recognise the same
+// reference.
 const REFERENCE_CHAR_CLASS = "[^\\s`'\">,]+";
 
 const RELATIVE_CURRENT_RE = new RegExp(`@\\.\\/(${REFERENCE_CHAR_CLASS})`, "g");
 const RELATIVE_PARENT_RE = new RegExp(`@\\.\\.\\/(${REFERENCE_CHAR_CLASS})`, "g");
 
-// Matches @${CLAUDE_PLUGIN_ROOT}/<rel> — only when prefixed with @ (spec C-v2.2).
+// Only with a leading `@`: a bare ${CLAUDE_PLUGIN_ROOT} is left alone.
 const CLAUDE_ROOT_RE = new RegExp(`@\\$\\{CLAUDE_PLUGIN_ROOT\\}\\/(${REFERENCE_CHAR_CLASS})`, "g");
 
 export interface RewriteRelativeLinksOptions {
   readonly currentFilePluginRelative: string;
-  /**
-   * Optional override for how @${CLAUDE_PLUGIN_ROOT}/<rel> target paths are
-   * resolved before computing the markdown link. Receives the plugin-relative
-   * path (e.g. "agents/foo.md") and returns the path to use in the link.
-   * Defaults to identity (Mode A behaviour — relative path from current file).
-   */
+  /** Where a plugin-relative target lands before the link is computed. Defaults to identity,
+   * which keeps the link relative to the current file. */
   readonly resolveTargetPath?: (pluginRelPath: string) => string;
 }
 
 /**
- * Rewrites @./X → [X](./X), @../X → [X](../X), and
- * @${CLAUDE_PLUGIN_ROOT}/<rel> → a markdown link with a relative path computed
- * from the current file's plugin-relative location (spec §"Content rewrite" rules 1–3).
+ * `@{{TOOLS}}/...` is left alone: a caller has to detect that pattern and halt on it.
  *
- * Does NOT rewrite @{{TOOLS}}/... — callers must detect and halt on that pattern.
- * Does NOT touch bare ${CLAUDE_PLUGIN_ROOT} without a leading @ (spec C-v2.2).
- *
- * No inverse: rewriteRelativeLinks is a one-way expansion — @-shorthand is
- * replaced with full markdown links that cannot be unambiguously reversed to the
- * original @-syntax (the label and path are indistinguishable from user-authored links).
+ * One-way: the markdown links this produces are indistinguishable from ones a person wrote,
+ * so the `@`-shorthand cannot be recovered from them.
  */
 export function rewriteRelativeLinks(
   content: string,

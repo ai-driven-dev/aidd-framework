@@ -9,9 +9,8 @@ import {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
- * record ever lands on a given day. A day with nothing is still a row: a gap in a series
- * reads as continuity, so the row has to exist to be a zero. */
+/** Every UTC day from `fromDay` to `toDay`, inclusive. A day with nothing is still a row: a
+ * gap in a series reads as continuity, so the row has to exist to be a zero. */
 export function dayRange(fromDay: string, toDay: string): readonly string[] {
   const days: string[] = [];
   const end = Date.parse(`${toDay}T00:00:00Z`);
@@ -21,9 +20,8 @@ export function dayRange(fromDay: string, toDay: string): readonly string[] {
   return days;
 }
 
-/** Only a day the period itself spans: `emptyGroups` seeded every one of them, so a record
- * dated outside the period joins nothing rather than adding a day the report never claimed
- * to cover. */
+/** Only a day the period itself spans, every one of them already seeded, so a record dated
+ * outside the period joins nothing rather than adding a day the report never covered. */
 export function addToDayGroup(
   days: Map<string, TotalsAccumulator>,
   record: TelemetrySinkRecord

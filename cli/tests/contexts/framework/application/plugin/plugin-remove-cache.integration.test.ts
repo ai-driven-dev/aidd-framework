@@ -1,12 +1,6 @@
 /**
- * `plugin remove` purging one plugin's own cache subtree — `cache/<hostName>/<plugin>/`
- * — under the same declared-root-plus-`realpath`-containment whitelist `clean`'s own
- * marketplace-level purge shares (`cli/src/contexts/framework/application/shared/purge-declared-cache.ts`). Unlike `clean`'s codex
- * path, this purge is never gated on emptiness: a plugin's own cache directory is
- * exactly the content this removal is asking the host to forget, so once the host
- * confirms `uninstallPlugin` succeeded, the whole subtree goes — never on the
- * manifest's word alone (`uninstallPlugin` throwing, or the binary being off `PATH`,
- * both leave it in place and named).
+ * Unlike `clean`'s codex path, this purge is never gated on emptiness: the plugin's cache is
+ * what the removal asks the host to forget, so it goes only once the host confirms.
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -25,9 +19,8 @@ const PROJECT_ROOT = "/test-project";
 const ALIAS = "my-local-alias";
 const HOST_NAME = "upstream-catalog-name";
 const PLUGIN_NAME = "aidd-telemetry";
-// The host call addresses the host by `hostName`, read from this tool's own
-// `nativeRegistrations` (lot 9, item A) — never by `ALIAS`, this project's own local
-// key, which a host never learns.
+// The host is addressed by `hostName`, never by `ALIAS`, this project's own local key,
+// which a host never learns.
 const REF = `${PLUGIN_NAME}@${HOST_NAME}`;
 const CLAUDE_CACHE_ROOT = join(homedir(), ".claude", "plugins", "cache");
 

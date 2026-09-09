@@ -48,8 +48,7 @@ export interface StatusOptions {
 }
 
 /**
- * The question an orchestrator asks of status: one report per scope. Callers that only
- * ask depend on this, not on the class that answers it - so a double is a real
+ * Callers that only ask depend on this, not on the class that answers it, so a double is a real
  * implementation rather than a cast.
  */
 export interface StatusQuery {
@@ -132,9 +131,9 @@ export class StatusUseCase implements StatusQuery {
     directory: string,
     trackedSet: Set<string>,
     projectRoot: string,
-    // Written by this CLI on purpose and never tracked — reporting one as something the
-    // user added would be a lie. The `.backup` skip below is not the same thing: nothing in
-    // this codebase writes such a file, so it only spares one an older version left behind.
+    // Written by this CLI on purpose and never tracked — reporting one as something the user added
+    // would be a lie. The `.backup` skip below is not the same thing: nothing here writes such a
+    // file, so it only spares one an older version left behind.
     machineLocal: readonly string[]
     // User-scope plugin dirs (e.g. ~/.cursor/plugins/local/) are not scanned for added files;
     // only tracked-file drift is detected for user-scope plugins.

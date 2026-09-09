@@ -6,10 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { journalRepo } from "../../../helpers/telemetry-journal-hook.js";
 
 // git exports GIT_DIR into every process it spawns, and the journal hook runs from inside
-// one. It must read the repository at `cwd` rather than the one the environment points at:
-// without the strip, a session started from a git hook or a CI step tags every record it
-// writes with the wrong project — and the CLI reads that project off the journal
-// (`session-project.ts`), so a wrong answer here is a wrong answer in every report.
+// one: without the strip, a hook-started session tags every record with the wrong project.
 describe("the journal hook does not follow a leaked GIT_DIR", () => {
   const created: string[] = [];
   const savedGitDir = process.env.GIT_DIR;

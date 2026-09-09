@@ -1,26 +1,18 @@
 // OpenCode's own extension surface: a JS module it loads in-process through its
-// `{plugin,plugins}/*.{ts,js}` auto-discovery convention - never a hook it spawns per event,
-// which is why every other file in this directory (a command journal.cjs runs, reading stdin)
-// has no counterpart here.
+// `{plugin,plugins}/*.{ts,js}` auto-discovery convention, never a hook it spawns per event.
 //
-// The export shape below is load-bearing, not style: OpenCode's loader only recognises a
-// genuine ESM export. Measured across three real sessions, a CommonJS `module.exports` file
-// sat in the auto-discovery path, was logged as found, and never ran a single line of its own
-// code - no error, no output. An `export const` file loaded and ran on the very next attempt.
+// The export shape is load-bearing, not style: OpenCode's loader only recognises a genuine
+// ESM export. A CommonJS `module.exports` file sits in the auto-discovery path, is logged as
+// found, and never runs a line of its own code - no error, no output.
 //
-// A second, separate limit rules out reusing journal.cjs's own functions in-process: OpenCode's
-// loader cannot see a local CommonJS file's exports at all - `await import("./lib/record.cjs")`
-// resolves to a namespace with none, even for a trivial one-line `module.exports = {...}` file,
-// while a genuine ESM sibling imports fine. So this file spawns `journal.cjs` as the child
-// process every other host's own hook already runs, over the same stdin-JSON contract, naming
-// itself so `detectHost` (lib/host.cjs) recognises it without guessing at a fifth vendor shape.
-// See scripts/__tests__/fixtures/opencode-session-idle.json and its README entry for the
-// captured evidence behind this shape.
+// A second limit rules out reusing journal.cjs's functions in-process: OpenCode's loader
+// cannot see a local CommonJS file's exports at all, so `await import("./lib/record.cjs")`
+// resolves to an empty namespace while a genuine ESM sibling imports fine. So this spawns
+// `journal.cjs` as a child over the same stdin-JSON contract every other host's hook uses,
+// naming itself so `detectHost` recognises it without guessing at a fifth vendor shape.
 //
-// A third gap, found only by running a real session: `node <a file:// URL>` is not a valid
-// invocation - Node's CLI treats the string as a module specifier and resolves it relative
-// to its own cwd, not as an absolute script path, so the spawned process died with
-// MODULE_NOT_FOUND every time and journal.cjs never ran. fileURLToPath fixes it.
+// `node <a file:// URL>` is not a valid invocation - Node treats the string as a module
+// specifier resolved against its own cwd - so fileURLToPath is what makes the spawn work.
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -29,11 +21,9 @@ const JOURNAL_SCRIPT = fileURLToPath(new URL("./journal.cjs", import.meta.url));
 // Never `process.execPath`: OpenCode ships as its own standalone binary, so that path names
 // `opencode` itself, not a Node runtime that can run journal.cjs.
 //
-// `timeout` bounds the block this same call already pays for, measured below at
-// `mightDeclareATask` - that measurement is of the common case, not a guarantee, and this
-// runs in-process rather than as a host-spawned hook OpenCode expects to wait on. A
-// `journal.cjs` that hangs must not freeze OpenCode's own event loop with it; a killed run is
-// one missed measurement, the same trade its own `main()` makes exiting 0 on any error.
+// This runs in-process, not as a host-spawned hook OpenCode expects to wait on, so `timeout`
+// bounds the block: a `journal.cjs` that hangs must not freeze OpenCode's event loop, and a
+// killed run is one missed measurement.
 function runJournal(event, payload) {
   spawnSync("node", [JOURNAL_SCRIPT, event], {
     input: JSON.stringify(payload),
@@ -42,45 +32,27 @@ function runJournal(event, payload) {
   });
 }
 
-// `session.created` carries the session's own `info.directory`, set by OpenCode itself;
-// `session.idle` and `message.part.updated` carry only `sessionID`. A single server can
-// outlive many sessions and serve more than one directory (`opencode run --dir`,
-// `--attach`), so `input.directory` - this plugin instance's own init-time directory, fixed
-// once - is not a safe stand-in: a turn-end or a declaration written to the wrong project's
-// journal finds no run file and silently no-ops. Cached per session id instead, from the
-// one event that actually carries it.
+// Only `session.created` carries the session's own `info.directory`; the other events carry
+// `sessionID` alone. A single server can outlive many sessions and serve more than one
+// directory, so this plugin's fixed init-time directory is not a safe stand-in - a turn-end
+// written to the wrong project's journal finds no run file and silently no-ops.
 //
-// `session.created` was never observed reaching this hook in a live `opencode 1.14.20`
-// measurement (2026-08-31) that discriminates "never published" from "published but not
-// delivered" - see the fixtures' own README entry for that run's log and two further
-// attempts that could not distinguish the two.
-//
-// Every `opencode run` invocation is a session OpenCode never announced, so nothing fills
-// this cache from `session.created` there, and `session.idle`/`message.part.updated` fall
-// back to `input.directory` below - this plugin's own init-time directory, which is
-// correct for the single-directory case `opencode run` is. `journalCallsFor` writes that
-// same directory back into this cache when it opens such a session, so the session is
-// opened once and every later event reads the directory its own opening used.
+// `session.created` was never observed reaching this hook, and every `opencode run` is a
+// session OpenCode never announced, so the later events fall back to the init-time directory,
+// which is correct for the single-directory case `opencode run` is. `journalCallsFor` writes
+// it back here, so the session is opened once and every later event reads the same directory.
 const directoryBySessionId = new Map();
 
-// Mirrors `lib/task-declared.cjs`'s own `TASK_PATH_PATTERN` and `lib/host.cjs`'s
-// `stringsWithin`, duplicated rather than imported: this file's own top-of-file comment
-// already measured that OpenCode's loader cannot see a local CommonJS file's exports at
-// all, which is the reason this plugin spawns `journal.cjs` as a child process in the
-// first place rather than calling its functions in-process. That constraint applies here
-// too - the same import that never worked for `record.cjs` would not work for
-// `task-declared.cjs` either.
+// Mirrors `lib/task-declared.cjs`'s own `TASK_PATH_PATTERN`, duplicated rather than
+// imported: OpenCode's loader cannot see a local CommonJS file's exports at all, which is the
+// same constraint that makes this plugin spawn `journal.cjs` rather than call into it.
 const TASK_PATH_PATTERN =
   /aidd_docs\/tasks\/\d{4}_\d{2}\/[^/"'\s]+\/[^"'\s]*|aidd_docs\/tasks\/\d{4}_\d{2}\/[^/"'\s]+\.md/u;
 
-// Every completed tool part reaches this hook - most naming no task at all - and, unlike
-// every other host's own hook runner, this one runs inside OpenCode's own in-process event
-// handler: a `spawnSync` per call here blocks the agent's own event loop, not a
-// short-lived hook process the host expects to pay for anyway. Cheap and conservative:
-// `true` only when a string reachable inside `toolInput` could possibly be a declared
-// path, exactly what `declaredTaskPath` would itself test after the spawn - so this can
-// never skip a call `handleTaskDeclared` would have acted on, only calls it would have
-// read and discarded.
+// Every completed tool part reaches this hook, most naming no task, and a `spawnSync` per
+// call blocks OpenCode's own event loop. Cheap and conservative: `true` only when a string
+// inside `toolInput` could possibly be a declared path, which is what `declaredTaskPath`
+// tests after the spawn, so this can never skip a call that would have been acted on.
 function mightDeclareATask(toolInput) {
   if (typeof toolInput === "string") {
     return TASK_PATH_PATTERN.test(toolInput.replace(/\\/gu, "/"));
@@ -89,26 +61,14 @@ function mightDeclareATask(toolInput) {
   return Object.values(toolInput).some(mightDeclareATask);
 }
 
-// A tool call's own arguments, once it has any: `pending` carries `input: {}`, empty and
-// unsearchable, before OpenCode has resolved what the call is even for - only `completed`
-// is read, the moment every argument, and the tool's own output, are settled, the same
-// moment every other host's own PostToolUse-style hook fires at. Reading `running` too
-// would call `handleTaskDeclared` a second time for the one real call already caught at
-// `completed` - never wrong, since a duplicate declaration is a duplicate closed interval
-// pointing at the same path, but a needless one.
+// Only `completed` is read: `pending` carries an empty, unsearchable `input`, and reading
+// `running` too would declare the same task twice for one call.
 //
-// Measured live, `opencode 1.14.20`, 2026-08-31: a tool part's own `event.properties.part`
-// carries no task identity of any kind - only `tool` (a name: `"read"`, `"bash"`, …) and
-// `state.input`, the call's own arguments, exactly the shape `declaredTaskPath` already
-// reads on every other host as `tool_input`. `state.input.filePath` (a `read` call) and
-// `state.input.command` (a `bash` call) were both observed carrying an absolute path or a
-// shell command line - the same two shapes Claude Code's `Read` and Codex's `Bash` already
-// give this reader, never a new field this reader has to learn.
+// A tool part carries no task identity of any kind - only the tool's name and `state.input`,
+// the call's own arguments, which is exactly the shape `declaredTaskPath` already reads on
+// every other host as `tool_input`.
 //
-// `mightDeclareATask` is read before this ever produces a call worth spawning for: on
-// OpenCode, `tool-used` does exactly one thing downstream (`journal.cjs`'s own
-// `handleFileWritten` and `handleStepStart` both no-op for a host with no `writtenPath` /
-// `stepStart` extractor - see `lib/tools/opencode.cjs`) - task declaration - so a call this
+// On OpenCode `tool-used` does exactly one thing downstream, task declaration, so a call this
 // pre-filter refuses would have done nothing after the spawn either.
 function declaredTaskCallFor(event, sessionDirectories, fallbackDirectory) {
   const part = event.properties.part;
@@ -122,18 +82,12 @@ function declaredTaskCallFor(event, sessionDirectories, fallbackDirectory) {
   };
 }
 
-/** One OpenCode event in, the journal call it produces out - or `null` for an event this
- * plugin does not act on. Pure but for the one map mutation `session.created` makes on
- * its way through: kept separate from `runJournal`'s spawn so a captured event can be
- * asserted against without running node as a child process.
+/** Kept separate from `runJournal`'s spawn so a captured event can be asserted against
+ * without running node as a child process.
  *
- * Reached as a property of the plugin below, never as a second named export. OpenCode's
- * loader calls every function-valued export of a file in `plugin/` as a plugin factory of
- * its own: measured against opencode 1.14.20 in a freshly installed project, this function
- * exported beside the plugin was called with one argument, returned `null`, and `opencode
- * run` died reading `.auth` off it before any session started - the tool this plugin
- * measures, unusable in every project the framework had installed. A property is invisible
- * to that loader, and a non-function export would have been ignored by it too. */
+ * Reached as a property of the plugin below, never as a second named export: OpenCode's
+ * loader calls every function-valued export of a file in `plugin/` as a plugin factory of its
+ * own, and doing that to this function left `opencode run` dead before any session started. */
 function journalCallFor(event, sessionDirectories, fallbackDirectory) {
   if (event.type === "session.created") {
     const sessionId = event.properties?.info?.id;
@@ -152,33 +106,25 @@ function journalCallFor(event, sessionDirectories, fallbackDirectory) {
   return null;
 }
 
-/** The session id an event names, whichever field its own type carries it in. Nothing on
- * OpenCode's own bus guarantees `properties` is ever set - an event type this plugin does
- * not otherwise act on (`server.connected`, say) is read here before any per-type dispatch
- * would have skipped it, so a missing field must resolve to `undefined`, never throw. */
+/** Nothing on OpenCode's bus guarantees `properties` is set, and an event this plugin does
+ * not act on is read here before any per-type dispatch would skip it, so a missing field must
+ * resolve to `undefined` rather than throw. */
 function sessionIdOf(event) {
   if (event.type === "session.created") return event.properties?.info?.id;
   return event.properties?.sessionID;
 }
 
 /** Every journal call one OpenCode event produces, in the order the journal must receive
- * them - empty for an event this plugin does not act on.
+ * them.
  *
- * `journalCallFor` alone leaves `opencode run` measuring nothing. OpenCode publishes
- * `session.created` on its own bus and never delivers it to a plugin's event hook
- * (measured, 2026-08-31 - see plugins/aidd-telemetry/README.md, "OpenCode never announces a
- * session"), and `opencode run` is always such a session. So the journal
- * never receives a `session_start`, never creates the run file the rest of the session
- * appends to, and drops the `turn-end` and every task declaration that follows - while
- * `telemetryLocalRead` declares the tool covered and `aidd telemetry read`, which reads
- * only sessions the run journal knows, can never find one. A declaration with nothing
- * behind it, the same fault this plugin's own second export was.
+ * OpenCode publishes `session.created` on its own bus and never delivers it to a plugin's
+ * event hook, and `opencode run` is always such a session — so `journalCallFor` alone leaves
+ * the journal with no `session_start`, no run file, and every later line dropped, while the
+ * tool still reads as covered.
  *
- * So the first call for a session nobody announced opens it. The `session-start` carries
- * the directory that following call was already going to use - never a new guess: for a
- * session no `session.created` named, that is this plugin's own init-time directory,
- * exactly what `journalCallFor` already hands `turn-end` and `tool-used`. An announced
- * session is untouched, and no session is opened twice. */
+ * So the first call for a session nobody announced opens it, carrying the directory that
+ * call was already going to use rather than a new guess. An announced session is untouched,
+ * and no session is opened twice. */
 function journalCallsFor(event, sessionDirectories, fallbackDirectory) {
   const sessionId = sessionIdOf(event);
   const announced = sessionId !== undefined && sessionDirectories.has(sessionId);
@@ -192,11 +138,9 @@ function journalCallsFor(event, sessionDirectories, fallbackDirectory) {
 
 export const AiddTelemetry = async (input) => ({
   event: async ({ event }) => {
-    // The same rule journal.cjs's own main() states, applied where OpenCode calls this
-    // in-process instead of spawning it: a measurement layer that breaks a session is worse
-    // than one that misses one. Whatever throws here is this plugin's own fault - a shape
-    // `journalCallsFor` did not expect, a failed spawn - never the person's, and OpenCode's
-    // event loop must not see it.
+    // The rule journal.cjs's own main() states, applied where OpenCode calls this in-process
+    // instead of spawning it: a measurement layer that breaks a session is worse than one
+    // that misses one, and whatever throws here is this plugin's fault, never the person's.
     try {
       for (const call of journalCallsFor(event, directoryBySessionId, input.directory)) {
         runJournal(call.script, call.payload);
@@ -207,7 +151,7 @@ export const AiddTelemetry = async (input) => ({
   },
 });
 
-// The spawn-free test seams, hung off the one export rather than standing beside it - see
-// journalCallFor's own comment for the measurement that rules out a second export.
+// The spawn-free test seams, hung off the one export rather than standing beside it — see
+// journalCallFor's own comment for why a second export is ruled out.
 AiddTelemetry.journalCallFor = journalCallFor;
 AiddTelemetry.journalCallsFor = journalCallsFor;

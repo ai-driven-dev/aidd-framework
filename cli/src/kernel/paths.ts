@@ -6,10 +6,9 @@ export const AIDD_CONFIG_FILENAME = "config.json";
 /** The project-scope marketplace registry, named once: `MarketplaceRegistryAdapter` writes
  * it and `CleanUseCase` removes it, and a second spelling is how one of them forgets. */
 export const AIDD_MARKETPLACES_FILENAME = "marketplaces.json";
-/** The registry of projects that reference the shared machine-scope source, named once
- * for the same reason as `AIDD_MARKETPLACES_FILENAME`: `UserSourceReferencesAdapter`
- * writes it, and a future machine-scope `clean` purges it — a second spelling is how one
- * of them would forget the other. */
+/** The registry of projects referencing the shared machine-scope source, named once for the
+ * same reason as `AIDD_MARKETPLACES_FILENAME`: one adapter writes it, a machine-scope
+ * `clean` purges it, and a second spelling is how one of them forgets the other. */
 export const USER_SOURCE_REFERENCES_FILENAME = "references.json";
 export const DOCS_DIR = "aidd_docs" as const;
 export const RUNS_SUBDIR = "runs" as const;
@@ -17,22 +16,16 @@ export const PLUGIN_CACHE_SUBDIR = join(AIDD_DIR, "plugin-cache");
 export const MARKETPLACE_CACHE_SUBDIR = join(AIDD_DIR, "cache", "marketplaces");
 export const BUILT_CACHE_SUBDIR = join(AIDD_DIR, "cache", "built");
 
-// The one spelling of "the run journal's directory, as a gitignore/pathspec entry" -
-// `telemetry-on-use-case.ts`'s `protectRunsDir` and `forget-telemetry-use-case.ts`'s
-// history check both ask `VersionControl.listTrackedFiles` about exactly this path; a
-// second literal of the same string would be a second way of asking the same question.
+// The one spelling of "the run journal's directory, as a gitignore/pathspec entry":
+// `telemetry-on-use-case.ts` and `forget-telemetry-use-case.ts` both ask
+// `VersionControl.listTrackedFiles` about exactly this path.
 export const RUNS_ENTRY = `${DOCS_DIR}/${RUNS_SUBDIR}/`;
 
 /**
- * Where the run journal actually lives — at the repository root above `projectRoot`, never
- * `projectRoot` itself. The hook that writes it anchors at `git rev-parse --show-toplevel`
- * (`repositoryRootAbove`'s own doc explains why), so a session started from a subdirectory
- * of a checkout still writes one journal at the checkout's root; a reader that joined
- * straight onto `projectRoot` instead found nothing there.
- *
- * The one resolver: `RunJournalReaderAdapter` and `TelemetryEvidenceAdapter` used to derive
- * this independently — one walked up to the repository root, the other did not — and
- * disagreed from any subdirectory. `AIDD_RUNS_DIR` overrides it outright, matching the hook.
+ * Where the run journal lives — at the repository root above `projectRoot`, never
+ * `projectRoot` itself, because the hook that writes it anchors there (`repositoryRootAbove`
+ * carries why). The one resolver, so two readers cannot disagree from a subdirectory.
+ * `AIDD_RUNS_DIR` overrides it outright, matching the hook.
  */
 export function resolvedRunsDir(projectRoot: string): string {
   return process.env.AIDD_RUNS_DIR || join(repositoryRootAbove(projectRoot), DOCS_DIR, RUNS_SUBDIR);
@@ -51,26 +44,15 @@ export function builtMarketplaceDir(
 }
 
 /** The directory every version's own built tree sits under — `clean --scope user`'s
- * whole-source purge target, one `rm -rf` on a directory `userBuiltMarketplaceDir`
- * always nests three segments beneath. Named once so a version-scoped path and the
- * root that holds every version stay in sync by construction, never two separate
- * `join` calls a future edit could drift apart. */
+ * whole-source purge target, three segments above `userBuiltMarketplaceDir`. Named once so
+ * the version-scoped path and the root holding every version cannot drift apart. */
 export function userBuiltCacheRoot(userConfigDir: string): string {
   return join(userConfigDir, "cache", "built");
 }
 
-/**
- * Where a user-scope marketplace's built tree lives: under the CLI's own user
- * directory, which is already the `.aidd` of the user, so the layout below it repeats
- * the project one without repeating the `.aidd` segment.
- *
- * The CLI version sits before the marketplace name, not after: a purge of one
- * version is then a single `rm -rf` on a directory this CLI alone owns, and two
- * projects on two different CLI versions never resolve to the same directory — the
- * one shape that lets a second project coexist with a first without one silently
- * repointing the host away from the other (measured against the real `claude`,
- * `codex` and `copilot` binaries: only a version-carrying path makes that safe).
- */
+/** The CLI version sits before the marketplace name, so purging one version is a single
+ * `rm -rf` and two projects on two CLI versions never resolve to the same directory — what
+ * keeps a second project from silently repointing a host away from the first. */
 export function userBuiltMarketplaceDir(
   userConfigDir: string,
   cliVersion: string,
@@ -88,14 +70,10 @@ export interface UserBuiltMarketplaceLocation {
 }
 
 /**
- * The inverse of `userBuiltMarketplaceDir`: whether `path` has exactly that shape
- * under `userConfigDir`, and if so, the version/name/target it carries — `undefined`
- * for anything else, foreign path included.
- *
- * This is how a host's registered source is told apart from a request for a
- * different version of aidd's own shared build without opening anything: the fact
- * lives in the path's own segments, decided structurally, never guessed from a
- * catalog's declared name or plugin set.
+ * The inverse of `userBuiltMarketplaceDir`: the version/name/target `path` carries when it
+ * has exactly that shape under `userConfigDir`, `undefined` otherwise. Decided from the
+ * path's own segments, so a host's registered source is told apart from another version of
+ * the shared build without opening any catalog.
  */
 export function parseUserBuiltMarketplaceDir(
   userConfigDir: string,
@@ -114,10 +92,8 @@ export interface BuiltMarketplaceLocation {
   readonly target: string;
 }
 
-/**
- * The inverse of `builtMarketplaceDir`, mirroring `parseUserBuiltMarketplaceDir` for
- * the project-scope shape — decidable the same way, from the path's own segments.
- */
+/** The inverse of `builtMarketplaceDir`, decided from the path's own segments the way
+ * `parseUserBuiltMarketplaceDir` decides the user-scope shape. */
 export function parseBuiltMarketplaceDir(
   projectRoot: string,
   path: string,
@@ -129,34 +105,16 @@ export function parseBuiltMarketplaceDir(
   return { marketplaceName, target };
 }
 
-/** What `parseBuiltMarketplaceDirAtAnyRoot` read back — `builtMarketplaceDir`'s own
- * shape, plus the project root that produced it, since that root is exactly what
- * `parseBuiltMarketplaceDir` needs handed to it and `parseBuiltMarketplaceDirAtAnyRoot`
- * exists to find without one. */
+/** `builtMarketplaceDir`'s own shape plus the project root that produced it — the root
+ * `parseBuiltMarketplaceDir` has to be handed and this one exists to discover. */
 export interface AnyProjectBuiltMarketplaceLocation extends BuiltMarketplaceLocation {
   readonly projectRoot: string;
 }
 
-/**
- * The inverse of `builtMarketplaceDir` when the project root itself is not known in
- * advance — recognises a *foreign* project's own pre-migration cache, the one shape
- * `parseBuiltMarketplaceDir` cannot answer for without already being handed the root
- * it is trying to discover. `undefined` for anything that is not exactly
- * `<root>/.aidd/cache/built/<marketplaceName>/<target>`, root included: a marker with
- * nothing before it names no project and is refused the same way an empty remainder
- * already is elsewhere in this file.
- *
- * Segment-by-segment, like `segmentsUnder`, never index arithmetic over a
- * case-folded string: folding a string for a win32 comparison is not guaranteed to
- * preserve its length, so an offset found in the folded string is not safe to slice
- * out of the original one.
- *
- * `projectRoot` is rejoined with `platform`'s own separator, never a hardcoded `/`:
- * every other writer of `references.json` records a `realpath` result, which is
- * backslash-separated on win32, and `samePathSegment`'s own case-folding compares
- * spelling, never separators — a forward-slash root here would never equal that
- * writer's, and the two would never be recognised as the same project again.
- */
+/** Matched segment by segment, never by index arithmetic over a case-folded string: win32
+ * folding need not preserve length. `projectRoot` is rejoined with `platform`'s own separator,
+ * since every other writer of `references.json` records a backslash `realpath` on win32 and
+ * `samePathSegment` compares spelling. */
 export function parseBuiltMarketplaceDirAtAnyRoot(
   path: string,
   platform: string = process.platform
@@ -178,13 +136,10 @@ export function parseBuiltMarketplaceDirAtAnyRoot(
   return { projectRoot, marketplaceName, target };
 }
 
-/** The path segments of `path` past `base`, or `undefined` when `path` does not sit
- * under `base` at all — the shared string mechanics behind both parsers above, so
- * the separator-normalisation rule lives in one place, the same as
- * `pathContainsOrEquals`. Compares spelling (folded by `platform` for the containment
- * test only — the segments returned keep their original casing); does not resolve
- * either side. A trailing separator on `base` is tolerated: a real directory string
- * carrying one is not a corrupted path. */
+/** The path segments of `path` past `base`, `undefined` when `path` does not sit under
+ * `base`. Compares spelling — folded by `platform` for the containment test only, so the
+ * segments returned keep their original casing — and resolves neither side. A trailing
+ * separator on `base` is tolerated. */
 function segmentsUnder(base: string, path: string, platform: string): string[] | undefined {
   const normalizedBase = stripTrailingSeparator(base.replace(/\\/g, "/"));
   const normalizedPath = stripTrailingSeparator(path.replace(/\\/g, "/"));
@@ -204,13 +159,10 @@ function foldCase(p: string, platform: string): string {
   return platform === "win32" ? p.toLowerCase() : p;
 }
 
-/** Whether two path segments name the same thing, folded the same way a case-insensitive
- * platform's own filesystem would: identical spelling everywhere but win32, where the
- * comparison is case-insensitive — the same rule `segmentsUnder` applies to containment,
- * named here for a caller comparing an already-extracted segment (a marketplace name, a
- * build target) rather than a whole path. `platform` is passed explicitly, never read
- * from `process.platform` directly, so a test can exercise the win32 branch on any OS —
- * the same testable shape `mcp-exclusion.ts`'s `transformFor` already uses. */
+/** Whether two path segments name the same thing, folded the way a case-insensitive
+ * filesystem would: identical spelling everywhere but win32, where the comparison ignores
+ * case. `platform` is a parameter, never `process.platform` read inline, so a test can
+ * exercise the win32 branch on any OS. */
 export function samePathSegment(
   a: string,
   b: string,
@@ -219,13 +171,9 @@ export function samePathSegment(
   return platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
-/** `roots` with every entry `samePathSegment` would call a duplicate of an earlier one
- * collapsed away, the first spelling encountered kept — a plain `Set` compares by exact
- * string equality only, so on win32 two entries differing only in case (the same
- * directory a case-insensitive filesystem never told apart) survived as two. Named once
- * so a caller that needs this dedup — `UserSourceReferencesAdapter.listAllReferencingProjects`
- * today — asks for it rather than reimplementing the comparison `samePathSegment` already
- * owns. */
+/** `roots` with every `samePathSegment` duplicate collapsed away, the first spelling kept.
+ * A plain `Set` compares by exact string equality, so on win32 two entries differing only
+ * in case — one directory the filesystem never tells apart — would survive as two. */
 export function dedupePathSegments(
   roots: readonly string[],
   platform: string = process.platform
@@ -237,12 +185,9 @@ export function dedupePathSegments(
   return deduped;
 }
 
-// One directory is the other, or contains it. Two callers guard on this - a build refusing
-// to write into the tree it reads from, and the cache-rebuild path deciding whether it
-// needs the temp-dir detour - and each spelled the comparison itself with a hardcoded "/",
-// so on Windows neither ever recognised real nesting. Named once here so the
-// question has an answer to point at rather than a habit to repeat. Both sides are
-// expected already resolved: this compares spelling, it does not resolve.
+// One directory is the other, or contains it — separators normalised, so nesting is
+// recognised on Windows too. Both sides are expected already resolved: this compares
+// spelling, it does not resolve.
 export function pathContainsOrEquals(outer: string, inner: string): boolean {
   const normalizedOuter = outer.replace(/\\/g, "/");
   const normalizedInner = inner.replace(/\\/g, "/");
@@ -254,30 +199,23 @@ export function pathsOverlap(a: string, b: string): boolean {
   return pathContainsOrEquals(a, b) || pathContainsOrEquals(b, a);
 }
 
-/**
- * Where the user-scope manifest lives: directly under `userConfigDir()`, never nested
- * under an `.aidd/` segment — there is no project to hold one, and `marketplaces.json`
- * and `references.json` already sit at this same root with no such nesting either.
- */
+/** Where the user-scope manifest lives: directly under `userConfigDir()`, never nested in an
+ * `.aidd/` segment — there is no project to hold one, and `marketplaces.json` and
+ * `references.json` sit at that same root already. */
 export function userManifestPath(userConfigDir: string): string {
   return join(userConfigDir, MANIFEST_FILENAME);
 }
 
-/** The manifest's filename, in the domain because two adapters name that file and a
- * diagnostic prints both. `telemetry-evidence-adapter.ts` scans it for a declaration while
- * `manifest-repository-adapter.ts` loads and validates it, and `aidd telemetry check` prints
- * a row from each — so a person reads two sentences about one file. They agreed by two
- * matching literals until this existed, which is agreement by coincidence: renaming the file
- * at one site would have made the rows contradict each other again, which is the defect that
- * pairing was introduced to close. */
+/** The manifest's filename, named once because `telemetry-evidence-adapter.ts` and
+ * `manifest-repository-adapter.ts` both open that file and `aidd telemetry check` prints a
+ * row from each: two literals would let a rename make those rows contradict each other. */
 export const MANIFEST_FILENAME = "manifest.json";
 
 /**
- * `target` relative to `base`, spelled with forward slashes whatever the platform. The
- * form every file this CLI records for another machine to read takes — a manifest's
- * `files[].relativePath`, a snapshot key, a plugin ref — so a tree written on Windows and
- * read on Linux names the same file. Every caller that used to spell its own
- * `relative(...).replace(...)` goes through here instead: one fact, one home.
+ * `target` relative to `base`, spelled with forward slashes whatever the platform — the form
+ * every path this CLI records for another machine to read takes (a manifest's
+ * `files[].relativePath`, a snapshot key, a plugin ref), so a tree written on Windows and
+ * read on Linux names the same file.
  */
 export function posixRelative(
   base: string,

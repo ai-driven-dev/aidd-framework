@@ -2,24 +2,15 @@ import type { MarketplaceScope } from "../../../../kernel/scope.js";
 import type { HostPluginRegistryReader } from "../../../tools/domain/ports/host-plugin-registry-reader.js";
 
 /**
- * The scope(s) worth asking a host's own CLI to uninstall `ref` at, in the order to try
- * them.
+ * The scope(s) worth asking a host's own CLI to uninstall `ref` at, in the order to try them.
  *
- * The host's own registry is authoritative when it answers for this ref (Claude's own
- * `installed_plugins.json` records the scope an entry was written at) — a single scope,
- * trusted outright. When it does not — no reader exists for this tool at all, the ref
- * is absent from what the registry currently carries, or the host's own registry has no
- * per-entry scope concept (Codex, Copilot are both machine-global) — this falls back to
- * `manifestScope`, the scope this project's own manifest recorded at install time, then
- * the other one.
- *
- * That fallback exists because `manifestScope` can itself be wrong: before scope
- * threading existed, `enablePlugin` carried no scope argument at all, so a real
- * `claude` binary always registered at its own implicit default, `"user"`, regardless
- * of what the manifest went on to record for the plugin's own files. Trying the wrong
- * scope first costs one failed, best-effort attempt — a real `claude` binary refuses a
- * mismatched-scope uninstall outright rather than silently missing it (measured) — never
- * a wrong result, since the caller stops at the first scope that succeeds.
+ * A host's own registry is authoritative when it answers for this ref (claude records the scope an
+ * entry was written at) — a single scope, trusted outright. Otherwise — no reader, the ref absent,
+ * or a host with no per-entry scope concept (codex, copilot are machine-global) — this falls back
+ * to `manifestScope`, then the other one, since a plugin enabled before this CLI passed a scope at
+ * all sits at claude's own implicit `"user"` default whatever the manifest recorded. Trying the
+ * wrong scope first costs one failed, best-effort attempt: measured, a real `claude` binary refuses
+ * a mismatched-scope uninstall outright rather than silently missing it.
  */
 export async function resolveUninstallScopeOrder(
   reader: HostPluginRegistryReader | undefined,

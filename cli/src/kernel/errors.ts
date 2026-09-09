@@ -160,10 +160,9 @@ export class InvalidPluginVersionError extends Error {
   }
 }
 
-// Not `InvalidPluginScopeError`: that name is already the CLI-facing "this tool does not
-// support the scope you asked for" error (`install-scope.ts`). This one is a manifest
-// integrity failure — the recorded `scope` field itself is missing or not one of the two
-// values it may hold — a different failure with a different fix.
+// Not `InvalidPluginScopeError`, the CLI-facing "this tool does not support the scope you
+// asked for" (`install-scope.ts`): this one is a manifest integrity failure — the recorded
+// `scope` field is missing or not one of the two values it may hold.
 export class MalformedPluginScopeError extends Error {
   constructor(pluginName: string, scope: unknown) {
     super(
@@ -189,11 +188,8 @@ export class InvalidPluginManifestError extends Error {
   }
 }
 
-// Thrown when a marketplace catalog file (.claude-plugin/marketplace.json or
-// .plugin/marketplace.json) exists but cannot be parsed. Extends
-// InvalidPluginManifestError so existing `instanceof` checks still hold, while
-// adding an actionable recovery hint — a cached catalog is healed by re-fetch,
-// a user-provided source must be fixed by hand.
+// Extends InvalidPluginManifestError so existing `instanceof` checks still hold, adding the
+// recovery: a cached catalog heals by re-fetch, a user-provided source only by hand.
 export class MalformedMarketplaceCatalogError extends InvalidPluginManifestError {
   constructor(path: string, detail: string, cached: boolean) {
     const recovery = cached
@@ -294,11 +290,9 @@ export class NoMarketplacesRegisteredError extends Error {
   }
 }
 
-/** The registry file exists but cannot be read as one is never read as an empty registry:
- * `save()` reads this same list, appends to it and writes the whole file back, so a silent
- * empty read would not merely hide the marketplaces a person registered, it would delete
- * them on the very next write. Modeled on `UnreadableIdentityFileError`, the same situation
- * for the other user-config file this CLI shares with whoever edits it. */
+/** An unreadable registry file is never read as an empty one: `save()` reads this same list,
+ * appends to it and writes the whole file back, so a silent empty read would delete the
+ * marketplaces a person registered on the very next write. */
 export class UnreadableMarketplaceRegistryError extends Error {
   constructor(path: string, reason: string) {
     super(
@@ -309,10 +303,9 @@ export class UnreadableMarketplaceRegistryError extends Error {
   }
 }
 
-/** Modeled on `UnreadableMarketplaceRegistryError`: `references.json` is written by
- * appending to whatever it already holds, one version key at a time, so a silent empty
- * read on a corrupted file would delete every other project's own reference on the very
- * next write, not merely the one this run cares about. */
+/** As `UnreadableMarketplaceRegistryError`: `references.json` is written by appending to
+ * what it already holds, so a silent empty read on a corrupted file would delete every
+ * other project's own reference on the very next write. */
 export class UnreadableUserSourceReferencesError extends Error {
   constructor(path: string, reason: string) {
     super(
@@ -330,10 +323,9 @@ export class InteractiveOnlyError extends Error {
   }
 }
 
-/** `sync` restoring one scope out of several and failing another is not a silent partial
- * success: each failure already reached the user through its own `output.warn` line, so
- * this names only the scopes, not the messages again, and lets `errorHandler` be the one
- * place that turns a failed sync into a non-zero exit. */
+/** Each failure already reached the user through its own `output.warn` line, so this names
+ * only the scopes and lets `errorHandler` be the one place turning a partly failed sync
+ * into a non-zero exit. */
 export class SyncFailedError extends Error {
   constructor(errors: readonly { scope: string; message: string }[]) {
     super(`Sync failed for: ${errors.map((e) => e.scope).join(", ")}. See the warnings above.`);
@@ -549,19 +541,10 @@ export class NativePluginCliError extends Error {
   }
 }
 
-/**
- * A host's own marketplace registry already holds this catalog's declared name,
- * pointed at a genuinely *different* catalog — a different plugin set, or a different
- * declared name at that source — so driving the host's CLI to register it would
- * silently steal or mislabel that name. Message-only, matching every sibling in this
- * catalog: the registered and requested sources differ, and folding both into fields
- * shared across cases would misname one of them. A project's own local alias
- * diverging from what its catalog declares itself is a supported capability, never a
- * refusal here — see `architecture.md`. The structured facts behind a real conflict
- * live in `cli/src/contexts/tools/domain/marketplace-source-conflict.ts`'s own
- * `MarketplaceSourceConflict`, consumed directly by `doctor` — this class only carries
- * the message a person reads when `aidd sync` refuses.
- */
+/** A host's own marketplace registry already holds this catalog's declared name pointed at a
+ * genuinely *different* catalog, so registering it would steal or mislabel that name. A
+ * project's local alias diverging from its catalog's declared name is not this, and is never
+ * refused. */
 export class MarketplaceSourceConflictError extends Error {
   constructor(message: string) {
     super(message);
@@ -569,12 +552,10 @@ export class MarketplaceSourceConflictError extends Error {
   }
 }
 
-/** `MarketplaceSyncSettingsUseCase.registerMarketplace` just built this catalog itself
- * and found nothing readable at the exact path its own tool profile probes — the
- * catalog's own declared name is what a host-facing registration must be keyed by, and
- * this CLI has no other fact to key it by. Registering nothing and naming the file
- * beats writing this project's own local alias in its place: a manifest that guessed
- * would go on claiming a `hostName` the host was never asked to hold. */
+/** A host-facing registration must be keyed by the catalog's own declared name, and an
+ * unreadable catalog leaves this CLI no other fact to key it by. Registering nothing beats
+ * writing this project's local alias: a manifest that guessed would claim a `hostName` the
+ * host was never asked to hold. */
 export class UnreadableBuiltCatalogError extends Error {
   constructor(path: string) {
     super(
@@ -683,9 +664,8 @@ export class UnknownTelemetrySinkSchemaVersionError extends Error {
 }
 
 /** A genuine `opencode export` failure — a non-zero exit not explained by "no such
- * session", or the command exceeding its timeout. An absent binary or an unknown session
- * are not this: those mean the machine simply holds no OpenCode data, and the reader
- * resolves to an empty array for them instead of throwing. */
+ * session", or a timeout. An absent binary or an unknown session mean the machine holds no
+ * OpenCode data, and resolve to an empty array instead of throwing. */
 export class OpencodeExportError extends Error {
   constructor(message: string) {
     super(message);
@@ -709,11 +689,7 @@ export class InvalidReportSpanError extends Error {
 
 /** The identity file exists but could not be read back — a read failure (e.g. it is a
  * directory) or content that does not parse. Distinct from no file at all, which is a
- * person never having opted in and answers `null` rather than throwing.
- *
- * Also what a damaged separate declaration file would have thrown, back when one existed
- * as its own file (`UnreadablePersonMappingFileError`, deleted alongside it): one file,
- * one error for a read that could not come back. */
+ * person never having opted in and answers `null` rather than throwing. */
 export class UnreadableIdentityFileError extends Error {
   constructor(filePath: string, cause: string) {
     super(`Could not read the identity file at ${filePath} (${cause}).`);
@@ -721,11 +697,9 @@ export class UnreadableIdentityFileError extends Error {
   }
 }
 
-/** One sentence for one consequence: writing a git-tracked file that turns telemetry on for
- * everyone who clones. `endpoint --scope project` and `telemetry on` both have exactly this
- * consequence — the parameterised `action` and `trackedPath` are the only two things that
- * differ between them, so they share the one error rather than each writing its own
- * sentence for the same fact. */
+/** One consequence, shared by `endpoint --scope project` and `telemetry on`: writing a
+ * git-tracked file that turns telemetry on for everyone who clones. `action` and
+ * `trackedPath` are all that differ between them. */
 export class TelemetryProjectScopeRequiresYesError extends Error {
   constructor(action: string, trackedPath: string) {
     super(
@@ -767,9 +741,8 @@ export class TelemetrySinkUnwritableError extends Error {
 }
 
 /** A write or a delete against the identity file failed for a reason other than the file
- * simply not being there — permission denied, a full disk, and the like. Distinct from
- * `UnreadableIdentityFileError`, above: that one names a read that could not
- * come back, this one a write or a forget that could not go out. */
+ * not being there — permission denied, a full disk. `UnreadableIdentityFileError` above is
+ * the read that could not come back; this is the write that could not go out. */
 export class IdentityWriteError extends Error {
   /** `action` names what the person was doing, because the sentence reaches them: someone
    * withdrawing should not be told a write failed. */

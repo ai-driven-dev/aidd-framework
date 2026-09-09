@@ -1,65 +1,25 @@
 #!/usr/bin/env bash
-# Smoke against REAL AI-tool binaries, in the REAL $HOME, on a machine that has them
-# installed. This is the one check `smoke-tools.sh` cannot do: that suite relocates
-# HOME/XDG_CONFIG_HOME on purpose (see `smoke-harness-isolation.unit.test.ts`), so it
-# never proves a host's own CLI actually registers, sees, or unregisters a plugin —
-# only that this CLI *called* the host binary and it exited 0. This script does not
-# relocate HOME: reaching the real registry is the whole point.
+# Smoke against REAL AI-tool binaries in the REAL $HOME. `smoke-tools.sh` relocates HOME on
+# purpose, so it proves only that this CLI called a host binary, never that the host itself
+# registered, saw, or unregistered anything. Never in CI, never in lefthook: `pnpm smoke:real`.
 #
-# Never in CI, never in lefthook. Opt-in, local-only: `pnpm smoke:real`.
+# Every marketplace and plugin name is unique per run, and `setup` is never asked to
+# auto-register: that flow always takes the reserved name `aidd-framework`, which a real
+# machine already carries at every host, and `claude plugin marketplace add` silently
+# repoints an existing entry rather than refusing it. A unique name is what keeps this run
+# from cornering a real registration, and what stops cleanup mistaking a real entry for one
+# this run made.
 #
-# --- Why this cannot reuse the naming scheme the design assumed ------------------
-# `setup`'s auto-register always names the marketplace "aidd-framework"
-# (`contexts/distribution/domain/marketplace.ts`'s FRAMEWORK_MARKETPLACE_NAME) — it does not read the name
-# from the source's own marketplace.json, and there is no flag to override it.
-# Measured on this machine: `aidd-framework` is already registered, permanently, at
-# every one of the five hosts (real daily-driver installs). Worse, measured directly
-# against the real `claude` binary: `claude plugin marketplace add <path>` derives the
-# registered name from the *source's* marketplace.json and, when that name already
-# exists, SILENTLY overwrites the existing entry's install location — no prompt, no
-# error, exit 0, regardless of --scope. Running `setup`'s literal auto-register flow
-# here would corner this exact machine's real `aidd-framework` registration into
-# pointing at a fixture this script deletes on exit, with no guarantee `aidd clean`
-# could point it back — measured separately: a `marketplace remove` scoped to where
-# the entry was added purges this run's own `known_marketplaces.json` entry cleanly
-# in the ordinary add-once/remove-once path this script exercises, but a smaller
-# probe (adding the same name twice, from two different sources, before removing)
-# found a scoped remove that could no longer find its own declaration to undo. A
-# unique per-run name sidesteps needing to know exactly when that edge bites.
+# `HOME` stays real because reaching each host's own registry is the point, but
+# `AIDD_USER_CONFIG_DIR` is relocated into the run temp root, exported script-wide before the
+# first `aidd` call — per-phase relocation is how a phase added later reaches the real
+# profile instead. The `clean --scope user` whitelist deletes `cache/built/`, the self-update
+# cache and `references.json` outright, none of which may point at a real profile. The
+# variable does not move `identity.json`: `resolveAiddConfigDir()`
+# (`kernel/reading/home-dir.ts`) refuses it on purpose, so identity is read from the real one.
 #
-# So: this script never asks `setup` to auto-register a marketplace. It installs
-# per-tool files with `--no-default-marketplace`, then drives native registration
-# itself through `marketplace add <unique-name> <derived-fixture> --scope project`
-# and `plugin install <unique-name> --tool <t> --from <unique-name> --yes`, against a
-# fixture copy whose marketplace.json and plugin.json both carry that unique name —
-# so every registry key this run touches (`<name>@<name>`, the cursor directory, the
-# codex table) is one no pre-existing install could already hold, and no cleanup step
-# can mistake a real entry for one this run made.
-#
-# --- Why `HOME` is real but `AIDD_USER_CONFIG_DIR` is not -----------------------
-# Machine scope (`--scope user`) reads and writes `userConfigDir()`, which on a real
-# daily driver holds this person's own `marketplaces.json`, `references.json`,
-# `auth.json`, `manifest.json`, `cache/` and `telemetry/`. Every phase below would
-# otherwise register into, and later purge from, that live directory — and
-# `clean --scope user`'s whitelist deletes `cache/built/` in full, the self-update
-# `cache/update-check.json` beside it, the `cache/` shell they leave behind, and
-# `references.json` outright, which is not a thing to point at somebody's real profile.
-# `AIDD_USER_CONFIG_DIR` relocates all of those (`aidd_docs/memory/cli.md`'s
-# distribution bullet carries the full list, including the telemetry sink's own legacy
-# fallback). It does NOT relocate `identity.json`: `resolveAiddConfigDir()`
-# (`kernel/reading/home-dir.ts`) refuses this variable on purpose, so identity is read
-# from and written to the real profile even here. The variable is exported once,
-# script-wide, before the first `aidd` call. `HOME` stays real:
-# reaching claude/codex/copilot/cursor's own registries is the whole point of this
-# script, and none of them lives under `userConfigDir()`.
-#
-# --- Why `--no-default-marketplace` is mandatory at user scope -------------------
-# `setup --scope user` without it resolves and registers a source under the reserved
-# name `aidd-framework` (`SetupMarketplaceRegistrationUseCase.resolveSourceIfNeeded`
-# returns null only for `--no-default-marketplace`), machine-wide, at every host — the
-# one registration this machine already carries for real. Every `--scope user` call
-# below therefore passes the flag, and the shared source these phases actually measure
-# is registered by name instead: `marketplace add <unique>-user <fixture> --scope user`.
+# Every `--scope user` call passes `--no-default-marketplace`; without it `setup --scope user`
+# registers the reserved name machine-wide at every host.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -73,9 +33,8 @@ MODE="allow-existing"
 
 AI_TOOLS=(claude codex copilot opencode cursor)
 declare -A PRESENT=()
-# Set to "present" right after `plugin install`, once each host's own cache directory
-# is proven to exist — `set -u` is on, so these must exist before `cleanup`'s trap can
-# read them even on an early failure that never reaches that point.
+# Set to "present" once each host's own cache directory is proven to exist. `set -u` is on,
+# so they must be declared before `cleanup`'s trap can read them on an early failure.
 CLAUDE_CACHE_BEFORE=""
 CODEX_CACHE_BEFORE=""
 
@@ -89,9 +48,8 @@ section() { echo; echo "=== $1 === [$(date +%H:%M:%S)]"; }
 CMD_TIMEOUT="${SMOKE_CMD_TIMEOUT:-180}"
 
 # run <name> <expect_exit(s)> <expect_substr|""> <cwd> -- <argv...>
-# Same alarm-survives-exec mechanism as smoke-tools.sh. `< /dev/null` closes stdin so
-# a real binary that would otherwise wait on a TTY prompt fails fast instead of
-# hanging out the clock on CMD_TIMEOUT.
+# `< /dev/null` closes stdin so a real binary waiting on a TTY prompt fails fast instead of
+# hanging out CMD_TIMEOUT.
 run() {
   local name="$1" expect_exit="$2" expect="$3" cwd="$4"; shift 4
   [[ "${1:-}" == "--" ]] && shift
@@ -140,13 +98,10 @@ if [[ ${#PRESENT[@]} -eq 0 ]]; then
 fi
 
 # --- The guard, and its honest limit -----------------------------------------
-# `strict` refuses to run at all if this machine already carries an aidd registration
-# under the reserved name, because a unique per-run name protects only against THIS
-# run colliding with itself — it says nothing about whether a previous, differently
-# broken run already left the machine in a state this script cannot tell apart from
-# a real install. `allow-existing` (the default here) accepts that this machine is a
-# real daily driver with `aidd-framework` permanently registered, and relies solely
-# on the per-run unique name for isolation.
+# A unique per-run name protects only against this run colliding with itself, never against
+# a state an earlier broken run left that this script cannot tell from a real install.
+# `--strict` refuses to run at all when the reserved name is already registered here;
+# `allow-existing`, the default, accepts a real daily driver and relies on the unique name.
 preexisting_aidd_framework() {
   [[ -n "${PRESENT[claude]:-}" ]] && grep -qF '"aidd-framework"' "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null && return 0
   [[ -n "${PRESENT[codex]:-}" ]] && grep -q '@aidd-framework"\]' "$HOME/.codex/config.toml" 2>/dev/null && return 0
@@ -164,21 +119,14 @@ fi
 
 # --- Unique identity for this run --------------------------------------------
 MKT="aidd-smoke-$(date +%s)-$$"
-# A second, equally unique name for everything machine-scope. Never `$MKT` itself: the
-# project-scope registration below builds to `$PROJ/.aidd/cache/built/$MKT/<tool>` while
-# a user-scope one of the same name builds to
-# `userConfigDir()/cache/built/<version>/$MKT/<tool>` — two different paths under one
-# host registry key, which is a collision with this run's own project phase rather than
-# the two-projects case the machine-scope phases mean to measure.
+# Never `$MKT` itself: project scope builds under `$PROJ/.aidd/cache/built/`, machine scope
+# under `userConfigDir()/cache/built/<version>/` — one host registry key, two paths.
 MKT_USER="$MKT-user"
 echo "Marketplace/plugin name for this run: $MKT (machine scope: $MKT_USER)"
 
-# Renaming the JSON name fields alone is not enough: `translate-source.ts`'s
-# `buildPlugin` (the path cursor and opencode go through, since they install by file
-# rather than by native CLI) resolves a plugin's directory as `plugins/<entry.name>`
-# unconditionally — it never reads the `source` field claude/codex/copilot's native
-# `add` does. The plugin directory itself must carry the new name too, and the
-# `source` field is kept in step so every resolution path agrees.
+# `translate-source.ts`'s `buildPlugin`, the path cursor and opencode install by, resolves a
+# plugin directory as `plugins/<entry.name>` and never reads `source`, so the directory must
+# be renamed too and `source` kept in step for every resolution path to agree.
 derive_fixture() {
   local dest="$1" name="$2"
   cp -R "$FRAMEWORK_FIXTURE" "$dest"
@@ -213,18 +161,14 @@ PROJECTS=("$PROJ")
 REF="$MKT@$MKT"
 REF_USER="$MKT_USER@$MKT_USER"
 
-# The project every `--scope user` call runs from. Machine scope writes nothing under
-# it — that is the claim the `scope-user` phase checks with `git status --porcelain` —
-# but a command still needs a cwd, and `cleanup` needs one that exists however early
-# the run died.
+# The cwd every `--scope user` call runs from: machine scope writes nothing under it, but a
+# command still needs one, and so does `cleanup` however early the run died.
 PROJ_U=$(mktemp -d "$TMPROOT/proj-user.XXXXXX")
 (cd "$PROJ_U" && git init -q)
 
-# `setup --scope user` refuses a tool that declares no machine-wide activation at all
-# (`registry.ts`'s `supportsUserScopeActivation`: a native CLI, or `installScope: "user"`
-# for its plugin files). Measured against the real binary set: passing `opencode` exits 1
-# with `UserScopeUnsupportedAiToolsError` before anything is written, so the machine-scope
-# phases carry their own tool list rather than reusing `ai_list`.
+# `setup --scope user` exits 1 for a tool declaring no machine-wide activation
+# (`registry.ts`'s `supportsUserScopeActivation`; opencode today), before anything is
+# written — so the machine-scope phases carry their own tool list, never `ai_list`.
 user_ai_list() {
   local ids=()
   for t in claude codex copilot cursor; do
@@ -233,9 +177,8 @@ user_ai_list() {
   (IFS=,; echo "${ids[*]}")
 }
 
-# Whether any host's own registry still names this run's machine-scope marketplace —
-# what decides, in `cleanup`, between "already undone" and "recreate the record and
-# undo it now".
+# Whether any host still names this run's machine-scope marketplace: what decides, in
+# `cleanup`, between "already undone" and "recreate the record and undo it now".
 user_marketplace_still_registered() {
   grep -qF "\"$MKT_USER\"" "$HOME/.claude/plugins/known_marketplaces.json" 2>/dev/null && return 0
   grep -qF "[marketplaces.$MKT_USER]" "$HOME/.codex/config.toml" 2>/dev/null && return 0
@@ -263,10 +206,8 @@ cleanup_user_scope() {
   run "clean --scope user --force" 0 "" "$PROJ_U" -- node "$CLI" clean --scope user --force
 }
 
-# Copilot's own uninstall convention (measured, see host-plugin-registry-reader-adapter.ts)
-# keeps a disabled plugin's key in enabledPlugins with value `false` rather than deleting
-# it. A plain grep for the ref string cannot tell "installed" from "disabled" apart, and
-# reported clean as having failed when it had not — this reads the actual boolean.
+# Copilot keeps a disabled plugin's key in enabledPlugins at `false` rather than deleting it,
+# so only the boolean tells "installed" from "disabled"; a grep for the ref cannot.
 copilot_ref_enabled() {
   node -e '
     const fs = require("node:fs");
@@ -279,11 +220,9 @@ copilot_ref_enabled() {
   ' "$HOME/.copilot/settings.json" "${1:-$REF}"
 }
 
-# `aidd clean` never writes a host registry by hand, by design (architecture.md) — this
-# script may, because the two keys below are exactly this run's own unique names
-# ($REF, $REF_USER), never a string a real install could hold. Removes only a key whose
-# value is the disabled `false` copilot's own uninstall convention leaves behind; a key
-# still `true` means cleanup failed upstream and is left alone, reported `bad`.
+# `aidd clean` never writes a host registry by hand; this script may, because $REF and
+# $REF_USER are this run's own unique names and no string a real install could hold. Only a
+# key already at `false` is dropped: one still `true` means cleanup failed upstream.
 copilot_purge_disabled_run_keys() {
   if [[ -z "${PRESENT[copilot]:-}" ]]; then
     skip "copilot: purge disabled run keys (copilot not installed)"
@@ -342,9 +281,8 @@ copilot_purge_disabled_run_keys() {
 
 # --- Cleanup runs no matter what happens, and is the only place `clean` is called ---
 cleanup() {
-  # Captured under its own name: the helpers called below assign `rc=` themselves, and
-  # bash's dynamic scoping would let them overwrite a local named the same, so the
-  # script would exit with whatever the last helper measured rather than its own status.
+  # Under its own name: the helpers below assign `rc=` themselves, and bash's dynamic scoping
+  # would otherwise exit with whatever the last helper measured.
   local entry_rc=$?
   section "cleanup"
   for proj in "${PROJECTS[@]}"; do
@@ -355,38 +293,28 @@ cleanup() {
     fi
   done
 
-  # Machine scope is undone only through the user manifest: `clean --scope user` reads
-  # `nativeRegistrations` from it and from nowhere else, and a project-scope `clean`
-  # deliberately refuses to unregister a `scope: "user"` marketplace (measured — the
-  # `clean-project-preserves-shared` phase asserts exactly that warning). So a run that
-  # died between `marketplace add --scope user` and the `sync --scope user` that records
-  # the registration would leave `$MKT_USER` registered at every host with nothing left
-  # to undo it: recreate the manifest and the record first, then clean.
+  # Machine scope is undone only through the user manifest, which `clean --scope user` reads
+  # and nothing else does. A run dying between `marketplace add --scope user` and the
+  # `sync --scope user` that records it strands the registration: recreate the record first.
   cleanup_user_scope
 
-  # The decisive check is presence of THIS run's unique token, not a byte-for-byte
-  # file diff: everything else in these registries belongs to real, unrelated
-  # installs and legitimately keeps changing (lastUpdated, other projects' entries).
+  # Presence of THIS run's unique token, never a byte-for-byte diff: everything else in these
+  # registries belongs to real installs and legitimately keeps changing.
   if [[ -n "${PRESENT[claude]:-}" ]]; then
     if grep -qF "\"$REF\"" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
       bad "claude: installed_plugins.json still names $REF after clean"
     else
       ok "claude: installed_plugins.json carries no trace of $REF"
     fi
-    # A separate, smaller probe (adding the same name twice from two different
-    # sources in one project) found a scoped `marketplace remove` that could no
-    # longer find its own declaration to remove — this is the guard against that
-    # class of residue reaching this global cache, checked honestly rather than
-    # assumed silent. The straightforward add-once-remove-once path this script
-    # actually exercises has measured clean here on every run so far.
+    # A scoped `marketplace remove` can fail to find its own declaration when one name was
+    # added twice from two sources; this guards that residue out of the global cache.
     if grep -qF "\"$MKT\"" "$HOME/.claude/plugins/known_marketplaces.json" 2>/dev/null; then
       bad "claude: known_marketplaces.json still carries $MKT after clean"
     else
       ok "claude: known_marketplaces.json carries no trace of $MKT"
     fi
-    # Phase C2's alias-divergence registration: `activateTool` registers every known
-    # marketplace regardless of whether a plugin points at it, so `clean --force`
-    # above already had nativeRegistrations naming this hostName to unregister too.
+    # `activateTool` registers every known marketplace, plugin or not, so `clean --force` above
+    # already had Phase C2's alias-divergence hostName in nativeRegistrations to unregister.
     if [[ -n "${UPSTREAM_NAME:-}" ]]; then
       if grep -qF "\"$UPSTREAM_NAME\"" "$HOME/.claude/plugins/known_marketplaces.json" 2>/dev/null; then
         bad "claude: known_marketplaces.json still carries $UPSTREAM_NAME after clean"
@@ -394,13 +322,9 @@ cleanup() {
         ok "claude: known_marketplaces.json carries no trace of $UPSTREAM_NAME"
       fi
     fi
-    # Measured (aidd_docs/memory/architecture.md): `claude plugin uninstall` +
-    # `marketplace remove` leave the built tree under cache/$MKT/ in full, marked
-    # `.orphaned_at`, never deleted by claude itself — `clean` now purges it once the
-    # check above proves known_marketplaces.json no longer names it. This is checked
-    # against `CLAUDE_CACHE_BEFORE`, captured right after `plugin install` below,
-    # never a bare `[[ -d ]]` here alone: an absent directory proves nothing on its
-    # own unless this run is also the one that watched it appear first.
+    # Claude marks an orphaned built tree `.orphaned_at` and never deletes it, so `clean`
+    # purges it once known_marketplaces.json no longer names it. Checked against
+    # `CLAUDE_CACHE_BEFORE`: an absent directory proves nothing unless it was seen present.
     if [[ "$CLAUDE_CACHE_BEFORE" != "present" ]]; then
       bad "claude: plugins/cache/$MKT was never proven present before clean ran"
     elif [[ -d "$HOME/.claude/plugins/cache/$MKT" ]]; then
@@ -408,10 +332,8 @@ cleanup() {
     else
       ok "claude: plugins/cache/$MKT is gone after clean, having been proven present before"
     fi
-    # Phase C2's alias-divergence registration again, this time its cache: the same
-    # `pluginCacheDir` root a plugin install populates, but here reached through
-    # `marketplace add` alone (no plugin ever installed under this name), so this
-    # asserts absence-after only — a "before" claim this script has not measured.
+    # The same cache root, reached through `marketplace add` alone with no plugin ever
+    # installed under this name, so absence-after is all this can honestly assert.
     if [[ -n "${UPSTREAM_NAME:-}" ]]; then
       if [[ -d "$HOME/.claude/plugins/cache/$UPSTREAM_NAME" ]]; then
         bad "claude: plugins/cache/$UPSTREAM_NAME still exists after clean"
@@ -420,27 +342,19 @@ cleanup() {
       fi
     fi
   fi
-  # This whole block is the shared-ref guard's negative control: $MKT is a unique
-  # per-run name, never the reserved `aidd-framework` one, so `references.json` never
-  # tracks it and no other project on this machine can ever reference it — a
-  # non-shared source is expected to be torn down in full at every host, codex
-  # included, exactly what these checks assert. The guarded path (this project's own
-  # ref left enabled because another project still references the *shared* source at
-  # a host that enables a plugin machine-wide) is covered elsewhere:
-  # `clean-shared-ref-guard.integration.test.ts` and
-  # `tests/e2e/clean-shared-ref-codex.e2e.test.ts`, never here.
+  # The shared-ref guard's negative control: $MKT is unique per run, never the reserved name,
+  # so `references.json` never tracks it and a non-shared source is torn down in full at every
+  # host. The guarded path itself is unobservable here and is covered by
+  # `clean-shared-ref-guard.integration.test.ts` and `tests/e2e/clean-shared-ref-codex.e2e.test.ts`.
   if [[ -n "${PRESENT[codex]:-}" ]]; then
     if grep -qF "\"$REF\"" "$HOME/.codex/config.toml" 2>/dev/null; then
       bad "codex: config.toml still names $REF after clean"
     else
       ok "codex: config.toml carries no trace of $REF"
     fi
-    # Measured: `codex plugin remove` deletes a marketplace's cached content but
-    # leaves the now-empty cache/$MKT/ shell behind — the residue that reached this
-    # real $HOME on every smoke:real run before `clean` learned to purge an empty one.
-    # Same non-vacuity guard as claude's above: `CODEX_CACHE_BEFORE` is captured right
-    # after `plugin install`, so an absent directory here is proven gone, not merely
-    # never populated.
+    # `codex plugin remove` deletes a marketplace's cached content but leaves the empty
+    # `cache/$MKT/` shell, which `clean` purges. Same non-vacuity guard as claude's above:
+    # `CODEX_CACHE_BEFORE` makes an absent directory proven gone, not merely never populated.
     if [[ "$CODEX_CACHE_BEFORE" != "present" ]]; then
       bad "codex: plugins/cache/$MKT was never proven present before clean ran"
     elif [[ -d "$HOME/.codex/plugins/cache/$MKT" ]]; then
@@ -464,9 +378,8 @@ cleanup() {
     fi
   fi
 
-  # The machine-scope name, at every host that could hold it. Separate from the block
-  # above on purpose: `$MKT` is undone by a project's own `clean`, `$MKT_USER` only by
-  # `clean --scope user`, and a run where one worked and the other did not must say so.
+  # Separate from the block above: `$MKT` is undone by a project's own `clean`, `$MKT_USER`
+  # only by `clean --scope user`, and a run where one worked and the other did not must say so.
   if [[ -n "${PRESENT[claude]:-}" ]]; then
     grep -qF "\"$MKT_USER\"" "$HOME/.claude/plugins/known_marketplaces.json" 2>/dev/null \
       && bad "claude: known_marketplaces.json still carries $MKT_USER after clean --scope user" \
@@ -495,10 +408,8 @@ cleanup() {
       || ok "cursor: ~/.cursor/plugins/local/$MKT_USER is gone after clean --scope user"
   fi
 
-  # Nothing of aidd's own machine state left under the relocated config dir. Measured
-  # (`clean-user` phase): `marketplaces.json` deliberately survives — the whitelist
-  # deletes the reserved `aidd-framework` entry alone out of it — so it is not asserted
-  # absent here; what must be gone is everything the whitelist does name.
+  # `marketplaces.json` survives on purpose: the whitelist deletes the reserved
+  # `aidd-framework` entry alone out of it. What must be gone is everything else it names.
   for leftover in manifest.json references.json cache/built; do
     [[ -e "$AIDD_USER_CONFIG_DIR/$leftover" ]] \
       && bad "user config dir: $leftover survives clean --scope user ($AIDD_USER_CONFIG_DIR/$leftover)" \
@@ -557,12 +468,10 @@ if [[ -n "${PRESENT[cursor]:-}" ]]; then
     || bad "cursor: ~/.cursor/plugins/local/$MKT/.cursor-plugin/plugin.json missing"
 fi
 
-# `cleanup`'s own cache/$MKT checks below are otherwise vacuous: an absent directory
-# after `clean` proves nothing unless this run also watched it exist first. Path
-# fragments here (`.claude/plugins/cache`, `.codex/plugins/cache`) are the same ones
-# `claude/profile.ts` and `codex/profile.ts` declare as `NativeActivation.pluginCacheDir`
-# — pinned to that source by `scripts/__tests__/smoke-real-plugin-cache-path-parity.test.js`,
-# since this script cannot call into the built CLI to read the path back out.
+# Without this, `cleanup`'s cache checks are vacuous: an absent directory after `clean` proves
+# nothing unless this run watched it exist first. The path fragments below are literals of what
+# each profile declares as `NativeActivation.pluginCacheDir`, since this script cannot read it
+# back out of the built CLI; `smoke-real-plugin-cache-path-parity.test.js` pins them to it.
 if [[ -n "${PRESENT[claude]:-}" ]]; then
   if [[ -d "$HOME/.claude/plugins/cache/$MKT" ]]; then
     CLAUDE_CACHE_BEFORE="present"
@@ -580,14 +489,9 @@ if [[ -n "${PRESENT[codex]:-}" ]]; then
   fi
 fi
 
-# Checks the one thing this run put in doctor's hands: whether it names $REF as an
-# unregistered drift. Not doctor's overall exit code — the framework fixture this
-# script installs ships an opencode skill with a deliberately broken relative link
-# (`tests/fixtures/framework/plugins/aidd-test/skills/hello.md`), which keeps doctor
-# at exit 1 on a `Warning` severity throughout this run regardless of native
-# registration. `smoke-tools.sh` already accepts that same ambiguity for its own
-# bare `doctor` check (`run "doctor" "0|1" ...`); asserting the precise message is
-# what actually verifies lot 1 without also asserting an unrelated fixture quirk.
+# Matches doctor's drift message, never its exit code: the fixture installed here ships a
+# deliberately broken relative link, which holds doctor at exit 1 on a `Warning` throughout
+# the run whatever the native registration says.
 doctor_names_ref() {
   local label="$1" want="$2" # want: "absent" (registered) or "present" (drift, names the fix)
   local proj="${3:-$PROJ}" ref="${4:-$REF}"
@@ -610,14 +514,9 @@ doctor_names_ref "doctor: $REF registered, no drift error" absent
 
 if [[ -n "${PRESENT[claude]:-}" ]]; then
   section "doctor after the HOST's own binary drops a registration (claude)"
-  # `--scope local` is not decoration: aidd now enables a project-scope plugin at
-  # claude's own `--scope local` (`NativePluginActivator.enablePlugin`'s scope
-  # parameter, `architecture.md`), and measured against the real binary, a scopeless
-  # `claude plugin uninstall` defaults to `user` and refuses outright —
-  # `Plugin "<ref>" is installed in local scope, not user. Use --scope local to
-  # uninstall.` It exits non-zero, which `"0|1"` accepts, so the phase used to sail
-  # past a host that had dropped nothing and then fail on the drift that never
-  # happened. Naming the scope is what makes this phase drop a registration at all.
+  # `--scope local` is load-bearing: aidd enables a project-scope plugin there, and a
+  # scopeless `claude plugin uninstall` defaults to `user` and refuses — non-zero, which
+  # `"0|1"` accepts, so without the scope this phase would drop no registration at all.
   run "claude plugin uninstall $REF" "0|1" "" "$PROJ" -- \
     claude plugin uninstall "$REF" --scope local --yes
   doctor_names_ref "doctor: $REF drift detected after host-side uninstall, names aidd sync" present
@@ -658,11 +557,8 @@ if [[ -n "${PRESENT[opencode]:-}" ]]; then
   elif grep -qiE "auth|api key|provider|not logged in|credential" "$run_out"; then
     skip "opencode run: needs provider auth on this machine (real limitation, not a defect) — exit $oc_rc"
   elif [[ "$oc_rc" -eq 142 ]]; then
-    # Measured twice on this machine: opencode prints only its own session banner
-    # (e.g. "> build · <slug>") and then hangs the full 60s with no provider reply and
-    # no error. That is not evidence the bridge is broken, nor that it works — the
-    # same ambiguity the design plan already named for this exact check (no
-    # `session.created` signal to fall back on without a configured provider).
+    # Without a configured provider opencode prints its session banner and then hangs with no
+    # reply and no error, which is evidence neither way about the bridge.
     skip "opencode run: timed out after 60s with no auth/error/completion signal (see log) — inconclusive without a configured provider"
   else
     bad "opencode run: exit $oc_rc, no auth signature (see log)" "$(cat "$run_out")"
@@ -673,16 +569,10 @@ else
 fi
 
 # --- Phase C1: the guard refuses a genuinely different catalog under the same name ---
-# Identity is a catalog's own declared name plus its plugin set, never a resolved path
-# and never the version (`marketplace-source-conflict.ts`) — so the fixture built here
-# still declares itself `$MKT` (the same catalog name Phase B already registered
-# natively), but drops the one plugin the original fixture carries, leaving a
-# genuinely different plugin set under the same name. Registered locally under a fresh
-# alias, `$MKT-conflict`, so `marketplace add` itself succeeds at writing this
-# project's own registry entry — the refusal this phase measures comes from `sync`
-# re-driving native activation afterward, the same guard `aidd marketplace add` already
-# ran into once and that every later `sync` must refuse identically, not only the add
-# that happened to trip over it first.
+# Identity is a catalog's declared name plus its plugin set, never a path and never a version
+# (`marketplace-source-conflict.ts`), so this fixture keeps the name `$MKT` and drops its one
+# plugin. The alias `$MKT-conflict` lets `marketplace add` write the project's own entry: the
+# refusal measured here is `sync` re-driving activation, which must refuse identically.
 if [[ -n "${PRESENT[claude]:-}" ]]; then
   section "sync refuses a different catalog registered under the same name ($MKT, fewer plugins)"
   MKT2_FIXTURE="$TMPROOT/fixture-conflict"
@@ -714,22 +604,18 @@ if [[ -n "${PRESENT[claude]:-}" ]]; then
   fi
   rm -f "$sync_out"
 
-  # Leave the project as Phase B left it: with the conflicting catalog still declared,
-  # every later activation of this project (Phase C2's `marketplace add`, the trap's
-  # `clean`) would re-run into the same refusal, and the phase would be measuring its
-  # own residue rather than the capability it names.
+  # Leaves the project as Phase B left it: a conflicting catalog still declared would make
+  # every later activation re-run into this refusal and measure its own residue.
   run "marketplace remove $MKT-conflict (restores the project's state)" 0 "" "$PROJ" -- \
     node "$CLI" marketplace remove "$MKT-conflict" --yes
 else
   skip "sync refuses a different catalog under the same name (claude not installed)"
 fi
 
-# --- Phase C2: this project's own local alias is free to differ from what its ------
-# catalog declares itself under — a supported capability, never a fault. A brand-new
-# catalog name here, never registered by this run before, so nothing in Phase C1 can
-# make this one collide: the point is that the alias (`$MKT-alias`) and the catalog's
-# own declared name (`$MKT-upstream`) are simply different strings, and `marketplace
-# add` still succeeds.
+# --- Phase C2: a local alias may differ from the catalog's own declared name -------
+# A supported capability, never a fault. The catalog name is brand new to this run, so
+# nothing in Phase C1 can make it collide: alias and declared name are simply different
+# strings, and `marketplace add` still succeeds.
 if [[ -n "${PRESENT[claude]:-}" ]]; then
   section "marketplace add registers freely when the local alias differs from the catalog's own name"
   MKT3_FIXTURE="$TMPROOT/fixture-alias"
@@ -749,16 +635,9 @@ if [[ -n "${PRESENT[claude]:-}" ]]; then
   run "marketplace add $MKT-alias (catalog declares $UPSTREAM_NAME)" 0 "" "$PROJ" -- \
     node "$CLI" marketplace add "$MKT-alias" "$MKT3_FIXTURE" --scope project --yes
 
-  # Lot 9, item C: `marketplace add` now narrows the sync it re-drives to the
-  # marketplace it just registered ($MKT-alias) alone — the real-binary confirmation
-  # that `recordNativeRegistrations`'s keyed replacement, not a plain replace, is what
-  # actually shipped. A plain replace would have wiped $MKT's own nativeRegistrations
-  # entry (registered earlier in this run, untouched by this add) the moment this add
-  # ran — but that entry lives in *this project's own* `.aidd/manifest.json`, never in
-  # claude's registry: nothing here ever asks claude to remove $MKT, so
-  # known_marketplaces.json still names it whether the merge is keyed or a plain
-  # replace, and grepping it (the earlier version of this check) confirmed nothing.
-  # The manifest is the only artifact a plain replace would have actually corrupted.
+  # `marketplace add` narrows the sync it re-drives to what it registered, so
+  # `recordNativeRegistrations` must merge by key: a plain replace would drop $MKT's entry.
+  # Only the manifest can show that — no host registry is asked to remove $MKT here.
   if node -e '
     const fs = require("node:fs");
     const [proj, mkt] = process.argv.slice(1);
@@ -774,21 +653,16 @@ if [[ -n "${PRESENT[claude]:-}" ]]; then
     bad "claude: .aidd/manifest.json lost $MKT's nativeRegistrations after a marketplace add narrowed to $MKT-alias"
   fi
 
-  # `activateTool` registers every known marketplace, plugin or not (see
-  # `marketplace-sync-settings-use-case.ts`), so `clean --force` in the trap below
-  # already knows to unregister $UPSTREAM_NAME through nativeRegistrations — no
-  # separate teardown needed here.
+  # `activateTool` registers every known marketplace, plugin or not, so the trap's own
+  # `clean --force` already unregisters $UPSTREAM_NAME. No teardown needed here.
 else
   skip "marketplace add alias-divergence capability (claude not installed)"
 fi
 
 # --- Phase D: `--scope user` writes nothing under a project ---------------------
-# First of the machine-scope phases on purpose: it is what creates the user manifest,
-# and `clean --scope user` — the only thing that can undo a machine-scope registration
-# — reads its `nativeRegistrations` and nothing else. Registering `$MKT_USER` before
-# that manifest exists would leave a window where a crash strands the registration at
-# every host with nothing left able to name it (`cleanup_user_scope` recovers from it,
-# but a phase order that never opens the window is the cheaper guarantee).
+# First of the machine-scope phases on purpose: it creates the user manifest, and
+# `clean --scope user` reads that and nothing else. Registering `$MKT_USER` first would open
+# a window where a crash strands the registration at every host with nothing able to name it.
 USER_AI_LIST=$(user_ai_list)
 section "setup --scope user (machine-wide, nothing under the project)"
 if [[ -n "$USER_AI_LIST" ]]; then
@@ -805,11 +679,9 @@ if [[ -n "$USER_AI_LIST" ]]; then
     && ok "scope user: userConfigDir()/manifest.json exists" \
     || bad "scope user: userConfigDir()/manifest.json missing after setup --scope user"
 
-  # Exit 0, measured: a user manifest whose tool entries carry no `nativeRegistrations`
-  # yet gives `DoctorRegistrationUseCase` nothing to compare, so it reports no issue at
-  # all and prints `User-scope installation is healthy`. Unlike the project-scope
-  # `doctor` this script runs, nothing here is at the mercy of the fixture's own broken
-  # opencode link: `--scope user` checks registration alone, never a tracked file.
+  # A user manifest carrying no `nativeRegistrations` yet gives `DoctorRegistrationUseCase`
+  # nothing to compare, so this exits 0 — and unlike project scope it never reads a tracked
+  # file, so the fixture's own broken opencode link cannot reach it.
   run "doctor --scope user" 0 "User-scope installation is healthy" "$PROJ_U" -- \
     node "$CLI" doctor --scope user
 else
@@ -817,13 +689,10 @@ else
 fi
 
 # --- Phase E: two projects, one machine-scope source ----------------------------
-# The capability §1.5 of the design plan names: a second project on the same machine
-# must not be refused by codex or copilot. It is a machine-scope registration that
-# makes that true — both projects resolve the *same* built tree under
-# `userConfigDir()/cache/built/<version>/<name>/<tool>`, so neither host ever sees a
-# second source under a name it already holds. The phase asserts that path itself, not
-# only an exit code: a build landing under either project's own `.aidd/cache/` is the
-# pre-migration shape this whole scope exists to retire.
+# A second project on the same machine must not be refused by codex or copilot: both resolve
+# the same built tree under `userConfigDir()/cache/built/<version>/<name>/<tool>`, so no host
+# sees a second source under a name it holds. The path is asserted, not only the exit code — a
+# build under either project's own `.aidd/cache/` is the pre-migration shape being retired.
 section "two projects share one machine-scope marketplace ($MKT_USER)"
 if [[ -n "$USER_AI_LIST" ]]; then
   PROJ_A=$(mktemp -d "$TMPROOT/proj-a.XXXXXX"); (cd "$PROJ_A" && git init -q)
@@ -839,9 +708,8 @@ if [[ -n "$USER_AI_LIST" ]]; then
   run "marketplace add $MKT_USER --scope user (project A)" 0 "" "$PROJ_A" -- \
     node "$CLI" marketplace add "$MKT_USER" "$USER_FIXTURE" --scope user --yes
 
-  # Asserted here, between the `add` and the `sync` below, so the path measured is the
-  # one `marketplace add` itself wrote: both writers resolve `userBuiltMarketplaceDir`,
-  # and a divergence between them would otherwise be invisible.
+  # Between the `add` and the `sync`, so the path measured is the one `marketplace add` wrote:
+  # both writers resolve `userBuiltMarketplaceDir`, and a divergence would otherwise hide.
   user_built_root="$AIDD_USER_CONFIG_DIR/cache/built"
   registers_under_user_config() {
     local label="$1" file="$2"
@@ -863,11 +731,9 @@ if [[ -n "$USER_AI_LIST" ]]; then
       || ok "claude: no registration of $MKT_USER points inside $(basename "$p")"
   done
 
-  # Records the registration in the user manifest, so `clean --scope user` (the phase
-  # below, and `cleanup`) has something to undo — `undoNativeRegistrations` reads that
-  # manifest and nothing else. Guarded rather than assumed: with an empty registry,
-  # `sync --scope user` runs `ensureFrameworkRegistered`, which registers the reserved
-  # `aidd-framework` name — exactly what this script must never do on a real machine.
+  # Records the registration in the user manifest, the only thing `undoNativeRegistrations`
+  # reads. Guarded, not assumed: against an empty registry `sync --scope user` would run
+  # `ensureFrameworkRegistered` and take the reserved name on a real machine.
   if grep -qF "\"$MKT_USER\"" "$AIDD_USER_CONFIG_DIR/marketplaces.json" 2>/dev/null; then
     run "sync --scope user records the registration" 0 "" "$PROJ_U" -- \
       node "$CLI" sync --scope user
@@ -880,11 +746,8 @@ if [[ -n "$USER_AI_LIST" ]]; then
       node "$CLI" plugin install "$MKT_USER" --tool "$t" --from "$MKT_USER" --yes
   done
 
-  # Measured: aidd's own registry refuses a name it already holds at user scope, before
-  # any host is reached — `Marketplace '<name>' is already registered.`, exit 1. That is
-  # the honest behaviour, and it is not the §1.5 failure: the second project does not
-  # need to add anything, since the entry is already machine-wide. What it must be able
-  # to do is install from it, which is what the loop below measures at every host.
+  # aidd's own registry refuses a name it already holds at user scope before any host is
+  # reached. Not a failure: the second project needs no add, only the install below.
   run "marketplace add $MKT_USER --scope user (project B) is refused as already registered" \
     1 "is already registered" "$PROJ_B" -- \
     node "$CLI" marketplace add "$MKT_USER" "$USER_FIXTURE" --scope user --yes
@@ -911,12 +774,9 @@ if [[ -n "$USER_AI_LIST" ]]; then
       || bad "copilot: settings.json does not enable $REF_USER"
   fi
 
-  # `references.json` tracks the reserved name alone: every write site gates on
-  # `frameworkSourceIsShared(name, scope)`, which is
-  # `name === FRAMEWORK_MARKETPLACE_NAME && scope === "user"`
-  # (`application/shared/shared-source-reference-support.ts`). A unique machine-scope
-  # name records nothing, so this asserts absence rather than the two project roots a
-  # reference registry that covered every shared source would carry.
+  # `references.json` tracks the reserved name alone — every write site gates on
+  # `frameworkSourceIsShared(name, scope)` — so a unique machine-scope name records nothing
+  # and absence is what this asserts.
   if [[ ! -f "$AIDD_USER_CONFIG_DIR/references.json" ]]; then
     ok "references.json: absent — only the reserved framework name is ever tracked there"
   elif grep -qF "$PROJ_A" "$AIDD_USER_CONFIG_DIR/references.json" 2>/dev/null; then
@@ -930,12 +790,9 @@ else
 fi
 
 # --- Phase F: a project's own clean leaves the shared registration alone ---------
-# `undoMarketplaceRegistration` refuses to unregister any marketplace whose recorded
-# scope is `"user"` — keyed on the scope, not on the reserved name — and says so. What
-# it does *not* protect is the plugin ref itself: `uninstallPlugin` runs for every ref
-# this project recorded, and at codex and copilot that ref is one global key, so
-# project B loses its enablement to project A's `clean`. Measured, and asserted here as
-# what it is: the marketplace survives, the ref does not, and `sync` in B repairs it.
+# `undoMarketplaceRegistration` refuses any marketplace whose recorded scope is `"user"`,
+# keyed on the scope and not the reserved name. It does not protect the plugin ref: at codex
+# and copilot that is one global key, so project B loses its enablement and repairs by `sync`.
 section "clean --force in project A leaves the shared marketplace registered"
 if [[ -n "$USER_AI_LIST" && -d "${PROJ_A:-}/.aidd" && -n "${PROJ_B:-}" ]]; then
   run "clean --force (project A)" 0 "is shared by every project on this machine" "$PROJ_A" -- \
@@ -951,12 +808,9 @@ if [[ -n "$USER_AI_LIST" && -d "${PROJ_A:-}/.aidd" && -n "${PROJ_B:-}" ]]; then
   [[ -n "${PRESENT[codex]:-}" ]] && survives "codex" "$HOME/.codex/config.toml"
   [[ -n "${PRESENT[copilot]:-}" ]] && survives "copilot" "$HOME/.copilot/settings.json"
 
-  # `doctor_names_ref present` matches on `does not carry <ref>`, which is codex's own
-  # wording for a ref its registry lost. Copilot words the same loss differently
-  # (`carries <ref> and records it disabled`, its own uninstall convention) and cursor
-  # differently again, so on a machine without codex this drift is reported and still
-  # not matched — gated rather than widened, so what it measures stays one host's
-  # message and not a disjunction nobody reads.
+  # `doctor_names_ref present` matches `does not carry <ref>`, codex's own wording for a lost
+  # ref; copilot and cursor word the same loss differently. Gated on codex rather than widened
+  # into a disjunction, so what it measures stays one host's message.
   if [[ -n "${PRESENT[codex]:-}" ]]; then
     doctor_names_ref "doctor (project B): $REF_USER drift after project A's clean, names aidd sync" \
       present "$PROJ_B" "$REF_USER"
@@ -974,9 +828,8 @@ fi
 # --- Phase G: clean --scope user is what purges machine scope --------------------
 section "clean --scope user --force"
 if [[ -n "$USER_AI_LIST" && -f "$AIDD_USER_CONFIG_DIR/manifest.json" && -n "${PROJ_B:-}" ]]; then
-  # Project B still holds plugin refs on the shared source; its own `clean` must run
-  # first, exactly as `clean --scope user`'s own output instructs when `references.json`
-  # names other projects.
+  # Project B still holds plugin refs on the shared source, so its own `clean` runs first —
+  # what `clean --scope user` instructs when `references.json` names other projects.
   if [[ -d "$PROJ_B/.aidd" ]]; then
     run "clean --force (project B) before the machine-scope purge" 0 "" "$PROJ_B" -- \
       node "$CLI" clean --force
@@ -988,31 +841,25 @@ if [[ -n "$USER_AI_LIST" && -f "$AIDD_USER_CONFIG_DIR/manifest.json" && -n "${PR
       && bad "clean --scope user: $gone survives under the user config dir" \
       || ok "clean --scope user: $gone is gone"
   done
-  # Measured, and deliberately not called a failure: the whitelist removes the reserved
-  # `aidd-framework` entry alone out of `marketplaces.json`
-  # (`clean-user-scope-use-case.ts`'s `marketplaceRegistry.delete(projectRoot,
-  # FRAMEWORK_MARKETPLACE_NAME, "user")`), so any other machine-scope entry is left
-  # declared, pointing at a build this same run just deleted. Asserted as the behaviour
-  # that exists, so a change to it is noticed here rather than discovered later.
+  # Not a failure: the whitelist removes the reserved `aidd-framework` entry alone out of
+  # `marketplaces.json`, so another machine-scope entry is left declared, pointing at a build
+  # this run just deleted. Asserted as it is, so a change to it is noticed here.
   if grep -qF "\"$MKT_USER\"" "$AIDD_USER_CONFIG_DIR/marketplaces.json" 2>/dev/null; then
     ok "clean --scope user: marketplaces.json still declares $MKT_USER (only the reserved name is dropped)"
   else
     bad "clean --scope user: marketplaces.json no longer declares $MKT_USER — the whitelist used to drop the reserved name alone; if that changed on purpose, this assertion is what needs updating"
   fi
 
-  # The host-side proof lives in `cleanup` below, which checks every registry for both
-  # names however the run ended — asserting it twice here would only make a green run
-  # longer, not more honest.
+  # The host-side proof lives in `cleanup`, which checks every registry for both names
+  # however the run ended.
 else
   skip "clean --scope user --force (no user manifest — the scope-user phase never ran)"
 fi
 
 # --- Phase G2: clean --scope user with no user manifest at all -------------------
-# The state a plain project-scope `setup` leaves: no `--scope user` manifest was ever
-# written, yet `userConfigDir()` still carries the whitelist's own occupants. Steps (1)
-# to (3) have nothing recorded to undo and are skipped; step (4) runs regardless. Driven
-# against its own config dir so it needs the main one neither manifest-free nor intact,
-# and it reaches no host binary at all.
+# The state a plain project-scope `setup` leaves: no user manifest, yet `userConfigDir()`
+# still carries the whitelist's occupants, so steps (1)-(3) are skipped and step (4) runs
+# regardless. Driven against a config dir of its own, and it reaches no host binary.
 section "clean --scope user --force with no user manifest"
 NO_MANIFEST_CONFIG="$TMPROOT/config-no-manifest"
 NO_MANIFEST_PROJ=$(mktemp -d "$TMPROOT/proj-referencing.XXXXXX")

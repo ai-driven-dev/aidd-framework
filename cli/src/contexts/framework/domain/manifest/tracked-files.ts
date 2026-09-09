@@ -1,8 +1,7 @@
 import { FileHash, type InstallationFile } from "../../../../kernel/file.js";
 
-// ── TrackedFile ──────────────────────────────────────────────────────────────
-// One tool's paths and hashes: what was written, and (for framework-owned files) where
-// it came from in the source tree.
+// One tool's paths and hashes: what was written, and, for a framework-owned file, where it came
+// from in the source tree.
 
 export interface TrackedFile {
   readonly relativePath: string;

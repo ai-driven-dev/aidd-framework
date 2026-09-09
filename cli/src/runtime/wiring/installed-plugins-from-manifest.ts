@@ -5,14 +5,9 @@ import type {
 } from "../../contexts/telemetry/domain/ports/installed-plugins-reader.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../kernel/tool.js";
 
-/**
- * Answers telemetry's `InstalledPluginsReader` from the installation manifest.
- *
- * It lives here, in the composition root, because it belongs to neither side: telemetry
- * states what it needs to know, framework keeps the record, and something has to translate
- * one into the other. Putting it in either context would be that context reaching into the
- * other's vocabulary, which is the thing the two ports exist to stop.
- */
+/** In the composition root because it belongs to neither side: telemetry states what it
+ * needs, framework keeps the record, and either context translating for the other would be
+ * the reach into another's vocabulary the two ports exist to stop. */
 export function installedPluginsFromManifest(repo: ManifestRepository): InstalledPluginsReader {
   return {
     path: repo.path,

@@ -20,9 +20,8 @@ describe("resolveScopeForInstall()", () => {
 
 describe("resolveBaseDirFromRecord() — the manifest's recorded scope, not the profile", () => {
   it("resolves project scope to projectRoot regardless of what the tool's profile says", () => {
-    // cursor's own profile declares installScope "user" — a manifest entry recorded
-    // scope: "project" must still resolve under projectRoot, never under the
-    // user-scope plugins dir the profile would otherwise pick.
+    // cursor's own profile declares installScope "user", so a manifest entry recorded
+    // scope: "project" must still resolve under projectRoot.
     const baseDir = resolveBaseDirFromRecord("project", "cursor", "/proj", homedir);
     expect(baseDir).toBe("/proj");
     expect(baseDir).not.toContain(join(".cursor", "plugins", "local"));
@@ -33,10 +32,8 @@ describe("resolveBaseDirFromRecord() — the manifest's recorded scope, not the 
     expect(baseDir).toBe(join(HOME, ".cursor", "plugins", "local"));
   });
 
-  // The guard: a "user" scope the tool's current profile cannot explain must refuse
-  // to guess, not quietly resolve under projectRoot. Mutation that proves it: replace
-  // the throw with `?? projectRoot` and this test goes red, because claude's profile
-  // declares no user-scope plugins directory at all.
+  // A "user" scope the tool's current profile cannot explain must refuse to guess rather
+  // than quietly resolve under projectRoot; claude declares no user-scope directory at all.
   it("throws, rather than falling back to projectRoot, when the tool declares no user-scope directory", () => {
     expect(() => resolveBaseDirFromRecord("user", "claude", "/proj", homedir)).toThrow(
       UnresolvableUserScopeError

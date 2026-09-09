@@ -32,11 +32,9 @@ const PLUGIN_MANIFEST_PATHS: readonly string[] = [
 interface TranslatedFile {
   relativePath: string;
   content: string;
-  /** An artefact, not prose: copied byte for byte, with no frontmatter round-trip and no
-   * path rewriting. A skill's `scripts/` and a hook's `lib/` hold executable files, and
-   * rewriting a path inside one silently corrupts it — measured: Codex's and Copilot's
-   * rewrites change a bundled script by six and one bytes respectively, which is a file
-   * that no longer parses. Prose is translated; artefacts are carried. */
+  /** An artefact, not prose: copied byte for byte, with no frontmatter round-trip and no path
+   * rewriting. Codex's and Copilot's own rewrites change a bundled script by six and one bytes
+   * respectively, which is a file that no longer parses. */
   verbatim?: true;
 }
 
@@ -142,14 +140,12 @@ export class PluginContentTranslator {
       const translated = this.translateFile(file, tool);
       if (translated === null) continue;
       const hooked = this.maybeConvertHooks(file.relativePath, translated.content, tool);
-      // Prose is rewritten, an artefact is carried byte for byte. Without this a script
-      // survived only where the tool's own rewrite happened to leave it alone, which is
-      // luck rather than a guarantee.
+      // Prose is rewritten, an artefact is carried byte for byte: a tool's own rewrite leaving
+      // a script intact is luck rather than a guarantee.
       const rewritten = isProse(file.relativePath) ? tool.rewriteContent(hooked) : hooked;
-      // The plugin-root variable is a path, not prose: a hook manifest and an mcp manifest
-      // both name one, in JSON. Gating it on prose left every tool but Claude — whose token
-      // is the source spelling — installing a hook that points at a variable its own runtime
-      // never expands. Only a file carried verbatim keeps its own bytes here.
+      // The plugin-root variable is a path, not prose: a hook manifest and an mcp manifest both
+      // name one, in JSON. Gating it on prose left every tool but Claude installing a hook that
+      // points at a variable its own runtime never expands.
       const content =
         translated.verbatim === true ? rewritten : this.rewritePluginRoot(rewritten, tool);
       const installedPath = `${pluginRoot}${translated.relativePath}`;
@@ -218,10 +214,9 @@ export class PluginContentTranslator {
       if (file.relativePath === `${PLUGIN_HOOKS_DIR}/hooks.json`) {
         return { relativePath: cap.hooksRelativePath, content: file.content };
       }
-      // Everything under `hooks/` but its own manifest is a script the host runs. It goes
-      // beside the manifest, and where the manifest sits at the plugin root it keeps its
-      // own directory — a script at the root would leave the command naming `hooks/`
-      // pointing at nothing.
+      // Everything under `hooks/` but its own manifest is a script the host runs. It goes beside
+      // the manifest, and where the manifest sits at the plugin root it keeps its own directory
+      // — a script at the root would leave the command naming `hooks/` pointing at nothing.
       const manifestDir = parentDirOf(cap.hooksRelativePath) || PLUGIN_HOOKS_DIR;
       return {
         relativePath: `${manifestDir}/${pathBelow(PLUGIN_HOOKS_DIR, file.relativePath)}`,
@@ -273,11 +268,9 @@ export class PluginContentTranslator {
     return { files: result, skipped };
   }
 
-  // hooks/hooks.json is a manifest a merge reads, never a runtime module a loader
-  // scans for, so it describes the wrong shape here and is never delivered.
-  // Everything else under hooks/ is carried verbatim, namespaced per plugin under
-  // flatHooksDir — unless it is that loader's own plugin module (flatHooksLoaderEntry),
-  // which is delivered flat and renamed instead. See flatHooksPathWithLoaderEntry.
+  // hooks/hooks.json is a manifest a merge reads, never a runtime module a loader scans for, so
+  // it is never delivered here. Everything else under hooks/ is carried verbatim, namespaced per
+  // plugin — unless it is that loader's own plugin module, delivered flat and renamed instead.
   private flatHooksFiles(dist: PluginDistribution, tool: AiTool<HasPlugins>): InstallationFile[] {
     const { flatHooksDir, flatHooksLoaderEntry, flatHooksBridge } = tool.capabilities.plugins;
     if (flatHooksDir === null) return [];
@@ -298,10 +291,9 @@ export class PluginContentTranslator {
     return bridge === null ? scripts : [...scripts, bridge];
   }
 
-  // The install-time counterpart of FlatBuildStrategy's own writeHooksBridgeIfDeclared:
-  // `setup`/`plugin install` reach OpenCode through this translator, never through the
-  // build strategy, so without this a plugin's hooks trigger on OpenCode only for a tree
-  // `translate` produced, not one `setup` installed into a project directly.
+  // The install-time counterpart of the flat build strategy's own bridge write: `setup` and
+  // `plugin install` reach OpenCode through this translator, never through the build strategy,
+  // so without this a plugin's hooks trigger only on a tree `translate` produced.
   private flatHooksBridgeFile(
     dist: PluginDistribution,
     bridge: FlatHooksBridge | null
@@ -354,9 +346,8 @@ export class PluginContentTranslator {
     if (!sectionPresent(tool, section)) return null;
     const sectionDir = `${section}/`;
     const fileName = file.relativePath.slice(sectionDir.length);
-    // Same rule as the native path: prose is rewritten, an artefact is carried. A flat
-    // install rewrote every file it carried, so a script survived here only where a tool's
-    // own rewrite happened to leave it alone — which is luck, not a guarantee.
+    // Same rule as the native path: prose is rewritten, an artefact is carried. Rewriting every
+    // flat file left a script intact only where a tool's own rewrite happened to spare it.
     const content = isProse(file.relativePath) ? tool.rewriteContent(file.content) : file.content;
     return this.makeFile(`${tool.directory}${section}/${pluginName}/${fileName}`, content);
   }
@@ -396,9 +387,8 @@ function sectionPresent(tool: AiTool<HasPlugins>, section: "agents" | "rules" | 
   return section in (tool.capabilities as object);
 }
 
-/** Prose is translated; anything else a plugin ships is an artefact, carried byte for
- * byte. The extension is the whole test: a plugin's components are markdown by definition,
- * and everything beside them — a script, a template, a fixture — is not. */
+/** Prose is translated; anything else a plugin ships is an artefact, carried byte for byte. The
+ * extension is the whole test: a plugin's components are markdown by definition. */
 function isProse(relativePath: string): boolean {
   return relativePath.endsWith(MARKDOWN_EXTENSION);
 }
@@ -465,9 +455,8 @@ function translateMarkdown(
 }
 
 /** A skill is prose with frontmatter; anything else under `skills/` is an asset the skill
- * carries — a script it runs, a template it copies. Translating an asset would put it
- * through a frontmatter round-trip and a path rewrite, neither of which is meaningful for
- * a file that is not prose and both of which can damage it. */
+ * carries. A frontmatter round-trip and a path rewrite are meaningless for a file that is not
+ * prose, and both can damage it. */
 function translateSkill(file: PluginComponentFile, cap: SkillCap): TranslatedFile {
   if (!isProse(file.relativePath)) {
     return { relativePath: file.relativePath, content: file.content, verbatim: true };

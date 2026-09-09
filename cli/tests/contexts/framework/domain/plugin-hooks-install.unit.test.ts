@@ -9,11 +9,8 @@ import { PluginContentTranslator } from "../../../../src/contexts/translate/doma
 import { PluginDistribution } from "../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { FileHash } from "../../../../src/kernel/file.js";
 
-/**
- * A hook that arrives is not a hook that runs. Each of these installs a plugin whose hook
- * names the plugin root and whose script sits beside it, then reads what landed — because
- * every failure this covers installed cleanly and did nothing.
- */
+/** A hook that arrives is not a hook that runs: every failure this covers installed cleanly
+ * and did nothing. */
 
 const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };
 const translator = new PluginContentTranslator(stubHasher);
@@ -75,10 +72,8 @@ describe("installing a plugin that ships hooks", () => {
   });
 
   it("resolves the root itself for a tool whose whole hook format is rewritten", () => {
-    // Cursor's converter turns the root into a path relative to the plugin, which is a
-    // third answer to the same question — the build route writes ${CURSOR_PLUGIN_ROOT}
-    // for the same plugin. Pinned as the divergence it is: Cursor is the one tool whose
-    // hooks could not be observed running, so neither answer has been checked against it.
+    // Cursor's converter turns the root into a path relative to the plugin, a third answer
+    // to the same question, and its hooks are the one set that could not be observed running.
     const manifest = contentEndingWith(installedFor(cursor), "hooks.json") ?? "";
 
     expect(manifest).toContain('"command": "node ./hooks/journal.cjs session-start"');
@@ -95,9 +90,8 @@ describe("installing a plugin that ships hooks", () => {
   });
 
   it("points an mcp server at the plugin root the target tool expands", () => {
-    // The one place the substitution changes an installed byte today: a hook manifest for
-    // Cursor is rewritten wholesale by its own converter, and every other tool expands the
-    // spelling the source already uses.
+    // The one place the substitution changes an installed byte: Cursor's own converter
+    // rewrites a hook manifest wholesale, every other tool expands the source's spelling.
     for (const tool of HOOK_HOSTS) {
       const served = contentEndingWith(
         installedFor(tool),

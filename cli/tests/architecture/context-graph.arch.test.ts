@@ -1,26 +1,8 @@
 /**
- * The chain the whole plan rests on, as a graph rather than a paragraph.
- *
- * `arborescence.md` invariant 2 allows exactly these edges between contexts:
- * `framework → translate`, `translate → tools`, `framework → distribution`, and every
- * context to the kernel. `framework → tools` is allowed too: framework installs for a
- * tool and must name it.
- *
- * Per-file biome overrides cannot see this. They match the text of a specifier, not the
- * path it resolves to, and they answer one file at a time — which is how twenty-three
- * forbidden edges survived until the graph was drawn.
- *
- * Since phase 16 the two non-context layers have names and a direction of their own:
- * `presentation` speaks to a human and may depend on anything below it, `runtime` wires
- * and provides technical services. Invariant 1 says the arrows run one way — presentation
- * to contexts to kernel — so a context reaching back into either is recorded here rather
- * than left to prose. It was left to prose until now, and three such imports appeared
- * without a test noticing.
- *
- * ALLOWED, BASELINE and the edge-walking machinery live in `helpers.ts` now: this is the
- * one place they are declared, so `biome-context-parity.arch.test.ts` checks
- * `cli/biome.json`'s own per-context overrides against this same data instead of a second,
- * hand-copied list that only looks like it agrees.
+ * The context chain as a graph rather than a paragraph. A per-file biome override cannot see
+ * it: an override matches the text of a specifier, not the path it resolves to, and answers
+ * one file at a time. `presentation` and `runtime` may depend on anything below them, so a
+ * context reaching back into either is an edge recorded here. Data lives in `helpers.ts`.
  */
 import { describe, expect, it } from "vitest";
 import {

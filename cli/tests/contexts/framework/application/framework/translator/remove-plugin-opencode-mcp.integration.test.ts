@@ -1,10 +1,3 @@
-/**
- * Phase 5 — OpenCode plugin remove: unmerge MCP entries.
- * Asserts that removing a plugin installed with mcpEntries:
- *   - strips only plugin-contributed servers from opencode.json
- *   - preserves user-added servers
- *   - removes the plugin from the manifest
- */
 import "../../../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -138,7 +131,6 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
       manifest,
       undefined
     );
-    // Simulate opencode.json not existing at remove time
     await fs.deleteFile(OPENCODE_JSON);
     await manifestRepo.save(manifest);
 

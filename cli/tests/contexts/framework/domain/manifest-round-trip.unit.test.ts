@@ -1,9 +1,5 @@
-// The strongest available net for a model change that must not move the document:
-// each fixture under tests/fixtures/manifests/ was captured, byte for byte, from the
-// pre-split Manifest. If the split changes what toJSON() produces for any of the six
-// members, the rewritten bytes stop matching the committed ones and this test fails —
-// unlike a fixed-point test (serialize(parse(x)) === serialize(parse(parse(x)))), which
-// stays green even if the new shape is merely self-consistent.
+// Each fixture is a byte-for-byte capture of a real manifest, so a rewritten shape that is
+// merely self-consistent — which a fixed-point test would still pass — fails here.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

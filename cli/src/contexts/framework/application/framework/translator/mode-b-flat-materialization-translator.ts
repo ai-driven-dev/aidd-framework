@@ -28,11 +28,9 @@ import type { PluginTranslator } from "./plugin-translator.js";
 import { ProjectHooksMaterializer, withoutHooks } from "./project-hooks-materializer.js";
 
 /**
- * Mode B — Flat materialization.
- *
- * This class is a translator adapter (not a hexagonal port adapter).
- * Materializes plugin content directly into the tool's plugin directory as files on disk.
- * Used by tools without native marketplace support: OpenCode, Cursor (user-scope).
+ * Mode B — flat materialization: writes a plugin's content directly into the tool's plugin
+ * directory, for a tool without native marketplace support. A translator adapter, not a hexagonal
+ * port adapter.
  */
 export class ModeBFlatMaterializationTranslator implements PluginTranslator {
   readonly mode = "flat" as const;

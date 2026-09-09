@@ -42,9 +42,8 @@ registerDoctorCommand(program);
 registerCleanCommand(program);
 registerTelemetryCommand(program);
 
-// Commands already paying for network I/O: piggyback the update-check refresh on them.
-// Subcommand-path-granular — `marketplace remove` (offline) and `update` (which already
-// resolves the latest version itself) are deliberately absent.
+// Commands already paying for network I/O, so the update-check refresh rides one of them.
+// `marketplace remove` is offline and `update` already resolves the latest version itself.
 const ONLINE_COMMAND_PATHS = new Set([
   "marketplace refresh",
   "marketplace check",

@@ -20,9 +20,8 @@ import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory
 
 const REAL_FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework-real");
 const CODEX_FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework-codex");
-// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
-// drive-relative and prepends the current drive, so production's own resolve(outDir)
-// would otherwise write under a different key than this constant's raw string names.
+// resolve(), not the bare literal: on Windows a leading "/" is drive-relative, so
+// production's own resolve(outDir) would key the tree differently from this constant.
 const OUT_DIR = resolve("/tmp/aidd-codex-test-out");
 
 // Avoid biome noTemplateCurlyInString: split literal
@@ -289,9 +288,7 @@ describe("CodexOutputStrategy", () => {
       await uc.execute({ sourceDir: CODEX_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
       const skillOut =
         fs.getFile(`${OUT_DIR}/plugins/aidd-codex-fixture/skills/sample/SKILL.md`) ?? "";
-      // Should not contain the raw variable reference
       expect(skillOut).not.toContain(CLAUDE_ROOT_VAR);
-      // Should contain a markdown link in place of the variable reference
       expect(skillOut).toContain("[planner.md]");
     });
   });
@@ -315,11 +312,8 @@ describe("CodexOutputStrategy", () => {
     });
   });
 
-  // #707: Codex is installed two ways - this built tree and a merged project config - and
-  // they have drifted three times. The rename lives in one place, renameCodexHookEvents,
-  // and this is the half that proves the *build* route spends it. Codex has no `Stop`, so a
-  // built tree that keeps it subscribes the turn-end hook to an event that never arrives
-  // and the turn is never closed, in silence.
+  // Codex has no `Stop`: a built tree that keeps it subscribes the turn-end hook to an
+  // event that never arrives, and the turn is never closed, in silence.
   describe("hook events Codex actually delivers (#707)", () => {
     it("renames Stop to SessionEnd in a built plugin's hooks.json", async () => {
       const fs = await makeSeededFsFromReal();
@@ -378,7 +372,6 @@ describe("CodexOutputStrategy", () => {
 
     it("warns and skips commands/ and rules/ directories", async () => {
       const fs = await makeSeededFsFromReal();
-      // Inject commands/ and rules/ into the plugin source
       fs.setFile(`${REAL_FIXTURE_DIR}/plugins/aidd-dev/commands/foo.md`, "# Foo");
       fs.setFile(`${REAL_FIXTURE_DIR}/plugins/aidd-dev/rules/bar.md`, "# Bar");
       const logger = new CapturingLogger();

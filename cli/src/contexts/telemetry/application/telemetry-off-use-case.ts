@@ -23,12 +23,8 @@ export interface TelemetryOffResult {
   readonly switchChanged: boolean;
 }
 
-/** Sets the switch off, preserving whatever `endpoint` the file already carries — see its
- * declaration in `telemetry-switch.ts` for why. Never edits a tool's own settings file:
- * no command left in this system writes one, so there is none this could safely undo
- * either — an `off` that started editing a file nobody here wrote could erase somebody's
- * real setup the moment they turned off the local journal. It only warns when one still
- * carries a stale export configuration; see `warnLeftoverExportConfig` below. */
+/** Sets the switch off, preserving any `endpoint` the file already carries. Never edits a tool's
+ * own settings file: nothing here wrote one, so editing it could erase somebody's real setup. */
 export class TelemetryOffUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,
@@ -46,21 +42,8 @@ export class TelemetryOffUseCase {
     return { switchPath, switchChanged };
   }
 
-  /** Unlike a tool's own settings file, this one *is* ours to undo: `on` wrote the hook
-   * line and the delegate beside it, so `off` takes both back. Runs whatever the switch's
-   * previous state was — a switch already off with the hook still installed is exactly the
-   * state a person running `off` a second time is trying to get out of.
-   *
-   * Commits already written keep the trailer they were written with. Nothing here rewrites
-   * history, the same rule `identity off` follows for records already stored.
-   *
-   * Under a manager whose own config already calls the delegate (B-B1), removing the
-   * delegate script does not remove the hand-added job or line that called it — that file is
-   * committed, shared config this CLI is never allowed to write, on the way out any more than
-   * on the way in. Left silent, a person reading `lefthook.yml` afterward would see a line
-   * that looks live and have no reason to doubt it; named here instead, with the one fact
-   * that makes it harmless: its own `[ -f "$delegate" ]` guard is now false, so it runs
-   * nothing. */
+  /** `on` wrote the hook line and the delegate, so `off` takes both back — whatever the switch's
+   * previous state was: already off with the hook installed is what a second `off` must fix. */
   private async stopTrailingCommits(projectRoot: string): Promise<void> {
     const result = await this.git.removeCommitMessageDelegate(
       projectRoot,
@@ -72,6 +55,8 @@ export class TelemetryOffUseCase {
           "keep theirs — nothing here rewrites history."
       );
     }
+    // A manager's own config is committed, shared config this CLI never writes, so the job
+    // calling the removed delegate stays — its own `[ -f ]` guard now finds nothing to run.
     if (result.hookManager !== undefined && result.managerCallsDelegate === true) {
       const { targetFile } = sessionTrailerManagerSnippet(
         result.hookManager,
@@ -86,10 +71,8 @@ export class TelemetryOffUseCase {
     }
   }
 
-  /** Names what `off` cannot touch: a tool's own settings file, still carrying a key
-   * `aidd telemetry endpoint` wrote before that command was deleted. Silence here is
-   * exactly the failure this exists to close — a person who ran that command has no other
-   * way left to learn their machine is still exporting. */
+  /** Names what `off` cannot touch: a tool's own settings file still carrying an export key.
+   * Silence is the failure this closes — nothing else tells a person their machine exports. */
   private async warnLeftoverExportConfig(projectRoot: string): Promise<void> {
     const leftovers = await this.telemetryEvidenceReader.findLeftoverExportConfig(projectRoot);
     for (const leftover of leftovers) {

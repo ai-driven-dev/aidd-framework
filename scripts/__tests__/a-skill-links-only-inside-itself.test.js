@@ -6,22 +6,14 @@ const { describe, it } = require("node:test");
 const ROOT = path.resolve(__dirname, "../..");
 
 /**
- * A skill ships two ways and a relative path survives only one of them.
+ * A skill ships two ways and a relative path survives only one of them: the tree ships flat
+ * and as a marketplace. `check-markdown-links.js` resolves every link against this
+ * repository, where the target does exist, so a link reaching out of a skill passes there
+ * and is dead in every installed copy.
  *
- * `architecture.md` has stated the rule since the per-tool distributions landed — "a skill
- * never links outside itself: the tree ships both flat and as a marketplace, so no relative
- * path survives both" — and nothing enforced it. `check-markdown-links.js` resolves every
- * link against this repository, where the target does exist, so a link reaching out of a
- * skill passes there and is dead in every installed copy.
- *
- * Five had accumulated, three of them into `aidd_docs/product/cost-report-contract.md`,
- * which no plugin ships at all.
- *
- * The skill's own directory is the boundary, not the plugin's: `plugins/<plugin>/skills/
- * <skill>/`. A link to a sibling skill, to the plugin's README, or to anything in the
- * repository is equally unreachable once a tool has installed the skill somewhere of its
- * own choosing. Name the file in prose instead — a reader can search for it, and a name
- * cannot rot into a broken link.
+ * The skill's own directory is the boundary, not the plugin's. A link to a sibling skill, to
+ * the plugin's README, or to anything in the repository is equally unreachable once a tool
+ * has installed the skill somewhere of its own choosing; name the file in prose instead.
  */
 
 const SKILL_ROOT = /^plugins\/[^/]+\/skills\/[^/]+$/u;

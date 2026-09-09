@@ -1,7 +1,6 @@
 import { stat } from "node:fs/promises";
-// FRAMEWORK_BUILD_REGISTRY below is built eagerly at module load from `buildContractFor`,
-// which reads the tool registry — so this module must register profiles itself rather
-// than rely on import order relative to `tools.ts` or `framework.ts`.
+// `FRAMEWORK_BUILD_REGISTRY` is built at module load from the tool registry, so this module
+// registers the profiles itself rather than rely on import order elsewhere.
 import "../../contexts/tools/domain/profiles/claude/profile.js";
 import "../../contexts/tools/domain/profiles/codex/profile.js";
 import "../../contexts/tools/domain/profiles/copilot/profile.js";
@@ -21,7 +20,6 @@ import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";
 
-/** The subset of shared deps the framework build pipeline reads — lets EnsureBuilt build any target. */
 export interface FrameworkBuildDeps {
   fs: FileReader & FileWriter & FileMerger;
   assetProvider: AssetProvider;
@@ -65,7 +63,6 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
-/** One registry entry for a tool/mode pair whose profile declares that build contract. */
 function frameworkBuildFactoryFor(
   buildContract: () => ToolBuildContract,
   mode: "marketplace" | "flat"
@@ -95,11 +92,8 @@ function frameworkBuildFactoryFor(
     );
 }
 
-/**
- * One factory per pair `frameworkBuildTargetModes()` reports, so the wiring cannot
- * offer a target the domain rejects, nor miss one it accepts. Both read the same
- * profiles; a sixth tool whose profile declares `buildContracts` needs no edit here.
- */
+/** One factory per pair `frameworkBuildTargetModes()` reports, so the wiring cannot offer a
+ * target the domain rejects nor miss one it accepts, and a new profile needs no edit here. */
 function frameworkBuildRegistryEntries(): (readonly [string, FrameworkBuildFactory])[] {
   const entries: (readonly [string, FrameworkBuildFactory])[] = [];
   for (const { target, mode } of frameworkBuildTargetModes()) {

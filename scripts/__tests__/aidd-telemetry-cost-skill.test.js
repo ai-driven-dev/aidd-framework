@@ -6,12 +6,9 @@ const test = require("node:test");
 
 const pluginDir = path.resolve(__dirname, "../../plugins/aidd-telemetry");
 const skillDir = path.join(pluginDir, "skills/01-cost");
-// Real source, not a re-description of it: closure tests below check the skill's own text
-// against what these two modules actually accept and actually emit.
 // Normalized, because these tests match multi-line shapes against the file's own text and
-// git hands a Windows checkout the same content with CRLF endings - where `\n\n` matches
-// nothing. Measured: the axis table regex below returns true on the POSIX checkout and false
-// on the identical file with CRLF, which is how a green suite failed on Windows alone.
+// git hands a Windows checkout the same content with CRLF endings, where `\n\n` matches
+// nothing - which is how a green suite failed on Windows alone.
 const read = (file) => fs.readFileSync(file, "utf8").replace(/\r\n/gu, "\n");
 const skill = read(path.join(skillDir, "SKILL.md"));
 // A router skill's rules live in its actions; reading only the router would test a
@@ -48,47 +45,26 @@ test("the cost skill prefers an absolute period for a figure that will be kept",
   assert.ok(everything.includes("resolves against today"), "must say why --days cannot be cited");
 });
 
-// The previous guard here was a list of six forbidden substrings ("reduce(", "sum(",
-// "* 0.", "rate per", "per 1M", "per 1K"). A section appended to 03-report.md telling an
-// agent to scrape the aligned human table, add its column up by hand, and multiply by "the
-// price of a million tokens" left every one of the 21 tests in this file green, including
-// this one - the six-token list is a guess about how a mistake will be spelled, and
-// rewording "per 1M tokens" walks straight past it without touching a single listed token.
-// It is dropped rather than extended: a longer blacklist is the same defect with more
-// words, and it was already false of the clean file, whose own step 4 legitimately
-// computes a share of a total the script printed.
+// Closure tests, never a wordlist of forbidden phrases: a blacklist is a guess about how a
+// mistake will be spelled, and rewording walks straight past it. The only rendering an agent
+// could scrape and add up by hand is the column-aligned one built for a person, so every
+// command the skill instructs is checked against the binary's own interface and every
+// `report` call must end on a path that hands back a value already computed.
 //
-// What is actually checkable is narrower: the only rendering an agent could scrape and add
-// up by hand is the padded, column-aligned one built for a person, and `emitReport`
-// (scripts/telemetry-report.cjs:268-273) only reaches it when a `report` call carries
-// neither `--json` nor `--axis`. So every command this skill instructs is checked against
-// the script's own interface, and every `report` call is required to end on one of the two
-// paths that hand back a value the script already computed - closure tests, not a wordlist,
-// so a differently-worded reintroduction of the same defect still has to name an invalid
-// command or an invalid flag to survive, not just avoid six phrases.
-//
-// "Prefer your own arithmetic over `cost_report_version`" and "ignore `undated_records`
-// because a partial total reads badly" are not covered by anything below. Both leave every
-// correct instruction already in the file untouched and only add a contradiction of it -
-// there is no file content whose absence or presence proves an agent will follow the newer,
-// wrong sentence over the older, right one. That is a claim about behaviour, checkable only
-// by running the skill, not by asserting over its text.
+// A sentence contradicting a correct instruction elsewhere in the file is not covered here:
+// nothing about the text proves which of the two an agent follows.
 
-/** Every `` `aidd telemetry report <flags>` `` the skill's actions write, flags only - the
- * subcommand itself is fixed in the pattern, not captured, so a bare `` `aidd telemetry
- * report` `` naming the command in prose (SKILL.md's own transversal rules) never matches:
- * that requires a space then at least one more character, which a bare mention has none of.
- * Phase 1 moved this from the plugin's own `telemetry-report.cjs` to the CLI; the pattern
- * moved with it, the same way `telemetry-cost-skill-commands.e2e.test.ts` extracts `` `aidd
- * telemetry …` `` commands to run against the real CLI. */
+/** Every `` `aidd telemetry report <flags>` `` the skill's actions write, flags only: the
+ * subcommand is fixed in the pattern and not captured, so a bare mention of the command in
+ * prose never matches, since that requires a space and at least one more character. */
 function reportCommands(text) {
   return [...text.matchAll(/`aidd telemetry report ([^`]+)`/gu)].map((m) => m[1].trim());
 }
 
 test("every report invocation asks for the object or a derived artefact, never the bare human table", () => {
   const commands = reportCommands(everything);
-  // A closure test over an empty extraction passes vacuously - exactly what silently
-  // happened here once the pattern still named the deleted `telemetry-report.cjs`.
+  // A closure test over an empty extraction passes vacuously, which is what happened here
+  // while the pattern still named the deleted `telemetry-report.cjs`.
   assert.ok(commands.length > 0, "the extraction must not be vacuous");
   for (const flags of commands) {
     const tokens = flags.split(/\s+/u);
@@ -99,12 +75,9 @@ test("every report invocation asks for the object or a derived artefact, never t
   }
 });
 
-/** A real envelope, built from the same `build` + `toEnvelope` pipeline the script itself
- * calls - never hand-typed - with a task and every capability populated, so a path this
- * fixture doesn't exercise never gets counted as unreachable-by-accident. */
 /** The envelope the CLI is pinned against, read from the committed fixture rather than built
- * here: the builder used to live in this plugin, and the point of the move is that it now
- * lives in one place. See cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts. */
+ * here, so the builder lives in one place. Every capability is populated, so a path the
+ * fixture does not exercise is never counted as unreachable by accident. */
 function realEnvelope() {
   return JSON.parse(
     fs.readFileSync(
@@ -148,21 +121,8 @@ test("every field the cost skill names by name resolves on the object the script
   const paths = envelopePaths(realEnvelope(), "", new Set());
   const claims = fieldClaims(everything);
   // Pinned for the reason the command count above is: an extractor matching nothing would
-  // make this pass on an empty set of claims.
-  // 13 -> 14 when the skill's own step 8 (03-report.md) named `measurement_enabled`, added
-  // alongside the CLI envelope gaining that field (review.md, "one route, and every
-  // sentence about it true", findings 2 and 3). 14 -> 15 when 03-report.md named `by_task`,
-  // the new top-level breakdown added alongside the six-questions task axis. 15 -> 16 when
-  // 03-report.md named `by_backlog`, the upward link's own top-level breakdown regrouping
-  // `by_task`'s rows by what each task's own folder declares. 16 -> 17 when 03-report.md
-  // named `by_flow`, the flow-and-versions top-level breakdown grouping by the orchestrated
-  // run the journal's own step sequence already names, nothing newly captured for it.
-  // 17 -> 18 when 03-report.md named `by_agent`, the breakdown by the agent that ran, added
-  // while bringing the skill's own version paragraph up from `8` to `11` - it had gone three
-  // bumps stale, so the paragraph named neither `by_agent` nor `prompt-matched` nor the
-  // fourth no-task reason a row can now carry. 18 -> 19 when 03-report.md named `by_prompt`,
-  // the breakdown by the prompt that caused the work - the one axis no host limit can empty,
-  // since the reader resolves the turn for itself rather than waiting on a capture.
+  // make this pass on an empty set of claims. The number moves whenever the skill names a
+  // field it did not before, which is a decision, not a drift.
   assert.equal(claims.size, 19, "expected exactly nineteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
@@ -234,15 +194,8 @@ test("the plugin README gives every partly-measurable tool its reason, not just 
 });
 
 test("no skill searches plugin directories for its own script any more", () => {
-  // Measured on Codex: `env | grep -i plugin_root` in the shell a skill spawns matches
-  // nothing, which is exactly why this search used to exist — a search that only knew
-  // Claude Code's directory found nothing there, on a tool where the script was actually
-  // installed. 00-init, 01-cost and 02-check have all since moved to `aidd`: none of the
-  // three ships a script to find any more, pinned instead by
-  // cli/tests/e2e/telemetry-init-skill-commands.e2e.test.ts,
-  // cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts and
-  // cli/tests/e2e/telemetry-check-skill-commands.e2e.test.ts respectively. This just pins that no
-  // locate/action file resurrects the search.
+  // None of the three skills ships a script to find any more - each calls `aidd` instead -
+  // so this pins that no locate or action file resurrects the plugin-root search.
   for (const skill of ["00-init", "01-cost", "02-check"]) {
     const dir = path.join(pluginDir, "skills", skill, "actions");
     const text = fs
@@ -260,8 +213,7 @@ test("the init skill owns turning measurement on, and asks first", () => {
     .map((name) => fs.readFileSync(path.join(initDir, "actions", name), "utf8"))
     .join("\n");
 
-  // Phase 3 moved this from a script beside the skill to the CLI — `aidd telemetry on` is
-  // now the place that turns it on, and the skill names no `.cjs` path any more.
+  // `aidd telemetry on` is the place that turns it on, and the skill names no `.cjs` path.
   assert.ok(init.includes("aidd telemetry on"), "must be the place that turns it on");
   assert.ok(/[Aa]sk/u.test(init), "must ask before measuring someone's project");
   assert.ok(!/\.cjs\b/u.test(init), "must not name a script beside itself any more");
@@ -294,8 +246,7 @@ test("no skill reaches into another skill's directory", () => {
 });
 
 test("the check skill calls the CLI, never a script of its own", () => {
-  // Phase 5 moved this from a script beside the skill to the CLI — `aidd telemetry check`
-  // is now the place that judges every claim, and the skill names no `.cjs` path any more.
+  // `aidd telemetry check` judges every claim, and the skill names no `.cjs` path.
   const checkDir = path.join(pluginDir, "skills/02-check");
   const check = fs
     .readdirSync(path.join(checkDir, "actions"))
@@ -401,10 +352,8 @@ test("reads a Windows checkout the same way it reads a POSIX one", () => {
   }
 });
 
-// Per person used to be the one axis nothing could answer, back when no record carried an
-// identity - #661 resolved one identity across tools and machines and gave the report a
-// `person` axis, so the skill must offer it rather than still claiming the question is
-// structurally unanswerable.
+// A record now carries an identity resolved across tools and machines, so the skill must
+// offer the `person` axis rather than still calling the question structurally unanswerable.
 test("the cost skill answers per person through the person axis, not as unanswerable", () => {
   assert.ok(/per.person/iu.test(everything), "must still speak in the language of the question");
   assert.ok(everything.includes("|person>"), "must list person among the --axis choices");
@@ -421,11 +370,6 @@ test("the cost skill answers per person through the person axis, not as unanswer
   );
 });
 
-// The version bug this pins against: render.cjs bumped `ENVELOPE_VERSION` to 2 when
-// `by_day` and `by_project` landed, and the skill kept telling itself to refuse anything
-// but version 1 - which would have made it stop on every object the script now prints.
-// Read off the live constant rather than a hardcoded number, so the same drift cannot
-// recur silently the next time `ENVELOPE_VERSION` bumps.
 // A total to quote and a table to paste are different things - a rendering suited to the
 // axis, written to a file when a file is what was asked for.
 test("the cost skill writes an artefact to a file when a file is what was asked for", () => {
@@ -438,7 +382,3 @@ test("the cost skill writes an artefact to a file when a file is what was asked 
   );
 });
 
-// Mirrors cli/tests/contexts/telemetry/domain/cost-report.unit.test.ts's "a still-open local-read
-// turn is superseded, never doubled" — the plugin's own `build()` must answer the same
-// way the CLI's `buildCostReport` does, since both read the same day files (phase-1,
-// "A turn read while it runs is not the last word").

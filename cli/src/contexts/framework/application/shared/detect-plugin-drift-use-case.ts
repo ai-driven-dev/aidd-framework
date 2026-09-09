@@ -17,14 +17,11 @@ export interface PluginDrift {
   pluginName: string;
   files: PluginFileDrift[];
   /**
-   * True when every one of this plugin's tracked files is missing and the tool
-   * installs to a user-scope directory (`~/.cursor/...`) rather than the project.
-   *
-   * A committed manifest describes that directory as it stood on the machine that
-   * wrote it; on any other machine it is simply unpopulated until `aidd sync` runs
-   * there, which is not the same fact as a project-scope file someone deleted.
-   * `files` is left empty here: there is nothing left to enumerate file by file, only
-   * the one fact a caller renders as one line instead of one per file.
+   * True when every one of this plugin's tracked files is missing and the tool installs to a
+   * user-scope directory rather than the project: a committed manifest describes that directory as
+   * it stood on the machine that wrote it, and on any other it is unpopulated until `aidd sync`
+   * runs — not the same fact as a project-scope file someone deleted. `files` stays empty, since
+   * there is nothing to enumerate file by file.
    */
   notInstalledOnMachine: boolean;
 }
@@ -37,8 +34,7 @@ export interface DetectPluginDriftOptions {
 }
 
 /**
- * Single source of truth for "which of a plugin's installed files no longer match
- * the manifest". `status` and `doctor` both project this into their own shapes.
+ * Single source of truth for "which of a plugin's installed files no longer match the manifest".
  */
 export class DetectPluginDriftUseCase {
   constructor(private readonly fs: FileReader) {}

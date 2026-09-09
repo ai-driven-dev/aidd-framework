@@ -1,28 +1,5 @@
-/**
- * Golden baseline — behavior snapshot for two scenarios.
- *
- * Not a list of independent invocations: the main scenario runs commands in order
- * against one hermetic fixture project, so state accumulates and `clean --force`
- * ends it. Error paths therefore get a second project of their own.
- *
- * Each entry captures stdout, stderr, exitCode, filesWritten and the manifest,
- * normalized (absolute paths → placeholders, versions → <VERSION>, file hashes
- * recomputed over normalized content) then compared byte-for-byte against
- * snapshots/phase0/.
- *
- * NOT covered here, on purpose:
- *   - anything reaching the network: `marketplace add` on a GitHub source,
- *     `update` (the CLI self-update, formerly `self-update`), the update check. The
- *     fixture is local so a capture never depends on a remote repository or a rate limit.
- *   - anything interactive: the menu and every prompt. Captures run with `--yes`.
- *   - `translate` (formerly `framework build`), which has its own golden over the nine
- *     target/mode cells in framework-build-golden.e2e.test.ts.
- *   - the shape of `--help`, frozen separately in help-surface.e2e.test.ts.
- *
- * USAGE:
- *   Capture: UPDATE_GOLDEN=1 pnpm test:e2e --reporter=verbose tests/golden/golden-baseline.e2e.test.ts
- *   Verify:  pnpm test:e2e tests/golden/golden-baseline.e2e.test.ts
- */
+/** Nothing here reaches the network or a prompt, so a capture never depends on a remote
+ * repository, a rate limit or a TTY. `translate` and `--help` have goldens of their own. */
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -35,10 +12,6 @@ const ROOT = resolve(fileURLToPath(import.meta.url), "../../..");
 const FRAMEWORK_FIXTURE = join(ROOT, "tests/fixtures/framework");
 const SNAPSHOT_FILE = join(ROOT, "tests/golden/snapshots/phase0/snapshot.json");
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface CommandEntry {
   command: string;
   exitCode: number;
@@ -46,41 +19,21 @@ interface CommandEntry {
   stderr: string;
   filesWritten: string[];
   manifest: unknown;
-  /** What sits under `userConfigDir()` right after this command — captured only for
-   * `clean --force`, the one project-scope command whose effect on the *shared*,
-   * machine-scope tree (`cache/built/`, `marketplaces.json`, `references.json`)
-   * `filesWritten` cannot see at all: that tree lives under the sandbox's fake $HOME,
-   * never under `projectDir`. Absent everywhere else — a project-scope command reads
-   * and writes nothing there, so recording an empty list for every other entry would
-   * only pad the snapshot with a fact that never changes. */
+  /** The shared machine-scope tree lives under the sandbox's fake $HOME, never under
+   * `projectDir`, so `filesWritten` cannot see it at all. */
   userConfigFiles?: string[];
-  /** The user-scope manifest's own content, captured only alongside `userConfigFiles` —
-   * that array names `manifest.json` by filename alone, never what it holds, so a
-   * `--scope user` run registering the wrong tool or the wrong version there would
-   * pass this snapshot unnoticed. Short and deterministic: a `--scope user` install
-   * records an empty file list per tool (`SetupMachineScopeUseCase.registerUserScopeTools`),
-   * so unlike the project manifest this needs no per-file hash recomputation. */
+  /** `userConfigFiles` names `manifest.json` by filename alone, never what it holds, so a
+   * `--scope user` run registering the wrong tool there would pass this snapshot unnoticed. */
   userManifest?: unknown;
 }
 
-// ---------------------------------------------------------------------------
-// Normalization
-// ---------------------------------------------------------------------------
-
-/**
- * Replace non-deterministic tokens so two captures of the same run are
- * byte-identical regardless of machine, home dir, version, or timestamp.
- */
+/** Two captures of the same run must be byte-identical whatever the machine, home
+ * directory, version or timestamp. */
 function normalize(text: string): string {
   return (
     text
-      // A Windows capture spells its separator "\" and carries a drive letter neither
-      // placeholder rule expects - fold both into the same drive-less, "/"-only shape a
-      // POSIX capture already has, so one set of rules covers a run from either platform.
-      // The lookbehind keeps a URL's scheme colon ("https:") alone - only a colon not
-      // preceded by a letter is a drive. Only ever called on a raw string (see
-      // normalizeManifest below for why the manifest is walked before, not after,
-      // JSON.stringify) so there is no JSON escaping here to corrupt.
+      // Folds a Windows capture into the drive-less, "/"-only shape a POSIX one already has.
+      // The lookbehind spares a URL's scheme colon: only a colon not preceded by a letter is a drive.
       .replace(/(?<![A-Za-z])[A-Za-z]:(?=[/\\])/g, "")
       .replace(/\\/g, "/")
       // Absolute paths → placeholder. The built-cache path is the project temp dir,
@@ -88,31 +41,18 @@ function normalize(text: string): string {
       .replace(/\/[^\s",'\\]+\/\.aidd\/cache\/built/g, "<BUILT_CACHE>")
       .replace(/\/[^\s",'\\]+\/tests\/fixtures\/framework/g, "<FRAMEWORK_FIXTURE>")
       .replace(/\/[^\s",'\\]+\/aidd\/cli/g, "<ROOT>")
-      // The sandbox's relocated `$HOME`, created fresh per run under a random temp
-      // directory (`createTestEnv`'s own `fakeHome`) — a native registration's
-      // `unanswerable` message names the registry file it tried and failed to open,
-      // and that path lives under this same per-run directory. Left unnormalized,
-      // two captures of the identical run differ only by their own temp dir name,
-      // which is exactly the failure `golden-machine-independence.md` describes.
+      // The sandbox's `$HOME` is a fresh per-run temp directory that an `unanswerable`
+      // registration message names, so unnormalized it alone makes two captures differ.
       .replace(/\/[^\s",'\\]+\/aidd-e2e-[^/\s",'\\]+\/home\b/g, "<HOME>")
-      // Version strings like 4.5.0 or 4.10.2 in manifest / stdout — a leading `\b` used
-      // to gate this, and it silently missed every `v<semver>` cell ("claude (v5.2.2)"):
-      // `\b` requires a non-word character right before the digits, and "v" is a word
-      // character itself, so there is no boundary between "v" and "5" for `\b\d` to
-      // match. `(?<!\d)` asks the narrower, correct question — not preceded by another
-      // digit, which still refuses to clip "5.2.2" out of the middle of "15.2.2" — and
-      // says nothing about what kind of character, if any, comes before that.
+      // `(?<!\d)` rather than `\b`: "v" is a word character, so `\b\d` never matches the
+      // digits of a `v<semver>` cell, while both still refuse to clip "5.2.2" out of "15.2.2".
       .replace(/(?<!\d)\d+\.\d+\.\d+\b/g, "<VERSION>")
-      // Windows line endings
       .replace(/\r\n/g, "\n")
   );
 }
 
-// Walks the parsed manifest and normalizes each string value directly, rather than
-// normalizing after JSON.stringify - a Windows path's "\" is a single character in a real
-// string but two once JSON-escapes it, and a blanket text replace big enough to fold both
-// forms would just as readily mangle every other escape (`\"`, `\n`) the same encoding
-// produces, corrupting content `JSON.parse` would then fail on rather than merely miscompare.
+// Normalizes each parsed string, never the JSON text: a replace wide enough to fold both a
+// real "\" and its escaped pair would mangle every other escape (`\"`, `\n`) the same way.
 function normalizeManifest(value: unknown): unknown {
   if (typeof value === "string") return normalize(value);
   if (Array.isArray(value)) return value.map(normalizeManifest);
@@ -147,10 +87,6 @@ function normalizeSnapshot(entries: CommandEntry[]): CommandEntry[] {
   return entries.map(normalizeEntry);
 }
 
-// ---------------------------------------------------------------------------
-// Capture helpers
-// ---------------------------------------------------------------------------
-
 async function readManifest(projectDir: string): Promise<unknown> {
   const manifestPath = join(projectDir, ".aidd", "manifest.json");
   try {
@@ -161,10 +97,8 @@ async function readManifest(projectDir: string): Promise<unknown> {
   }
 }
 
-/** The `--scope user` manifest's own content, `userConfigDir()/manifest.json` —
- * captured directly, unlike `readManifest`'s project counterpart, since a `--scope
- * user` install records an empty file list per tool and so needs no per-file hash
- * recomputation to stay machine-independent. */
+/** Read directly, unlike the project manifest: a `--scope user` install records an empty
+ * file list per tool, so no per-file hash needs recomputing to stay machine-independent. */
 async function readUserManifest(fakeHome: string): Promise<unknown> {
   const manifestPath = join(fakeHome, ".config", "aidd", "manifest.json");
   try {
@@ -175,13 +109,8 @@ async function readUserManifest(fakeHome: string): Promise<unknown> {
   }
 }
 
-/**
- * Recompute manifest file hashes over normalized content so the snapshot is
- * machine-independent. The production code hashes raw file bytes (which may
- * contain an absolute path like extraKnownMarketplaces). We replace each hash
- * with MD5(normalize(fileContent)) so CI and local machines produce the same
- * hex digest.
- */
+/** Production hashes raw bytes, which can hold an absolute path; rehashing over normalized
+ * content is what makes CI and a local machine produce the same digest. */
 async function normalizeManifestHashes(manifest: unknown, projectDir: string): Promise<unknown> {
   if (manifest === null || typeof manifest !== "object") return manifest;
 
@@ -221,21 +150,13 @@ async function recomputeFileHashes(files: unknown, projectDir: string): Promise<
   );
 }
 
-// A .json file's raw bytes escape a real path separator as two literal backslash
-// characters, never one - un-escape that pairing before the shared normalize() below,
-// which expects a genuine single "\" the same way a parsed string (or raw stdout/stderr)
-// already has it. Any other file's bytes are not JSON-encoded, so a literal "\" in them
-// already is one; normalize() alone is correct as-is. This only ever un-escapes a real
-// path separator correctly if the .json file's own string values carry no other escape
-// (`\"`, `\n`, ...) - true of every settings.json this matrix writes today (path, repo,
-// and plugin-name values only, per marketplace-entry.ts), not a general JSON un-escaper.
+// A .json file's bytes escape a path separator as two backslashes, so un-escape before
+// normalize(). Correct only while these files carry no other escape (`\"`, `\n`, ...).
 function normalizeFileContent(content: string, relativePath: string): string {
   return normalize(relativePath.endsWith(".json") ? content.replace(/\\\\/g, "\\") : content);
 }
 
-/** Run a command and return a single CommandEntry (raw, not normalized).
- * `captureUserConfig` also lists what sits under `userConfigDir()` right after —
- * see `CommandEntry.userConfigFiles` for why only one command in the matrix asks. */
+/** Returns a raw entry, not a normalized one. */
 async function captureCommand(
   args: string[],
   projectDir: string,
@@ -290,22 +211,13 @@ async function collectFiles(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Command matrix
-// ---------------------------------------------------------------------------
-
-/**
- * Overwrite a tracked file with fixed content, to make the next capture see drift.
- * Not a command, so it produces no entry: its effect shows in what follows.
- */
+/** Not a command, so it produces no entry: its effect shows in what follows. */
 async function drift(projectDir: string, relativePath: string): Promise<void> {
   await writeFile(join(projectDir, relativePath), "{}\n", "utf-8");
 }
 
-/**
- * The main scenario, in order, against one project. `clean --force` is terminal,
- * so nothing may follow it but the post-clean read.
- */
+/** One project, state accumulating in order: `clean --force` is terminal, so nothing may
+ * follow it but the post-clean read. */
 async function captureMatrix(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const entries: CommandEntry[] = [];
   const capture = async (
@@ -315,7 +227,6 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
     entries.push(await captureCommand(args, projectDir, fakeHome, options));
   };
 
-  // Fresh project, from the local fixture: claude only, no plugins.
   await capture([
     "setup",
     "--source",
@@ -329,12 +240,8 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
     "--yes",
   ]);
 
-  // --scope user: registers the shared source and native activation machine-wide.
-  // `filesWritten` (the project-directory diff `captureCommand` already takes) is the
-  // proof that lands in this snapshot: it must read `[]`, the same full-directory-delta
-  // assertion `cli/tests/e2e/setup-scope-user.e2e.test.ts` makes against `git status --porcelain`.
-  // `captureUserConfig` is what shows the other half — `manifest.json` newly present
-  // under `userConfigDir()`, alongside the already-registered `marketplaces.json`.
+  // `filesWritten` must read `[]` here: a `--scope user` run registers machine-wide and
+  // writes nothing under the project. `captureUserConfig` shows the other half.
   await capture(
     [
       "setup",
@@ -354,7 +261,6 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
   );
   await capture(["doctor", "--scope", "user"]);
 
-  // Read-only views of a freshly set up project.
   await capture(["doctor"]);
   await capture(["marketplace", "list"]);
   await capture(["plugin", "list"]);
@@ -363,44 +269,27 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
   await capture(["plugin", "install", "aidd-test"]);
   await capture(["plugin", "list"]);
 
-  // A second tool, written from bundled assets. `ai install` folded into `framework
-  // install --tool`; `status` folded into `doctor`, which now carries the drift report.
   await capture(["framework", "install", "--tool", "cursor", "--force"]);
   await capture(["doctor"]);
 
-  // A tracked file edited outside the CLI, read back through the one command that now
-  // reports both drift and structural health.
   await drift(projectDir, join(".claude", "settings.json"));
   await capture(["doctor"]);
 
-  // Regeneration (`restore` folded into `sync`), then back in sync.
   await capture(["sync", "--force"]);
   await capture(["doctor"]);
 
   await capture(["plugin", "remove", "aidd-test"]);
 
-  // Terminal: removes every AIDD file, then a read of the empty project. Only this
-  // step also lists userConfigDir(): a project-scope `clean` never registers or
-  // unregisters at the shared, machine-scope entry (architecture.md), and this is
-  // where that survives on record — the built cache tree, the marketplaces.json
-  // entry, and this project's own now-decremented reference.
+  // Only this step lists userConfigDir(), where what a project-scope `clean` leaves behind
+  // survives on record: the built cache, the marketplaces.json entry, the decremented reference.
   await capture(["clean", "--force"], { captureUserConfig: true });
   await capture(["doctor"]);
 
   return entries;
 }
 
-/**
- * `clean --scope user`, in a project of its own: a plain `setup` already registers
- * `aidd-framework` at user scope too (architecture.md — the shared entry is always
- * scope `"user"`, project-scope `setup` included), so running this inside the main
- * matrix would purge the very entry every step after the first `setup` call in it
- * still depends on. `captureUserConfig` on both commands is what shows the shared
- * source's own lifecycle: `manifest.json` and the `aidd-framework` entry appearing,
- * then gone — `cache/built/` never appears in this sandbox at all, the same absent-
- * binary reason `clean-scope-user.e2e.test.ts` seeds a fixture for; a golden capture
- * asserts the shape a real round-trip leaves, not that one happened.
- */
+/** A project of its own: a plain `setup` registers `aidd-framework` at user scope too, so
+ * purging it inside the main matrix would take the entry every later step depends on. */
 async function captureUserScopeClean(
   projectDir: string,
   fakeHome: string
@@ -437,10 +326,8 @@ async function captureUserScopeClean(
   return entries;
 }
 
-/**
- * Error paths, in a project of their own because `clean --force` ends the main one.
- * Each entry is prefixed so both scenarios can share one snapshot file.
- */
+/** A project of their own because `clean --force` ends the main one. Each entry is prefixed
+ * so both scenarios share one snapshot file. */
 async function captureErrors(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const entries: CommandEntry[] = [];
   const capture = async (args: string[]): Promise<void> => {
@@ -452,12 +339,10 @@ async function captureErrors(projectDir: string, fakeHome: string): Promise<Comm
   await capture(["doctor"]);
   await capture(["plugin", "list"]);
 
-  // Asking for something that cannot be resolved.
   await capture(["plugin", "install", "does-not-exist"]);
   await capture(["framework", "install", "--tool", "not-a-tool"]);
   await capture(["definitely-not-a-command"]);
 
-  // A marketplace whose catalog does not parse.
   await capture([
     "marketplace",
     "add",
@@ -468,10 +353,6 @@ async function captureErrors(projectDir: string, fakeHome: string): Promise<Comm
   return entries;
 }
 
-/**
- * Both scenarios, in one snapshot. The error scenario gets its own project because
- * the main one ends with `clean --force`.
- */
 async function captureAll(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const main = await captureMatrix(projectDir, fakeHome);
   const errorEnv = await createTestEnv("golden-errors");
@@ -488,10 +369,6 @@ async function captureAll(projectDir: string, fakeHome: string): Promise<Command
     await userScopeCleanEnv.cleanup();
   }
 }
-
-// ---------------------------------------------------------------------------
-// Test
-// ---------------------------------------------------------------------------
 
 describe.concurrent("Golden baseline — command matrix", () => {
   it("snapshot is deterministic (two captures are byte-identical)", async () => {

@@ -13,10 +13,8 @@ const marketplacePlugins = () =>
 
 const workflow = () => yaml.load(fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8"));
 
-// The matrix was written once, with the six plugins that existed then. Two more shipped
-// after it and nobody came back: `aidd-ui` and `aidd-telemetry` were tagged by
-// release-please and got no archive for months, in silence — a job that skips is
-// indistinguishable from a job that has nothing to do.
+// A plugin missing from the matrix is tagged by release-please and gets no archive, in
+// silence: a job that skips is indistinguishable from a job that has nothing to do.
 test("build-plugin builds an archive for every plugin the marketplace lists", () => {
   const matrix = [...workflow().jobs["build-plugin"].strategy.matrix.plugin].sort();
 

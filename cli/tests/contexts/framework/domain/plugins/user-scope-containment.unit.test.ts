@@ -29,9 +29,8 @@ describe("isStrictlyWithinUserScope", () => {
   });
 
   it("rejects a path that merely starts with the boundary's characters without a separator", () => {
-    // `/home/dev/.cursor/plugins/local-evil/...` textually starts with BOUNDARY but is a
-    // sibling directory, not something inside it — a naive `startsWith` would wrongly
-    // accept this.
+    // Textually starts with BOUNDARY but is a sibling directory, not something inside it —
+    // a naive `startsWith` would wrongly accept this.
     expect(isStrictlyWithinUserScope(`${BOUNDARY}-evil/payload`, BOUNDARY)).toBe(false);
   });
 });

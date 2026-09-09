@@ -41,10 +41,8 @@ describe("toInstalledRule — one installed file, read as a rule", () => {
     expect(bare.description).toBe("");
   });
 
-  /** Each tool names the scope field differently — `paths` for Claude Code and Codex,
-   * `globs` for Cursor, `applyTo` for Copilot — and a reader comparing two tools needs one
-   * name. Merged rather than picked: a file converted between tools can carry more than
-   * one, and dropping either would lose a scope the rule really states. */
+  /** Each tool names the scope field differently — `paths`, `globs`, `applyTo` — and a file
+   * converted between tools can carry more than one, so they are merged rather than picked. */
   it("merges every spelling of the scope field into one list", () => {
     const rule = toInstalledRule(
       "cursor",
@@ -77,10 +75,8 @@ describe("toInstalledRule — one installed file, read as a rule", () => {
     expect(rule.paths).toEqual(["src/**", "tests/**"]);
   });
 
-  /** A rule converted between tools can carry the same glob under two of the three field
-   * names at once. `SCOPE_FIELDS.flatMap` concatenates without deduplicating, so the same
-   * glob would otherwise come out twice in `InstalledRule.paths` — the list the skill reads
-   * as JSON. */
+  /** `SCOPE_FIELDS.flatMap` concatenates without deduplicating, so a glob carried under two
+   * field names at once would come out twice in `InstalledRule.paths`. */
   it("states a glob carried under two field names only once", () => {
     const rule = toInstalledRule(
       "cursor",

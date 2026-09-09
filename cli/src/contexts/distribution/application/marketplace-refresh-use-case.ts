@@ -57,8 +57,8 @@ export class MarketplaceRefreshUseCase implements MarketplaceRefresh {
     return { results, failedCount };
   }
 
-  // @policy report-and-continue: a single failed marketplace must not abort the
-  // batch refresh. Each failure is reported via the result, never thrown.
+  // A single failed marketplace must not abort the batch refresh: each failure is reported
+  // through the result, never thrown.
   private async refreshOne(projectRoot: string, m: Marketplace): Promise<RefreshEntryResult> {
     try {
       const cacheDir = marketplaceCacheDir(projectRoot, m.name);

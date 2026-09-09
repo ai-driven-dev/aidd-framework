@@ -8,9 +8,8 @@ import { RunJournalReaderAdapter } from "../../../../src/contexts/telemetry/infr
 import { environmentWithoutGitVariables } from "../../../../src/runtime/git/git-environment.js";
 import { journalFileWrites } from "../../../helpers/telemetry-journal-hook.js";
 
-// The line phase 2's task derivation rests on, exercised against the hook that writes it
-// and the adapter that reads it — nothing between them is stubbed. Without this, a change
-// to either side would leave every task in a report empty and no test would notice.
+// The line task derivation rests on, exercised against the hook that writes it and the adapter
+// that reads it with nothing stubbed between: a change to either side empties every task.
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 const TASK_FILE = "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md";
@@ -95,9 +94,8 @@ describe("file_written, from the hook that writes it to the reader that reads it
   });
 
   it("covers Claude Code alone, which a report has to print as a limit rather than assume away", () => {
-    // Not an aspiration: Copilot and Cursor were never captured writing a readable path,
-    // and Codex's writes live inside an apply_patch command string. A host absent here
-    // yields sessions attributable to a period and a step, never to a task.
+    // Copilot and Cursor were never captured writing a readable path, and Codex's writes live
+    // inside an apply_patch command string; a host absent here is never attributable to a task.
     expect(Object.keys(journalFileWrites.WRITTEN_PATH_EXTRACTOR_BY_HOST)).toEqual(["claude-code"]);
   });
 });

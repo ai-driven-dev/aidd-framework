@@ -9,22 +9,8 @@ import {
 } from "../../../../src/contexts/telemetry/domain/cost-report.js";
 import type { TelemetrySinkRecord } from "../../../../src/contexts/telemetry/domain/telemetry-sink-record.js";
 
-/**
- * A re-read appends, so one session's lines sit in different orders on two machines, and
- * nothing a consumer does controls it. `cost-report.unit.test.ts` already reverses four
- * records; this covers what that fixture cannot.
- *
- * Every row kind added since is keyed differently from the others, and mixed key kinds in
- * one `Map` are exactly where insertion order leaks into output: `by_flow` keys an
- * interval-derived row on the `FlowInterval` object and a tool-stated one on the skill's
- * name, and `by_agent` keys two of its three rows on symbols. A report that ranks by size
- * then breaks ties on a row key cannot be allowed to answer differently because the records
- * arrived shuffled.
- *
- * Verified against the real thing before it was written: 30,222 records of a live sink,
- * shuffled within every day file, produced a byte-identical report. This is the guard for
- * it, over permutations rather than one reversal.
- */
+// A re-read appends, so one session's lines sit in different orders on two machines. Mixed key
+// kinds in one `Map` — `by_flow` keys on an interval object or on a skill name — leak that order.
 const AT = "2026-08-18T10:00:00Z";
 const LATER = "2026-08-18T11:30:00Z";
 
@@ -81,10 +67,8 @@ function record(overrides: Partial<TelemetrySinkRecord>): TelemetrySinkRecord {
   };
 }
 
-/** Every row kind the report can produce, once each: an interval-derived flow and a
- * tool-stated one, all three agent attributions, a named prompt and one that named none,
- * two models, two tools, and a pair with identical figures whose order only a tie-break can
- * decide. */
+/** Every row kind the report can produce, once each — including a pair with identical figures
+ * whose order only a tie-break on the row's own key can decide. */
 const RECORDS: readonly TelemetrySinkRecord[] = [
   // Inside the witnessed flow, agent named by the tool.
   record({ turn_id: "a", agent_name: "aidd-dev:executor", model: "opus", prompt_id: "p-1" }),
@@ -114,9 +98,8 @@ const RECORDS: readonly TelemetrySinkRecord[] = [
   // them — the case repetition alone never catches.
   record({ turn_id: "f", model: "zulu", cost_usd: 3, prompt_id: "p-2" }),
   record({ turn_id: "g", model: "alpha", cost_usd: 3, prompt_id: "p-3" }),
-  // One billed call two routes saw, with equal counters and different content: only
-  // `pickDeterministically` can choose a survivor, and picking `group[0]` would make the
-  // choice depend on which line the day file happened to list first.
+  // One billed call two routes saw, with equal counters and different content: picking
+  // `group[0]` would make the survivor depend on which line the day file listed first.
   record({
     turn_id: "h",
     billed_request_id: "req-1",

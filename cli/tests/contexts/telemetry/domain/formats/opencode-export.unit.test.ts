@@ -5,25 +5,16 @@ import { mapOpencodeExportToSinkRecords } from "../../../../../src/contexts/tele
 
 const SESSION_ID = "ses_test_read";
 
-// opencode-export.json is a real `opencode export <sessionID> --sanitize` capture (opencode
-// 1.14.20, 2026-08-20), mechanically trimmed to `{info, messages: [{info}, ...]}` — `parts`
-// dropped, since the mapper under test reads only `messages[].info` and `--sanitize` had
-// already redacted everything `parts` still carried. No value inside `info` was hand-edited.
+// A real `opencode export --sanitize` capture (opencode 1.14.20), mechanically trimmed to
+// `{info, messages: [{info}, ...]}`. No value inside `info` was hand-edited.
 function loadFixture(name: string): unknown {
   const url = new URL(`../../../../fixtures/telemetry-sink/${name}`, import.meta.url);
   return JSON.parse(readFileSync(fileURLToPath(url), "utf8"));
 }
 
 describe("mapOpencodeExportToSinkRecords", () => {
-  // The comparison opencode-export.ts's own header named as missing: a large `cache.read`
-  // beside `input`, for a provider that is not Anthropic. Captured live 2026-09-06 from
-  // `opencode export --sanitize`, opencode 1.14.20, providerID "opencode", modelID
-  // "ling-3.0-flash-fin-free" - three billed turns of one session, cache genuinely
-  // exercised across them. `input` falls from 28242 to 269 as `cache.read` climbs from
-  // 640 to 28928: an `input` that already counted the cached tokens could not shrink that
-  // way. OpenCode's own `total` confirms it by arithmetic on every turn -
-  // `total == input + output + reasoning + cache.read + cache.write` - which only holds if
-  // the counters are disjoint.
+  // Measured on a non-Anthropic capture: `input` falls from 28242 to 269 as `cache.read`
+  // climbs to 28928, and `total` only adds up if the counters are disjoint.
   it("reads a non-Anthropic provider's counters as disjoint, the comparison no capture held", () => {
     const records = mapOpencodeExportToSinkRecords(
       loadFixture("opencode-export-non-anthropic-cache.json"),
@@ -48,9 +39,8 @@ describe("mapOpencodeExportToSinkRecords", () => {
   it("yields one record per billed message, by value, under the stored field names", () => {
     const records = mapOpencodeExportToSinkRecords(loadFixture("opencode-export.json"), SESSION_ID);
 
-    // The fixture holds 5 user turns (no `tokens`), 3 billed assistant turns (`tokens` with a
-    // `total`), and 1 assistant turn OpenCode created but never billed (`tokens` present, every
-    // counter 0, no `total`) — only the 3 billed turns are counted messages.
+    // The fixture holds 5 user turns, 3 billed assistant turns, and 1 assistant turn
+    // OpenCode created but never billed — only the billed ones are counted messages.
     expect(records).toHaveLength(3);
     expect(records).toEqual([
       {

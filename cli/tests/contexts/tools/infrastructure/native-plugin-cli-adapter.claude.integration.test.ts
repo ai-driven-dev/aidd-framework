@@ -21,10 +21,8 @@ function makeResult(overrides: Partial<ReturnType<typeof spawnSync>>) {
   } as ReturnType<typeof spawnSync>;
 }
 
-// Claude is the one profile that declares `scopeArgs` (`project` -> `--scope local`,
-// `user` -> `--scope user`), so it is the one binary this suite exercises — codex and
-// copilot declare no scopeArgs at all, and get nothing appended regardless of what is
-// passed, which is why neither carries a test like this one.
+// Claude is the one profile that declares `scopeArgs`; codex and copilot declare none and get
+// nothing appended whatever is passed, which is why neither carries a test like this one.
 function claudeAdapter(): NativePluginCliAdapter {
   return new NativePluginCliAdapter("claude", {
     scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },

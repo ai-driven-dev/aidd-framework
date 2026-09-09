@@ -9,10 +9,9 @@ import type { ContentSection } from "../../../../translate/domain/canon.js";
 const ALL_TOOL_SUFFIXES: readonly string[] = AI_TOOL_IDS.map((id) => `.${id}.md`);
 
 /**
- * Shape every content-section capability (agents/commands/rules/skills) exposes
- * with identical arity, so this engine can call them directly without per-section
- * branching. Where arity genuinely differs (acceptsFileName, convertFrontmatter),
- * a ContentSectionDescriptor supplies the per-section adapter instead.
+ * The shape every content-section capability exposes with identical arity, so this engine calls
+ * them without per-section branching. Where arity genuinely differs, a `ContentSectionDescriptor`
+ * supplies the per-section adapter instead.
  */
 export interface ContentSectionCapability {
   buildInstallPath(fileName: string): string | null;
@@ -20,10 +19,9 @@ export interface ContentSectionCapability {
 }
 
 /**
- * Per-section behaviour that cannot be expressed with a uniform signature across
- * agents/commands/rules/skills capabilities. `key` also drives which capability
- * is read off `toolConfig.capabilities`, keeping K, Cap and the toolConfig type
- * correlated through generics instead of an `as` cast at the call site.
+ * Per-section behaviour no uniform signature can express. `key` also drives which capability is
+ * read off `toolConfig.capabilities`, keeping K, Cap and the toolConfig type correlated through
+ * generics instead of an `as` cast at the call site.
  */
 export interface ContentSectionDescriptor<
   K extends UserFileSection,

@@ -3,11 +3,7 @@ import { isAiTool, type ToolConfig } from "../../../../tools/domain/registry.js"
 import type { PluginTranslator } from "./plugin-translator.js";
 import { resolveTranslator, type TranslatorDeps } from "./plugin-translator-factory.js";
 
-/**
- * Resolves the plugin translator for a tool, or null when the tool is not an AI
- * tool or has no plugins capability. Shared guard used by every call site that
- * needs a translator before materializing plugin files.
- */
+/** `null` when the tool is not an AI tool, or has no plugins capability. */
 export function resolvePluginTranslator(
   toolConfig: ToolConfig,
   deps: TranslatorDeps

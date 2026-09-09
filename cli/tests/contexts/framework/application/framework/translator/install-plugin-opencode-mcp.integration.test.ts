@@ -1,13 +1,3 @@
-/**
- * Phase 4b — OpenCode MCP merge integration.
- * Asserts that installing a plugin with .mcp.json against OpenCode:
- *   - merges servers into opencode.json under the mcp section
- *   - preserves disabled state (enabled: false) from source
- *   - populates Plugin.mcpEntries in the manifest
- *   - does not affect Claude (Mode A) installs
- *   - is idempotent: a second add with same version produces byte-equal opencode.json
- *   - replace path: v1→v2 drops orphaned servers, adds new ones
- */
 import "../../../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import "../../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { join } from "node:path";
@@ -141,7 +131,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
     const firstPlugin = manifest.getPlugins("opencode").find((p) => p.name === PLUGIN_NAME);
     const firstMcpEntries = firstPlugin?.mcpEntries ?? new Map();
 
-    // Simulate re-install (replace=true path: previous removed, then re-added)
+    // The replace path: the previous install is removed, then re-added.
     manifest.removePlugin("opencode", PLUGIN_NAME);
     await adapter.addPlugin(
       buildDist(),
@@ -304,16 +294,13 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
     expect(mcpSkip?.reason).toContain("local-tool");
     expect(mcpSkip?.pluginName).toBe(PLUGIN_NAME);
 
-    // User server must remain untouched
     const parsed = JSON.parse(await fs.readFile(OPENCODE_JSON)) as {
       mcp: Record<string, unknown>;
     };
     expect(parsed.mcp["local-tool"]).toEqual(userServer);
 
-    // Plugin must NOT claim local-tool in mcpEntries
     const installed = manifest.getPlugins("opencode").find((p) => p.name === PLUGIN_NAME);
     expect(installed?.mcpEntries.has("local-tool")).toBe(false);
-    // Non-colliding servers are still installed
     expect(installed?.mcpEntries.has("remote-tool")).toBe(true);
   });
 });

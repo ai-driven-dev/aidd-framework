@@ -7,11 +7,6 @@ import {
 } from "../../../src/presentation/display/telemetry-forget-display.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 
-/**
- * The one command here that destroys something, so what it prints is the whole of what a
- * person consents to. The preview's counts are what `--yes` is answered against; the
- * result's counts are what they check the preview against afterwards.
- */
 class CapturingOutput extends CLIOutput {
   readonly lines: string[] = [];
 
@@ -55,9 +50,8 @@ describe("what a person is shown before anything is removed", () => {
     expect(output.text).not.toContain("This would remove:");
   });
 
-  // The sink is machine-wide while the journal is this project's. A person removing "what
-  // this tool measured" is removing every project's figures, and the sentence has to say so
-  // before they answer `--yes`.
+  // The sink is machine-wide while the journal is this project's, so removing "what this tool
+  // measured" removes every project's figures — the sentence has to say so before `--yes`.
   it("says the stored records span every project measured on this machine", () => {
     const output = new CapturingOutput();
 

@@ -39,9 +39,9 @@ export function parseManifestTools(raw: Record<string, unknown>): Map<ToolId, To
   return tools;
 }
 
-/** Narrows one `tools.<id>` entry before it reaches `parseToolEntry`, which otherwise
- * throws a raw `TypeError` from deep inside `parseTrackedFiles` for a manifest a person
- * hand-edited badly. Every failure names the JSON path so the message is actionable. */
+/** Narrows one `tools.<id>` entry before it reaches `parseToolEntry`, which otherwise throws a raw
+ * `TypeError` from deep inside `parseTrackedFiles`. Every failure names the JSON path, so the
+ * message is actionable. */
 function parseToolEntryData(toolId: string, value: unknown): ToolEntryData {
   const entry = asPlainObject(value);
   if (entry === null) {

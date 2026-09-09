@@ -41,9 +41,7 @@ describe("InstallIdeToolUseCase", () => {
       expect(result.skipped).toBe(false);
       const settingsPath = join(PROJECT_ROOT, ".vscode/settings.json");
       const content = deps.fs.getFile(settingsPath) ?? "";
-      // copilot static keys must be present
       expect(content).toContain('"github.copilot.enable"');
-      // vscode framework keys must also be present
       expect(content).toContain('"editor.formatOnSave"');
     });
 
@@ -70,7 +68,6 @@ describe("InstallIdeToolUseCase", () => {
   describe("no AI tool depends on the installing IDE", () => {
     it("performs only the IDE install with no extra mergeJsonFile calls for copilot settings", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
-      // Install an AI tool that has NO vscode dependency (claude does not have requiresTool: vscode)
       await initAndInstall(deps, PROJECT_ROOT, "claude");
 
       const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
@@ -83,11 +80,10 @@ describe("InstallIdeToolUseCase", () => {
       });
 
       expect(result.skipped).toBe(false);
-      // Claude has no static settings with requiresTool: vscode, so copilot keys absent
+      // Claude declares no static settings with `requiresTool: vscode`.
       const settingsPath = join(PROJECT_ROOT, ".vscode/settings.json");
       const content = deps.fs.getFile(settingsPath) ?? "";
       expect(content).not.toContain('"github.copilot.enable"');
-      // But vscode framework keys are present
       expect(content).toContain('"editor.formatOnSave"');
     });
   });
@@ -128,10 +124,8 @@ describe("InstallIdeToolUseCase", () => {
 
       const settingsPath = join(PROJECT_ROOT, ".vscode/settings.json");
       const content = deps.fs.getFile(settingsPath) ?? "";
-      // Copilot AI-specific keys
       expect(content).toContain('"github.copilot.enable"');
       expect(content).toContain('"github.copilot.nextEditSuggestions.enabled"');
-      // VSCode framework keys
       expect(content).toContain('"editor.formatOnSave"');
     });
   });

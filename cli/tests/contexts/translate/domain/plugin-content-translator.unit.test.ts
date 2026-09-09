@@ -178,9 +178,6 @@ describe("PluginContentTranslator.translate()", () => {
     });
 
     it("emits commands under plugin-name-prefixed path", () => {
-      // greet.md → buildInstallPath yields ".cursor/commands/aidd/greet.md"
-      // toPluginRelativePath strips ".cursor/" then removes /aidd/ → "commands/greet.md"
-      // pluginRoot prepend → "sample-plugin/commands/greet.md"
       expect(pathsFor(cursor)).toContain("sample-plugin/commands/greet.md");
     });
 
@@ -330,15 +327,9 @@ describe("PluginContentTranslator.detectFlatCollisions()", () => {
   });
 });
 
-/**
- * The path a plugin's own content takes on its way to disk.
- *
- * This is the chain `aidd plugin install` follows — `translateWithComponentPaths` calls
- * `tool.rewriteContent`, and the caller writes the result — and it is the one the golden
- * suite cannot see, because `aidd translate` never calls `rewriteContent` at all. Deleting
- * copilot's rewriting as dead once shipped `{{TOOLS}}/...` verbatim into an installed file
- * with every gate green, which is what this covers.
- */
+/** The path a plugin's own content takes on its way to disk: the chain `aidd plugin install`
+ * follows, and the one the golden suite cannot see, since `aidd translate` never calls
+ * `rewriteContent` at all. */
 describe("a plugin whose content references the framework", () => {
   const withPlaceholder = () => {
     const skills = [

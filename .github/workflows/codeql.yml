@@ -17,9 +17,8 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    # CodeQL requires GitHub Advanced Security, which is free on public repos
-    # and paid on private ones. Skip while the repo is private to avoid
-    # spamming the run history with "Advanced Security must be enabled" failures.
+    # CodeQL needs Advanced Security, free only on a public repository: while this one is
+    # private every run would fail with "Advanced Security must be enabled".
     if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-latest
     strategy:

@@ -38,11 +38,8 @@ function makeTempDir(prefix) {
 
 test("MANIFEST_DIRS names every directory the build renames this plugin's manifest into", () => {
   // Duplicated from the CLI on purpose - this plugin is copied verbatim into user projects
-  // and can import nothing from `cli/`. Pinned here so the copy cannot drift from the list
-  // that decides where the manifest is actually written. Looking for one name found the
-  // version on Claude and nowhere else, which is the defect this list exists to close.
-  // Read off each profile's own declared manifest path: a tool's manifest directory is the
-  // parent of the `<dir>/plugin.json` it names, and no single file lists them any more.
+  // and can import nothing from `cli/` - and pinned here so the copy cannot drift. Read off
+  // each profile's own declared manifest path, since no single file lists them.
   const profilesDir = path.resolve(__dirname, "../../cli/src/contexts/tools/domain/profiles");
   const declared = [];
   for (const tool of fs.readdirSync(profilesDir, { withFileTypes: true })) {
@@ -113,9 +110,8 @@ test("readManifestVersion reads null for valid JSON that names no usable version
 });
 
 test("pluginVersion answers per repository, never handing one project's version to the next", () => {
-  // There used to be a process-wide memo here, keyed on nothing. It was harmless while the
-  // answer came from one fixed path; it stopped being harmless the moment the second route
-  // made the answer depend on which repository is asking.
+  // No process-wide memo: the second route makes the answer depend on which repository asks,
+  // so a cache keyed on nothing would hand one repository's answer to the next.
   const repoWithout = makeTempDir("aidd-plugin-version-norepo-");
   const repoWith = makeTempDir("aidd-plugin-version-withrepo-");
   fs.mkdirSync(path.join(repoWith, ".aidd"), { recursive: true });
@@ -151,10 +147,8 @@ test("the aidd manifest answers for the host's own tool, never for whichever lis
 });
 
 // The integration half: journal.cjs run from a temporary copy of this plugin's own hooks/
-// tree, so a missing manifest can be exercised without ever touching this repository's own
-// real, committed plugin.json - the same copy-and-run technique
-// plugin-install-shape.test.js and opencode-plugin.test.js already use for a structural
-// concern neither this repo's real tree nor a fixture file alone can vary.
+// tree, so a missing manifest is exercised without touching this repository's own committed
+// plugin.json - a structural concern neither the real tree nor a fixture alone can vary.
 const HOOKS_SRC = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks");
 const REAL_CLAUDE_PLUGIN_DIR = path.resolve(__dirname, "../../plugins/aidd-telemetry/.claude-plugin");
 
@@ -265,10 +259,9 @@ test("a plugin copy whose manifest is present but not valid JSON reads the same 
 });
 
 test("finds the manifest under every name the build renames it to, not only Claude's", () => {
-  // The defect this closes: the lookup named `.claude-plugin` alone, so a session on
-  // cursor, codex or copilot wrote a journal line with no version at all — indistinguishable
-  // from a line written before the field existed. Driven through the real hook, one built
-  // layout at a time.
+  // A lookup naming one manifest directory leaves every other tool writing a line with no
+  // version at all, indistinguishable from one written before the field existed. Driven
+  // through the real hook, one built layout at a time.
   for (const manifestDir of MANIFEST_DIRS) {
     const journalScript = makePluginCopy("valid", manifestDir);
     const repo = makeTempRepo();
@@ -282,9 +275,8 @@ test("finds the manifest under every name the build renames it to, not only Clau
 });
 
 test("falls back to what the aidd CLI recorded when the hooks were installed away from any manifest", () => {
-  // `aidd setup --ai cursor` copies `hooks/` alone into `.cursor/hooks/aidd-telemetry/`,
-  // with no manifest at any offset — measured, not assumed. The CLI writes
-  // `.aidd/manifest.json` in the same act, and that is the only thing left that knows.
+  // `aidd setup` copies `hooks/` alone, with no manifest at any offset, and writes
+  // `.aidd/manifest.json` in the same act - the only thing left that knows the version.
   const journalScript = makePluginCopy("absent");
   const repo = makeTempRepo();
   fs.writeFileSync(

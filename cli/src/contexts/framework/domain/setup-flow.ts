@@ -13,9 +13,8 @@ import { supportsUserScopeActivation } from "../../tools/domain/registry.js";
 
 export type PluginInstallMode = "interactive" | "all" | "recommended" | "named" | "none";
 
-/** Same value domain as `MarketplaceScope` — one project-or-user union, aliased here so
- * `SetupFlow`'s own field reads about what it means (a setup's scope) rather than
- * about the kernel type it happens to share. */
+/** Same value domain as `MarketplaceScope`, aliased so this field reads about a setup's own scope
+ * rather than about the kernel type it shares. */
 export type SetupScope = MarketplaceScope;
 
 export interface SetupFlowParams {
@@ -76,12 +75,11 @@ export class SetupFlow {
     }
   }
 
-  // `--scope user` writes nothing under `projectRoot` — there is no project for an IDE
-  // tool's own project-relative config to land in, an AI tool with neither native
-  // activation nor a user-scope install directory has nowhere to be registered, an
-  // empty --ai list registers the shared source for no tool at all, and no manifest
-  // entry exists yet to enable a plugin against. Each is refused rather than silently
-  // dropped.
+  // `--scope user` writes nothing under `projectRoot`: an IDE tool's project-relative config has
+  // nowhere to land, an AI tool with neither native activation nor a user-scope install directory
+  // has nowhere to be registered, an empty `--ai` list registers the shared source for no tool at
+  // all, and no manifest entry exists yet to enable a plugin against. Each is refused rather than
+  // silently dropped.
   private validateScope(
     scope: SetupScope,
     aiTools: readonly ToolId[],

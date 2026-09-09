@@ -54,28 +54,12 @@ import {
 } from "./shared/shared-source-reference-support.js";
 import { userScopeFilesSafeToDelete } from "./shared/user-scope-plugin-files.js";
 
-/** What dropping this project's own reference to the shared source found — `undefined`
- * only when there is nothing to guard on at all: the port is absent, or this project
- * has no shared, machine-scope marketplace registered locally. Threaded through the
- * whole native-undo pass so every tool's own "left registered" warning, and the
- * per-ref guard below, read the same already-computed fact rather than each
- * recomputing (and each decrementing) it on its own.
- *
- * `otherProjects` is read from `listAllReferencingProjects()` — every project this
- * file still names, across every version key, deduplicated and filtered by
- * existence — always, regardless of whether `removeReference` found this project's
- * own root to drop. A project whose own `references.json` entry was lost (deleted by
- * hand, or recorded under a path a later `realpath` no longer matches) still has
- * other projects' own claims to guard on, exactly the read
- * `plugin-remove-use-case.ts`'s own `describeGuardedPluginRef` makes for the same
- * reason, since it never has a claim of its own to drop at all. `resolvedRoot` is
- * subtracted by hand either way, the same way `plugin-remove-use-case.ts` does, since
- * `listAllReferencingProjects()` has no "except this one" parameter of its own.
- *
- * `alias` is this project's own local name for the shared source (`frameworkSourceIsShared`
- * matches it, always `FRAMEWORK_MARKETPLACE_NAME`), resolved per tool into that tool's
- * own `hostName` via `NativeRegistrations.marketplaces` — never the alias itself, which
- * a host never learns. */
+/** What dropping this project's own reference to the shared source found — `undefined` only
+ * when there is nothing to guard on at all: the port is absent, or no shared, machine-scope
+ * marketplace is registered locally. `otherProjects` is read regardless of whether this
+ * project's own claim was there to drop, since another project's claim is a fact worth
+ * guarding on either way. `alias` is this project's own local name for the source, resolved
+ * per tool into that tool's `hostName` — never the alias, which a host never learns. */
 interface SharedSourceReferenceOutcome {
   readonly alias: string;
   readonly otherProjects: readonly string[];
@@ -90,26 +74,21 @@ interface CleanOptions {
 interface CleanPreview {
   tools: Array<{ toolId: ToolId; fileCount: number }>;
   totalFileCount: number;
-  /** What a `--force` run will ask each tool's own CLI to undo — named ahead of time
-   * because that step drives an external binary, the one part of `clean` this preview
-   * cannot reduce to a file count. */
+  /** What a `--force` run will ask each tool's own CLI to undo — that step drives an external
+   * binary, the one part of `clean` this preview cannot reduce to a file count. */
   nativeRegistrations: Array<{
     toolId: ToolId;
     binary: string;
     marketplaceCount: number;
     pluginRefCount: number;
-    /** Absolute cache paths a `--force` run will attempt to purge, once undoing this
-     * registration actually frees each name — empty for a tool whose profile declares
-     * no `NativeActivation.pluginCacheDir`. A dry-run announcement, not a guarantee:
-     * whether a path is still there to purge, and whether it turns out safe to, is
-     * only known once the host's own CLI has actually run. */
+    /** Absolute cache paths a `--force` run will attempt to purge — empty for a tool whose
+     * profile declares no `NativeActivation.pluginCacheDir`. An announcement, not a guarantee:
+     * whether a path is still there, and safe to purge, is known only once the host's CLI ran. */
     cachePaths: readonly string[];
   }>;
-  /** The *other* projects on this machine that reference the shared source — the same
-   * list the guard and the survival warning both act on (every version key, this
-   * project's own root excluded, a dead root dropped), read before `--force` would
-   * drop this project's own claim, never after. `undefined` when the port was never
-   * wired in, or no shared, machine-scope marketplace is registered locally. */
+  /** The *other* projects on this machine that reference the shared source, read before
+   * `--force` would drop this project's own claim, never after. `undefined` when the port was
+   * never wired in, or no shared, machine-scope marketplace is registered locally. */
   sharedSourceOtherProjects?: readonly string[];
 }
 
@@ -120,8 +99,6 @@ interface CleanResult {
   fileCount: number;
 }
 
-/** What `undoNativeRegistrations` learned about one tool's registrations — the same
- * shape `purgeAllNativeCaches` (shared with `CleanUserScopeUseCase`) reads. */
 type UndoneRegistration = UndoneToolRegistrations;
 
 export class CleanUseCase {
@@ -130,40 +107,30 @@ export class CleanUseCase {
     private readonly manifestRepo: ManifestRepository,
     private readonly logger: Logger,
     private readonly gitignoreUseCase: GitignoreUseCase,
-    /** Native plugin CLI activators keyed by `NativeActivation.binary`, the same map
-     * `MarketplaceSyncSettingsUseCase` and `PluginRemoveUseCase` install through (see
-     * runtime/wiring/framework.ts). */
+    /** Native plugin CLI activators keyed by `NativeActivation.binary`. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator> = new Map(),
-    /** Resolves a registered marketplace's own scope, needed to undo a native
-     * registration at the same scope it was added at (see `undoNativeRegistrations`). */
+    /** Resolves a registered marketplace's own scope, needed to undo a native registration at
+     * the same scope it was added at. */
     private readonly marketplaceRegistry?: MarketplaceRegistry,
     private readonly prompter?: Prompter,
-    /** Readers of a host's own marketplace registry, keyed by `AiToolId` — the same map
-     * `MarketplaceSyncSettingsUseCase` reads, reused here as `purgeNativeCaches`'s own
-     * post-condition. Absent for a tool whose profile declares no `marketplaceRegistry`
-     * (codex): `purgeOneMarketplaceCache` then proves its leftover safe to remove by its
-     * own emptiness instead of a registry read. Defaults to empty for every existing
-     * caller that predates this guard. */
+    /** Readers of a host's own marketplace registry, keyed by `AiToolId`. Absent for a tool
+     * whose profile declares no `marketplaceRegistry` (codex): `purgeOneMarketplaceCache` then
+     * proves its leftover safe to remove by its own emptiness instead of a registry read. */
     private readonly hostMarketplaceRegistries: ReadonlyMap<
       AiToolId,
       HostMarketplaceRegistryReader
     > = new Map(),
-    /** The one resolver for the OS home directory this use case ever calls —
-     * `resolveHomeDir()` by default, never `os.homedir()` directly. `purgeNativeCaches`
-     * composes its cache root from this, and `filesSafeToDelete` its user-scope
-     * containment boundary: both must read the same `HOME` the caller's own
-     * `hostMarketplaceRegistries` readers were built from (see
-     * `host-marketplace-registry-reader-adapter.ts`), or a `HOME` override reaches one
-     * half of a post-condition and not the other. */
+    /** The one resolver for the OS home directory this use case ever calls. `purgeNativeCaches`
+     * composes its cache root from it and `filesSafeToDelete` its user-scope containment
+     * boundary: both must read the same `HOME` the caller's own `hostMarketplaceRegistries`
+     * readers were built from, or a `HOME` override reaches one half of a post-condition. */
     private readonly homeDir: () => string = resolveHomeDir,
-    /** The registry of projects referencing the shared machine-scope source. Absent for
-     * every caller that predates this, which skips the decrement entirely. */
+    /** The registry of projects referencing the shared machine-scope source. Absent skips the
+     * decrement entirely. */
     private readonly userSourceReferences?: UserSourceReferences,
-    /** Host plugin registry readers keyed by `AiToolId`, the same map
-     * `DoctorRegistrationUseCase` reads — consulted before uninstalling a ref so the
-     * scope asked for is the one the host actually registered it at, never a guess.
-     * Absent for every caller that predates this, which falls back to the manifest's
-     * own recorded scope (see `resolveUninstallScopeOrder`). */
+    /** Host plugin registry readers keyed by `AiToolId`, consulted before uninstalling a ref so
+     * the scope asked for is the one the host actually registered it at, never a guess. Absent
+     * falls back to the manifest's own recorded scope. */
     private readonly hostPluginRegistries: ReadonlyMap<
       AiToolId,
       HostPluginRegistryReader
@@ -180,16 +147,13 @@ export class CleanUseCase {
     const preview = await this.buildPreview(manifest, home, options.projectRoot);
     const dryRunResult = await this.confirmOrDryRun(options, preview);
     if (dryRunResult !== null) return dryRunResult;
-    // Decremented exactly once per run, before the per-tool loop below: the shared
-    // source's reference count is a project-level fact, not a per-tool one, and claude,
-    // codex and copilot can each carry their own `aidd-framework` ref — decrementing
-    // inside that loop would drop this project's own claim once per tool instead of once.
+    // Decremented exactly once per run, before the per-tool loop: the shared source's reference
+    // count is a project-level fact, and claude, codex and copilot can each carry their own ref,
+    // so decrementing inside that loop would drop this project's claim once per tool.
     const sharedSourceOutcome = await this.dropSharedSourceReference(options.projectRoot);
-    // Undoing a host's own registration must happen before any of the rest: the tool's
-    // CLI resolves the marketplace name against the built tree this project recorded,
-    // and that tree lives under .aidd/cache/ — which removeAiddState deletes next.
-    // Deleting it first leaves the host's own registry pointing at a source that no
-    // longer exists, which the host may then refuse to unregister at all.
+    // Undoing a host's own registration must happen before any of the rest: the tool's CLI
+    // resolves the marketplace name against the built tree under `.aidd/cache/`, which
+    // `removeAiddState` deletes next, and a host may refuse to unregister a source that is gone.
     const undone = await this.undoNativeRegistrations(
       manifest,
       options.projectRoot,
@@ -197,23 +161,20 @@ export class CleanUseCase {
       sharedSourceOutcome
     );
     // Purging a host's own plugin cache is the next step, never before this: it is only
-    // ever safe once undoNativeRegistrations has actually asked that host to forget the
-    // name (see purgeNativeCaches's own post-conditions).
+    // Only ever safe once `undoNativeRegistrations` has actually asked that host to forget the
+    // name (see `purgeNativeCaches`'s own post-conditions).
     await this.purgeNativeCaches(home, undone);
     let deleted = await this.deleteAllToolFiles(manifest, options.projectRoot);
     deleted += await this.deleteMachineLocalFiles(manifest, options.projectRoot);
     await this.removeAiddState(options.projectRoot);
-    // The same entries the pipeline added on install — clean must remove exactly what
-    // was added, never a subset of it.
+    // Exactly what the pipeline added on install, never a subset of it.
     await this.gitignoreUseCase.remove(options.projectRoot, aiddGitignoreEntries(manifest));
     return { dryRun: false, manifestFound: true, preview, fileCount: deleted };
   }
 
-  // config.json is the committed telemetry switch: a file clean did not write,
-  // so clean never removes it. Everything AIDD did write must go before the
-  // emptiness check, or its own presence blocks a removal that should happen —
-  // the registry `marketplace add` writes included, which is a file and was
-  // missed while only the directories were listed.
+  // `config.json` is the committed telemetry switch: a file clean did not write, so clean never
+  // removes it. Everything AIDD did write must go before the emptiness check, or its own presence
+  // blocks a removal that should happen — the registry `marketplace add` writes included.
   private async removeAiddState(projectRoot: string): Promise<void> {
     const aiddDir = join(projectRoot, AIDD_DIR);
     const configKept = await this.fs.fileExists(join(aiddDir, AIDD_CONFIG_FILENAME));
@@ -232,20 +193,13 @@ export class CleanUseCase {
     if (configKept) this.logger.info(`Kept ${AIDD_DIR}/${AIDD_CONFIG_FILENAME}`);
   }
 
-  // ── Undoing a host's own registration ───────────────────────────────────────
-
-  /** For every tool whose own CLI was asked to register something (`nativeRegistrations`
-   * — absent for a tool with no `nativeActivation`, or one whose CLI never ran), drives
-   * that same CLI to undo it. Never a direct edit of the host's own registry file: that
-   * file is the host's to write, and `clean` has no more title to it than `plugin
-   * remove` does.
+  /** Drives each tool's own CLI to undo what it was asked to register. Never a direct edit of
+   * the host's own registry file: that file is the host's to write.
    *
-   * Returns, per tool the activator actually ran for — never one whose binary was
-   * absent — both its full registrations and the `hostName`s `removeMarketplace`
-   * itself confirmed removed. The two are not the same set: a marketplace ref the host
-   * refused to drop is still in `registrations.marketplaces`, but absent from
-   * `removedHostNames`, which is what `purgeNativeCaches`'s codex branch gates its own
-   * purge on (see `purgeOneMarketplaceCache`). */
+   * Returns, per tool the activator actually ran for, both its full registrations and the
+   * `hostName`s `removeMarketplace` itself confirmed removed — a marketplace the host refused to
+   * drop stays in `registrations.marketplaces` but never in `removedHostNames`, which is what
+   * `purgeNativeCaches`'s codex branch gates its own purge on. */
   private async undoNativeRegistrations(
     manifest: Manifest,
     projectRoot: string,
@@ -318,14 +272,11 @@ export class CleanUseCase {
     return removedHostNames;
   }
 
-  // `alias` resolves this project's own registry entry, the only place its `scope` is
-  // recorded; `hostName` is what actually reaches the host's own CLI
-  // (`claude plugin marketplace remove <hostName>`), since a host only ever knows a
-  // registration by its catalog's own declared name, never by whatever local alias this
-  // project chose for it. The two differ whenever a project registers a marketplace
-  // under an alias its catalog does not declare itself under, a supported capability —
-  // passing `alias` to the host-facing call here would ask it to remove a name it never
-  // held.
+  // `alias` resolves this project's own registry entry, the only place its `scope` is recorded;
+  // `hostName` is what reaches the host's own CLI, since a host knows a registration only by its
+  // catalog's own declared name. The two differ whenever a project registers under an alias its
+  // catalog does not declare, a supported capability — passing `alias` to a host-facing call
+  // would ask it to remove a name it never held.
   private async undoMarketplaceRegistration(
     activator: NativePluginActivator,
     binary: string,
@@ -345,20 +296,10 @@ export class CleanUseCase {
       return false;
     }
     if (marketplace.scope === "user") {
-      // Machine-scope: every project on this machine shares this one registration, so
-      // a single project's `clean` must never unregister it — doing so would silently
-      // break every other project too. This project's own claim on it is dropped
-      // separately, once per run (`dropSharedSourceReference`, its own plugin refs
-      // already uninstalled just before this call) — the host's own registration is
-      // left in place regardless of what that drop found.
-      //
-      // Three things survive this, not one: the host's own registration (named
-      // above), the `userConfigDir()/marketplaces.json` entry
-      // `MarketplaceRegisterFrameworkUseCase` wrote (this project's own registry
-      // never held it to begin with, once machine-scope migration has run — nothing
-      // here to delete), and this tool's own plugin cache — named by its absolute
-      // path when this tool's profile declares one, the same fact
-      // `describeSurvivingCachePaths` announces for a binary that is off `PATH`.
+      // Machine-scope: every project on this machine shares this one registration, so a single
+      // project's `clean` must never unregister it. Three things survive, not one: the host's
+      // own registration, the `userConfigDir()/marketplaces.json` entry, and this tool's own
+      // plugin cache, named by its absolute path when the profile declares one.
       this.logger.warn(
         `${binary}: '${hostName}' is shared by every project on this machine — left registered. ` +
           this.describeSharedSourceSurvival(toolId, hostName, home, sharedSourceOutcome)
@@ -372,29 +313,21 @@ export class CleanUseCase {
     );
   }
 
-  /** Decrements this project's own claim on the shared source exactly once per `clean`
-   * run — independent of how many tools' own registrations name it, since the count in
-   * `references.json` is per project, never per tool. Never reads a "current" CLI
-   * version to decide which key to touch: `removeReference` finds the project wherever
-   * it is recorded, so a self-update between the `sync` that wrote the reference and
-   * this `clean` cannot strand it under a version key nobody ever asks about again.
-   * `undefined` only when the port was never wired in, or no shared, machine-scope
-   * marketplace is registered locally at all — never merely because this project's
-   * own claim was already missing, which still leaves other projects' own claims
-   * worth guarding on (see `SharedSourceReferenceOutcome`'s own doc). */
+  /** Decrements this project's own claim exactly once per `clean` run, independent of how many
+   * tools' registrations name it: the count in `references.json` is per project, never per tool.
+   * Never reads a "current" CLI version to decide which key to touch, so a self-update between
+   * the `sync` that wrote the reference and this `clean` cannot strand it. `undefined` only when
+   * the port was never wired in, or no shared marketplace is registered locally — never merely
+   * because this project's own claim was already missing. */
   private async dropSharedSourceReference(
     projectRoot: string
   ): Promise<SharedSourceReferenceOutcome | undefined> {
     return this.withSharedSourceClaims(
       projectRoot,
       async (userSourceReferences, alias, resolvedRoot) => {
-        // A no-op when this project's own registry never held the shared entry to begin
-        // with (deleted by hand, or recorded under a path a later `realpath` no longer
-        // matches) — which must never collapse into "no other projects": another
-        // project's own claim is a fact worth guarding on regardless of whether this
-        // project ever had one of its own, so `otherProjects` is always read from
-        // `listAllReferencingProjects()`, the same way `plugin-remove-use-case.ts`'s own
-        // `describeGuardedPluginRef` does when it has no claim of its own to drop at all.
+        // A no-op when this project's own registry never held the shared entry, which must never
+        // collapse into "no other projects": another project's claim is worth guarding on
+        // regardless, so `otherProjects` is always read in full.
         await userSourceReferences.removeReference(resolvedRoot);
         const otherProjects = await otherProjectsReferencing(userSourceReferences, resolvedRoot);
         return { alias, otherProjects };
@@ -402,13 +335,9 @@ export class CleanUseCase {
     );
   }
 
-  /** Shared preamble behind `dropSharedSourceReference` and
-   * `previewSharedSourceOtherProjects`: resolves whether a shared, machine-scope
-   * registration exists to act on at all (`undefined` when the port was never wired
-   * in, or none is registered locally), then resolves `projectRoot` through
-   * `resolveProjectRootForReferences` before handing `action` the shared alias and
-   * the resolved root. `action` alone decides whether the run only reads
-   * (`previewSharedSourceOtherProjects`) or also writes (`dropSharedSourceReference`). */
+  /** Shared preamble behind `dropSharedSourceReference` and `previewSharedSourceOtherProjects`:
+   * `undefined` when the port was never wired in or no shared, machine-scope registration exists
+   * to act on. `action` alone decides whether the run only reads or also writes. */
   private async withSharedSourceClaims<T>(
     projectRoot: string,
     action: (
@@ -428,12 +357,9 @@ export class CleanUseCase {
     });
   }
 
-  /** What survives a shared registration this run left in place, plus which other
-   * projects (`otherProjectsReferencing`) still claim the shared source this run just
-   * dropped this project's own reference to — empty when none do, and reported either
-   * way whether or not this project itself ever held a claim to begin with: purging
-   * the source itself is a machine-scope decision, not this project's own `clean` to
-   * make. */
+  /** What survives a shared registration this run left in place, plus which other projects still
+   * claim the shared source — reported whether or not this project itself ever held a claim:
+   * purging the source is a machine-scope decision, not this project's own `clean` to make. */
   private describeSharedSourceSurvival(
     toolId: ToolId,
     hostName: string,
@@ -450,8 +376,7 @@ export class CleanUseCase {
     return `${base} No project on this machine still references it — \`aidd clean --scope user\` is what purges it for the machine.`;
   }
 
-  /** One marketplace's own surviving cache path, the single-`hostName` counterpart to
-   * `describeSurvivingCachePaths` — empty for a tool whose profile declares no
+  /** One marketplace's own surviving cache path — empty for a tool whose profile declares no
    * `NativeActivation.pluginCacheDir` (copilot). */
   private describeSurvivingCachePath(toolId: ToolId, hostName: string, home: string): string {
     if (!isAiToolId(toolId)) return "";
@@ -460,11 +385,9 @@ export class CleanUseCase {
     return `, and its cache at: ${join(cacheRoot, hostName)}`;
   }
 
-  /** Named for the "not on the PATH" warning: `clean` never even reaches
-   * `purgeNativeCaches` for a tool whose binary is absent, so the cache it would have
-   * purged survives silently unless this names it too — the same absolute paths the
-   * dry-run preview already announces (`previewNativeRegistrations`). Empty for a tool
-   * whose profile declares no `NativeActivation.pluginCacheDir`. */
+  /** Named for the "not on the PATH" warning: `clean` never reaches `purgeNativeCaches` for a
+   * tool whose binary is absent, so the cache it would have purged survives silently unless this
+   * names it. Empty for a profile declaring no `NativeActivation.pluginCacheDir`. */
   private describeSurvivingCachePaths(
     toolId: ToolId,
     registrations: NativeRegistrations,
@@ -479,13 +402,10 @@ export class CleanUseCase {
   }
 
   /**
-   * Uninstalls one plugin ref at the scope it was actually registered at — never a
-   * default, and never the manifest's own recorded scope alone: `resolveUninstallScopeOrder`
-   * asks the host's own registry first, and only falls back to the manifest's scope,
-   * then the other one, when that registry has nothing to say. A real `claude` binary
-   * refuses a mismatched-scope uninstall outright, so the fallback list is tried in
-   * order until one succeeds; best-effort throughout, same as every other native undo
-   * here — a plugin this run cannot get the host to forget is named, not thrown.
+   * Uninstalls one plugin ref at the scope it was actually registered at, never a default:
+   * `resolveUninstallScopeOrder` asks the host's own registry first. A real `claude` binary
+   * refuses a mismatched-scope uninstall outright, so the resolved list is tried in order until
+   * one succeeds; best-effort throughout — a ref the host will not forget is named, not thrown.
    */
   private async uninstallPluginRef(
     activator: NativePluginActivator,
@@ -524,13 +444,11 @@ export class CleanUseCase {
     this.logger.warn(`${binary} plugin uninstall '${ref}' failed: ${lastMessage}`);
   }
 
-  /** `undefined` when nothing guards `ref` — the ordinary case that still uninstalls
-   * it. Otherwise the message to warn with instead of ever calling `uninstallPlugin`:
-   * this host enables a plugin for the whole machine (no `scopeArgs` — codex,
-   * copilot), `ref` came from the shared source, and another project on this machine
-   * still references it — uninstalling it here would disable it there too. Named
-   * projects, the same fact `aidd clean --scope user`'s own confirmation prompt
-   * names, so a person reading this warning already knows what removes it for good. */
+  /** `undefined` when nothing guards `ref` — the ordinary case that still uninstalls it.
+   * Otherwise the message to warn with instead of ever calling `uninstallPlugin`: this host
+   * enables a plugin for the whole machine (no `scopeArgs` — codex, copilot), `ref` came from the
+   * shared source, and another project still references it, so uninstalling here would disable it
+   * there too. */
   private describeGuardedPluginRef(
     binary: string,
     toolId: ToolId,
@@ -552,12 +470,10 @@ export class CleanUseCase {
     return describeGuardedPluginRefMessage({ binary, ref, otherProjects });
   }
 
-  /** The scope this project's own manifest recorded for the plugin behind `ref` —
-   * `"project"` when nothing in the manifest names it, the same default `uninstallPlugin`
-   * itself falls back to. `ref` is `<plugin>@<hostName>`, so matching it back to a
-   * manifest entry (keyed by `plugin.marketplace`, this project's own alias) goes
-   * through `registrations.marketplaces`, the one place both names are recorded
-   * together (see `pluginRefsToEnable`'s own doc in `marketplace-sync-settings-use-case.ts`). */
+  /** The scope this project's own manifest recorded for the plugin behind `ref`, `"project"` when
+   * nothing names it. `ref` is `<plugin>@<hostName>`, so matching it back to a manifest entry
+   * (keyed by this project's own alias) goes through `registrations.marketplaces`, the one place
+   * both names are recorded together. */
   private manifestScopeForRef(
     manifest: Manifest,
     toolId: ToolId,
@@ -575,11 +491,8 @@ export class CleanUseCase {
     return "project";
   }
 
-  // ── A host's own plugin cache, purged only under a declared, proven-safe path ──
-
-  /** For every tool `undoNativeRegistrations` actually drove — never one whose binary
-   * was absent, that map holds only the tools it ran for — purges the cache its profile
-   * declares. Delegates to `purgeAllNativeCaches`, shared with `CleanUserScopeUseCase`. */
+  /** Only for a tool `undoNativeRegistrations` actually drove — that map holds none whose binary
+   * was absent. */
   private async purgeNativeCaches(
     home: string,
     undone: ReadonlyMap<ToolId, UndoneRegistration>
@@ -587,14 +500,9 @@ export class CleanUseCase {
     await purgeAllNativeCaches(this.fs, this.logger, home, this.hostMarketplaceRegistries, undone);
   }
 
-  // ── Machine-local files a tool's own materialization writes, outside the manifest ──
-
-  /** The files a tool writes that `plugins[].files` never tracks: a machine-local
-   * settings file (`.claude/settings.local.json`) and, for a tool merging a plugin's
-   * hooks into its own project file (`.cursor/hooks.json`), the same unmerge `plugin
-   * remove` already drives for one plugin at a time — extracted to
-   * `cli/src/contexts/framework/application/shared/remove-project-hooks.ts` so both call
-   * the one place that knows how. */
+  /** The files a tool writes that `plugins[].files` never tracks: a machine-local settings file
+   * (`.claude/settings.local.json`) and, for a tool merging a plugin's hooks into its own project
+   * file (`.cursor/hooks.json`), the same unmerge `plugin remove` drives one plugin at a time. */
   private async deleteMachineLocalFiles(manifest: Manifest, projectRoot: string): Promise<number> {
     let count = 0;
     for (const toolId of manifest.getInstalledToolIds()) {
@@ -647,13 +555,9 @@ export class CleanUseCase {
     return { tools, totalFileCount, nativeRegistrations, sharedSourceOtherProjects };
   }
 
-  /** Read-only counterpart to `dropSharedSourceReference`: names the same "other
-   * projects" list the guard and the survival warning both act on, without dropping
-   * anything — a dry-run must never write. Reads `listAllReferencingProjects()`
-   * across every version key, this project's own root excluded — the same reason
-   * `dropSharedSourceReference` reads it this way (see its own doc) — so two projects
-   * synced under two different CLI versions see the same "other projects" fact from
-   * `aidd clean` as from `aidd clean --force`. */
+  /** Read-only counterpart to `dropSharedSourceReference`: a dry-run must never write. Reads
+   * across every version key, so two projects synced under two different CLI versions see the
+   * same "other projects" fact from `aidd clean` as from `aidd clean --force`. */
   private async previewSharedSourceOtherProjects(
     projectRoot: string
   ): Promise<readonly string[] | undefined> {
@@ -733,11 +637,10 @@ export class CleanUseCase {
     return count;
   }
 
-  /** For a project-scope plugin, every tracked file is safe: it lives under
-   * `projectRoot`, which `clean` is already trusted with. A user-scope plugin's own
-   * files are checked by `userScopeFilesSafeToDelete`, shared with
-   * `CleanUserScopeUseCase` — see its own doc comment for why a raw path comparison
-   * would miss both a `..` segment and a symlink escape. */
+  /** For a project-scope plugin every tracked file is safe: it lives under `projectRoot`, which
+   * `clean` is already trusted with. A user-scope plugin's files go through
+   * `userScopeFilesSafeToDelete`, where a raw path comparison would miss both a `..` segment and
+   * a symlink escape. */
   private async filesSafeToDelete(
     plugin: InstalledPlugin,
     toolId: AiToolId

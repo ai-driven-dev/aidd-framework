@@ -37,11 +37,8 @@ Examples:
 
 const SKIPPED_DIRS = new Set([".git", "node_modules", "worktrees", ".specstory"]);
 const SKIPPED_DIR_PREFIXES = [".tmp-check-markdown-links-"];
-// Always-ignored, not just a CLI --ignore convenience: cli/tests/fixtures/**
-// holds synthetic mock trees that intentionally don't materialize every file
-// they reference, and cli/aidd_docs/tasks/** is a historical record whose
-// @path references and inline rewrite-rule examples are expected to drift as
-// the codebase evolves after the fact.
+// Always ignored, never a --ignore convenience: both trees hold targets meant not to
+// resolve — synthetic mock references, and a historical record left as it was written.
 const DEFAULT_IGNORES = ["cli/tests/fixtures", "cli/aidd_docs/tasks"];
 const MARKDOWN_EXTENSIONS = new Set([".md", ".mdx"]);
 function normalizePathForDisplay(filePath) {
@@ -246,10 +243,8 @@ function anchorOf(target) {
   return hashIndex === -1 ? "" : target.slice(hashIndex + 1);
 }
 
-/** GitHub's rule: drop everything that is not a letter, digit, space, underscore or
- * hyphen — emoji and punctuation included — lowercase, then turn every remaining space
- * into a hyphen. Nothing is collapsed, which is why a leading emoji leaves the hyphen it
- * was separated by and an `&` leaves two. */
+/** GitHub's rule, reproduced: nothing is collapsed, which is why a leading emoji leaves
+ * the hyphen it was separated by and an `&` leaves two. */
 function headingSlug(text) {
   return text
     .replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1")
@@ -258,8 +253,8 @@ function headingSlug(text) {
     .replaceAll(" ", "-");
 }
 
-/** Every fragment the target file answers. A duplicate heading takes GitHub's `-1`, `-2`
- * suffix, so both the bare slug and the numbered one resolve. */
+/** A duplicate heading takes GitHub's `-1`, `-2` suffix, so both the bare slug and the
+ * numbered one resolve. */
 function headingSlugs(absolutePath) {
   const slugs = new Set();
   const seen = new Map();
@@ -317,10 +312,8 @@ function resolveLocalPath(target, sourceFile) {
     if (!fs.existsSync(absolute) && fs.existsSync(generatedTemplateAbsolute)) {
       return { absolute: generatedTemplateAbsolute };
     }
-    // A *-template.md scaffold links to files emitted next to the generated
-    // output at runtime (e.g. ./plan.md, ./phase-1.md), which never exist in
-    // the repo. A dot-relative target that resolves nowhere is an intentional
-    // placeholder for that generated sibling, not a broken link.
+    // A *-template.md scaffold links to siblings emitted at runtime, so a dot-relative
+    // target resolving nowhere is a placeholder rather than a broken link.
     if (!fs.existsSync(absolute) && /-template\.md$/u.test(sourceRelative) && /^\.\.?\//u.test(decoded)) {
       return { ignored: true };
     }
@@ -365,10 +358,8 @@ function problemForTarget(target, sourceFile) {
     return { raw: target, reason: "local-path-not-found" };
   }
 
-  // A fragment only means something in markdown, and only once the file itself resolves —
-  // otherwise a missing file would report twice for one fix.
-  // `#L119` and `#L119-L130` are GitHub's line fragments; they resolve against the file,
-  // never against a heading.
+  // A fragment is checked only once the file itself resolves, or a missing file reports
+  // twice for one fix. `#L119` is GitHub's line fragment: it answers to no heading.
   const anchor = /^L\d+(-L\d+)?$/u.test(anchorOf(validationTarget)) ? "" : anchorOf(validationTarget);
   if (anchor && MARKDOWN_EXTENSIONS.has(path.extname(resolved.absolute).toLowerCase())) {
     if (!headingSlugs(resolved.absolute).has(safeDecodeUri(anchor).toLowerCase())) {

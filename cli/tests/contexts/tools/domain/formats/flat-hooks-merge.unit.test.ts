@@ -7,8 +7,6 @@ import {
   mergeCursorFlatHooks,
 } from "../../../../../src/contexts/tools/domain/formats/flat-hooks-merge.js";
 
-// ── mergeClaudeSettingsHooks ──────────────────────────────────────────────────
-
 describe("mergeClaudeSettingsHooks", () => {
   it("merges plugin hooks into empty settings.json", () => {
     const plugin = JSON.stringify({
@@ -76,8 +74,6 @@ describe("mergeClaudeSettingsHooks", () => {
   });
 });
 
-// ── flattenCopilotHooksShape ──────────────────────────────────────────────────
-
 describe("flattenCopilotHooksShape", () => {
   it("flattens nested Claude matcher-group to flat entries", () => {
     const input = JSON.stringify({
@@ -137,8 +133,6 @@ describe("flattenCopilotHooksShape", () => {
   });
 });
 
-// ── mergeCursorFlatHooks ──────────────────────────────────────────────────────
-
 describe("mergeCursorFlatHooks", () => {
   it("maps SessionStart → sessionStart", () => {
     const plugin = JSON.stringify({
@@ -167,10 +161,8 @@ describe("mergeCursorFlatHooks", () => {
     expect(result.hooks).toHaveProperty("beforeSubmitPrompt");
   });
 
-  // #680: the only reason a Cursor session closes a turn headlessly. Measured 2026-08-22:
-  // an interactive session fires `stop` and a headless one fires `sessionEnd` instead,
-  // never both from one run - so subscribing to `stop` alone journals nothing headless,
-  // in silence. This test fails if either name stops being emitted.
+  // An interactive Cursor session fires `stop` and a headless one fires `sessionEnd`, never
+  // both from one run - so subscribing to `stop` alone journals nothing headless, in silence.
   it("maps Stop → both stop and sessionEnd, because Cursor fires one or the other", () => {
     const command = "node ./.cursor/hooks/plugin/turn-end.js";
     const plugin = JSON.stringify({
@@ -265,17 +257,12 @@ describe("mergeCursorFlatHooks", () => {
   });
 });
 
-// ── mergeCodexFrameworkHooksJson ──────────────────────────────────────────────
-
 describe("mergeCodexFrameworkHooksJson", () => {
-  // #707: Codex has no `Stop` event. Its vocabulary, read out of the 0.149.0 binary and
-  // confirmed by a live `codex exec` run with all four subscribed, is SessionStart /
-  // SessionEnd / PostToolUse / PreToolUse and friends - SessionStart and SessionEnd fired,
-  // Stop never did. Subscribing to Stop alone journals a session_start with nothing after
-  // it, in silence. This test fails if that mapping is dropped.
+  // Codex has no `Stop` event: its vocabulary is SessionStart / SessionEnd / PostToolUse /
+  // PreToolUse, so subscribing to Stop journals a session_start with nothing after it.
   it("maps Stop to SessionEnd, the event Codex actually delivers", () => {
-    // Split literal, the same way claude-root-path-rewrite.ts writes one: biome's
-    // noTemplateCurlyInString cannot tell a plugin-root token from a botched template.
+    // Split literal, the way a plugin-root token is written: biome's noTemplateCurlyInString
+    // cannot tell one from a botched template.
     const command = `node $${"{PLUGIN_ROOT}"}/hooks/journal.cjs turn-end`;
     const plugin = JSON.stringify({
       hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
@@ -376,8 +363,6 @@ describe("mergeCodexFrameworkHooksJson", () => {
     expect(result.hooks.SessionStart[0].matcher).toBe("startup");
   });
 });
-
-// ── hookCommandsForEvent ────────────────────────────────────────────────────────
 
 describe("hookCommandsForEvent", () => {
   it("reads a command out of Claude's nested matcher-group shape", () => {

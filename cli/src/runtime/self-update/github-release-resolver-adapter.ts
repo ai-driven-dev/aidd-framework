@@ -20,9 +20,8 @@ export class GitHubReleaseResolverAdapter implements LatestReleaseResolver {
   ) {}
 
   async resolveLatest(repo: string): Promise<string | null> {
-    // Use /releases?per_page=1 (not /releases/latest) — the latter excludes
-    // prereleases. We want the most recent published release of any kind so
-    // beta tags resolve too.
+    // `/releases?per_page=1`, not `/releases/latest`, which excludes prereleases: the most
+    // recent published release of any kind is wanted, so beta tags resolve too.
     const url = `${GITHUB_API_BASE}/repos/${repo}/releases?per_page=1`;
     const token = (await this.tokenProvider?.resolve()) ?? undefined;
     try {
@@ -37,8 +36,8 @@ export class GitHubReleaseResolverAdapter implements LatestReleaseResolver {
   }
 
   async listRootReleases(repo: string): Promise<string[]> {
-    // per_page=100 (GitHub max) so root tags are not buried under
-    // release-please per-component tags on busy repos.
+    // `per_page=100`, GitHub's maximum, so root tags are not buried under release-please's
+    // per-component tags on a busy repository.
     const url = `${GITHUB_API_BASE}/repos/${repo}/releases?per_page=100`;
     const token = (await this.tokenProvider?.resolve()) ?? undefined;
     try {
@@ -55,9 +54,8 @@ export class GitHubReleaseResolverAdapter implements LatestReleaseResolver {
   }
 
   async isRepoPublic(repo: string): Promise<boolean> {
-    // No token — probe unauthenticated reachability. A private/absent repo returns
-    // 404; only that unambiguously means "auth required". Any other error resolves
-    // true so a rate-limited or offline public user is not wrongly sent to login.
+    // Deliberately tokenless: only a 404 unambiguously means "auth required", so any other
+    // error resolves true and a rate-limited or offline public user is not sent to login.
     const url = `${GITHUB_API_BASE}/repos/${repo}`;
     try {
       await this.http.get(url);

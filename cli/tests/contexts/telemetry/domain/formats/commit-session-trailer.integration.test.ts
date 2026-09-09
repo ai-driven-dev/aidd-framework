@@ -8,12 +8,8 @@ import {
   sessionTrailerDelegateScript,
 } from "../../../../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
 
-/**
- * The delegate as git actually invokes it: `sh <script> <message-file> <message-source>`.
- * The unit test asserts on the script's own text, which cannot catch a `case` branch
- * matching the wrong argument or skipping the wrong source - only running the generated
- * script for real proves what it does with each `message_source` git passes.
- */
+/** The delegate as git actually invokes it: only running the generated script proves what a
+ * `case` branch does with each `message_source`, which asserting on its text cannot. */
 const SESSION = "55555555-5555-4555-8555-555555555555";
 
 const created: string[] = [];

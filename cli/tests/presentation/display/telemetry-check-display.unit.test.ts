@@ -4,12 +4,8 @@ import type { HostRegistrationEntry } from "../../../src/contexts/tools/domain/h
 import { printTelemetryCheckReport } from "../../../src/presentation/display/telemetry-check-display.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 
-/**
- * `aidd telemetry check` exists to send a person to the right place when nothing is being
- * recorded. Everything asserted here is about not sending them to the wrong one: a gated
- * run must not look like a judged one, an unreadable thing must not look like an absent
- * one, and the setup a person needs in order to act has to survive the gate.
- */
+/** Everything here is about not sending a person to the wrong place: a gated run must not
+ * look like a judged one, nor an unreadable thing like an absent one. */
 class CapturingOutput extends CLIOutput {
   readonly lines: string[] = [];
   readonly warnings: string[] = [];
@@ -349,10 +345,8 @@ describe("the row saying whether commits carry their session", () => {
     expect(text).toContain("prepare-commit-msg does not call it");
   });
 
-  // Git will not run a hook it cannot execute, so present-but-not-executable is its own
-  // sentence rather than a shade of installed.
-  // Zero with every part in place is the finding this row exists to surface. Excusing it as
-  // by-design was the one outcome that had to be impossible, and the guard read `>= 0`.
+  // Zero with every part in place is the finding this row exists to surface, so excusing it
+  // as by-design is the one outcome that must be impossible.
   it("never excuses zero, whatever else is in place", () => {
     const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 0, examined: 20 } });
 
@@ -378,11 +372,8 @@ describe("the row saying whether commits carry their session", () => {
     expect(text).not.toMatch(/lefthook|husky/iu);
   });
 
-  /**
-   * `hookManager` — read from a root marker file, never from the hook's own contents — is
-   * what makes naming the tool honest, unlike `hookHasOtherContent` above. The two facts are
-   * independent: a hand-written hook sets the second without the first, and stays unnamed.
-   */
+  /** `hookManager` is read from a root marker file, never from the hook's own contents, which
+   * is what makes naming a tool honest: a hand-written hook stays unnamed. */
   describe("where lefthook or husky owns prepare-commit-msg", () => {
     it("names lefthook and prints the job to add, when its config does not call the delegate", () => {
       const text = report({
@@ -416,9 +407,8 @@ describe("the row saying whether commits carry their session", () => {
       expect(text).not.toContain("does not call it");
     });
 
-    // The discriminating case for `check`: `callSite: "missing"` here describes the
-    // absolute-path line this CLI would otherwise look for, which a manager never calls the
-    // delegate through — it must not read as a fault once the manager's own config does.
+    // `callSite: "missing"` describes the absolute-path line this CLI looks for, which a
+    // manager never calls the delegate through — not a fault once its own config does.
     it("reports the chain wired through the manager and prints no job, once its config already calls the delegate", () => {
       const text = report({
         delegate: "executable",
@@ -435,10 +425,8 @@ describe("the row saying whether commits carry their session", () => {
       expect(text).not.toContain("prepare-commit-msg:");
     });
 
-    // B-S1: the manager's own config calling the delegate is not the same fact as the
-    // delegate actually being there to call. A checkout where `lefthook.yml` names the job
-    // but `telemetry on` was never run must not read as "wired" — that is exactly the state
-    // this repository itself is in until someone runs it.
+    // A config naming the job is not the delegate being there to answer it: a checkout where
+    // `telemetry on` was never run must not read as wired.
     it("does not report wired when nothing was ever installed to answer the call", () => {
       const text = report({
         delegate: "absent",
@@ -469,11 +457,8 @@ describe("the row saying whether commits carry their session", () => {
     });
   });
 
-  /**
-   * A commit no session made carries no trailer by design, and merges are skipped outright.
-   * So a number below the total is not a fault, and a bare "4 of 20" reads like one. The
-   * qualifier appears exactly when it could mislead — some carrying, every part in place.
-   */
+  // A commit no session made carries no trailer by design and merges are skipped, so a bare
+  // "4 of 20" would read as a fault when it is not one.
   it("says a shortfall is expected when every part is in place", () => {
     const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 4, examined: 20 } });
 
@@ -505,12 +490,8 @@ describe("the row saying whether commits carry their session", () => {
     expect(text).not.toContain("nothing installed");
   });
 
-  /**
-   * A repository whose git could not name its hooks directory still has a history, and the
-   * count is the fact that matters. An earlier version printed "no repository here" for it —
-   * measured false on a git that rejects `--git-path`, inside a repository with commits, one
-   * of which carried the trailer. One true fact replaced by one false one.
-   */
+  // A git that rejects `--git-path` still sits inside a repository with a history, so the
+  // count stays the fact that matters.
   it("keeps the count when git could not name the hooks directory", () => {
     const text = report({
       delegate: "absent",

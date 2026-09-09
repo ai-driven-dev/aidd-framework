@@ -7,10 +7,8 @@ export interface DriftDescriptor {
 }
 
 /**
- * What a leaf's drift scan found: entries that can actually be restored (`drift`),
- * and entries the manifest still tracks as drifted but the current distribution no
- * longer provides anything to restore them from (`unrestorable`) — e.g. a file
- * dropped in a newer framework version, or a tool whose content set changed.
+ * Entries that can actually be restored (`drift`), and entries the manifest still tracks as drifted
+ * but the current distribution no longer provides anything to restore them from (`unrestorable`).
  */
 export interface DriftCollection<TDrift extends DriftDescriptor> {
   drift: TDrift[];
@@ -18,9 +16,8 @@ export interface DriftCollection<TDrift extends DriftDescriptor> {
 }
 
 /**
- * The I/O leaf: everything that differs between restoring a whole file and
- * merging drifted keys back into one. The skeleton below never branches on
- * which leaf it is running — it only calls these three methods.
+ * The I/O leaf: everything that differs between restoring a whole file and merging drifted keys
+ * back into one. The skeleton never branches on which leaf it is running.
  */
 export interface RestoreDriftLeaf<TDrift extends DriftDescriptor, TResult> {
   collectDrift(): Promise<DriftCollection<TDrift>>;
@@ -28,12 +25,8 @@ export interface RestoreDriftLeaf<TDrift extends DriftDescriptor, TResult> {
   buildResult(restored: string[], kept: string[], unrestorable: string[]): TResult;
 }
 
-/**
- * Shared skeleton for both restore flows: collect drift, delegate the
- * keep/overwrite decision to ResolveRestoreDecisionUseCase, then partition
- * into restored/kept. This is the single place that decision logic lives —
- * both restore use-cases inject their own leaf instead of duplicating the loop.
- */
+/** The single place the keep/overwrite decision lives: both restore flows inject their own leaf
+ * rather than duplicating the loop. */
 export class RestoreDriftEntriesUseCase {
   private readonly resolveDecision: ResolveRestoreDecisionUseCase;
 

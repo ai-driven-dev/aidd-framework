@@ -31,19 +31,9 @@ import {
   decideTelemetrySinkRetention,
 } from "../domain/telemetry-sink-retention.js";
 
-/** Six answers, and only one of them may ever be printed as a zero.
- *
- * - `found` — this tool held the session and billed for it.
- * - `empty` — it held the session and billed nothing. The zero is the measurement.
- * - `not-found` — it has no trace of the session at all. Nothing is known about it.
- * - `unreadable` — its reader failed. Nothing is known about it, and something is wrong.
- * - `not-covered` — nothing here can read this tool, and its declaration says why.
- * - `not-asked` — the journal named another tool for this session, so this reader was
- *   never run. Deliberately not `not-found`: that one is an observation, this one is a
- *   decision not to look, and only the first is evidence about the tool.
- *
- * The last five look alike in a total and mean five different things. Collapsing any of
- * them into `empty` is exactly how a session that was never measured reads as free. */
+/** Six answers, and only `empty` may ever be printed as a zero — there the zero is the
+ * measurement. `not-found` is an observation, `not-asked` a decision not to look, `unreadable` a
+ * failure: collapsing any of them into `empty` is how a session nobody measured reads as free. */
 export type LocalCostToolStatus =
   | "found"
   | "empty"
@@ -61,14 +51,11 @@ export interface LocalCostToolReport {
   /** Records newly appended to the sink; a re-read of an already-stored session can be
    * `status: "found"` with `recordsStored: 0`. */
   readonly recordsStored: number;
-  /** Why this tool is not covered, or — for a covered one — what its figures cannot yet be
-   * used for; both come from the declaration. On `unreadable` it is what the reader itself
-   * said, since only the reader knows why it could not answer. */
+  /** Why this tool is not covered, or what a covered one's figures cannot yet be used for — both
+   * from the declaration. On `unreadable`, what the reader itself said. */
   readonly reason?: string;
-  /** Sessions this tool's reader threw on. Carried separately from `status` because a
-   * sweep can read nineteen sessions and fail the twentieth: the figures are real, so the
-   * status is `found`, and a failure that only showed up in the status would vanish
-   * exactly when there is most to lose. Zero on a single-session read that succeeded. */
+  /** Sessions this tool's reader threw on. Separate from `status` because a sweep can read
+   * nineteen and fail the twentieth: the figures are real, so the status stays `found`. */
   readonly sessionsFailed: number;
   /** What the last failed session's reader said, when any failed. */
   readonly failureReason?: string;
@@ -79,20 +66,16 @@ export interface ReadLocalCostOptions {
    * only route a person has, since nothing tells them a session identifier. */
   readonly sessionId?: string;
   readonly at?: Date;
-  /** Where to look for `.aidd/config.json` when asking whether the project switch is on —
-   * the same question `ReportCostUseCase` and `DiagnoseTelemetryUseCase` already ask
-   * before doing anything with what they read. Required, not defaulted: this is the one
-   * route left that writes the sink, and a refusal that does not hold on it is cosmetic. */
+  /** Where to look for `.aidd/config.json` when asking whether the project switch is on.
+   * Required, not defaulted: this is the one route left that writes the sink. */
   readonly projectRoot: string;
   /** Passed through to the same refusal check the switch itself honours
    * (`AIDD_TELEMETRY=0`), rather than read from `process.env` here. */
   readonly env: NodeJS.ProcessEnv;
 }
 
-/** What every candidate from one session gets stamped with, gathered once and carried as
- * one value rather than three parameters — `intervals` and `project` are per-session,
- * `person` is per-sweep, but all three are facts about where a record came from, never
- * about the record itself. */
+/** What every candidate gets stamped with: facts about where a record came from, never about the
+ * record itself. `intervals` and `project` are per-session, `person` per-sweep. */
 interface LocalReadAttribution {
   readonly intervals: readonly StepInterval[];
   readonly project: SessionProject | null;
@@ -111,11 +94,8 @@ export interface ReadLocalCostResult {
   /** Every tool's answer across every session read, so a caller sees one line per tool
    * rather than one per tool per session. */
   readonly toolReports: readonly LocalCostToolReport[];
-  /** Present only when the sweep refused to run at all — the project switch is off, or the
-   * person refused in their own environment. `sessions` and `toolReports` are both empty in
-   * this case, and never for any other reason a caller could confuse with this one: an
-   * empty sweep with no journal reads differently (see `printLocalCostReadReport`), and
-   * must not be told apart from a refusal by inference. */
+  /** Present only when the sweep refused to run at all. `sessions` and `toolReports` are empty
+   * then, and an empty sweep must never be told apart from a refusal by inference. */
   readonly refusedReason?: string;
 }
 
@@ -123,12 +103,8 @@ function isPresent(value: string | undefined): value is string {
   return value !== undefined;
 }
 
-/** Every already-stored record for this session, keyed on its own `turn_id` — a record
- * with none is not indexed, the same as it is never matched by a re-read.
- *
- * Mutable on purpose: `storeNewCandidates` adds each record it appends, so a second
- * candidate for the same turn in the same batch is matched against the first. Read once
- * and left frozen, it could only ever answer for what an earlier invocation stored. */
+/** Already-stored records for this session, keyed on `turn_id`; one carrying none is never
+ * indexed. Mutable on purpose, so two candidates for one turn in a batch match each other. */
 function groupByTurnId(
   records: readonly TelemetrySinkRecord[]
 ): Map<string, TelemetrySinkRecord[]> {
@@ -165,11 +141,8 @@ function counterWeight(record: TelemetrySinkRecord): number {
   return LOCAL_READ_TURN_COUNTER_KEYS.reduce((sum, key) => sum + (record[key] ?? 0), 0);
 }
 
-/** Whether `candidate` genuinely improves on `stored` — every counter at least as large,
- * and at least one strictly larger. A candidate that would drop a counter `stored` already
- * carried, or read smaller on any one, is never an improvement: the sink keeps the larger
- * reading rather than letting a figure fall back silently (metrics-contract.md, "The other
- * way to double count"). */
+/** Whether `candidate` improves on `stored`: every counter at least as large, one strictly
+ * larger. The sink keeps the larger reading rather than let a figure fall back silently. */
 function strictlyImprovesOn(
   stored: TelemetrySinkRecord,
   candidate: LocalCostCandidateRecord
@@ -188,13 +161,8 @@ function strictlyImprovesOn(
   return improved;
 }
 
-/** The strongest answer a tool gave anywhere in the sweep.
- *
- * A tool that read one session and could not read another reports as `found`: the figures
- * it produced are real, and calling the whole tool broken would discard them. The failure
- * does not disappear with the status — `sessionsFailed` counts it separately, precisely so
- * that a status which is honest about the figures cannot also be a silence about the
- * failures. `unreadable` outranks the two silences for the mirror reason. */
+/** The strongest answer a tool gave anywhere in the sweep. One session read and another failed
+ * reports `found` — those figures are real — and `sessionsFailed` carries the failure. */
 const STATUS_RANK: readonly LocalCostToolStatus[] = [
   "found",
   "unreadable",
@@ -207,11 +175,8 @@ const STATUS_RANK: readonly LocalCostToolStatus[] = [
 ];
 
 function strongestOf(tool: AiToolId, reports: readonly LocalCostToolReport[]): LocalCostToolReport {
-  // The seed for a tool with no report at all. Reached only when `reports` is empty, which
-  // `printLocalCostReadReport` never renders — it returns on an empty sweep before printing
-  // any tool line. So this is the honest value for an unreachable-today case, not a
-  // behaviour change: `not-asked` is what "nothing looked at it" means, where `not-found`
-  // would report an observation never made.
+  // The seed for a tool with no report at all: `not-asked` is what "nothing looked at it" means,
+  // where `not-found` would report an observation never made.
   const nothingKnown: LocalCostToolReport = {
     tool,
     status: "not-asked",
@@ -259,9 +224,8 @@ function notCovered(tool: AiToolId, localRead: TelemetryLocalReadUnsupported): L
   };
 }
 
-/** This tool's reader was never run, because the journal named another tool for the
- * session. Carries no `reason`: there is nothing wrong here and nothing was measured — the
- * status is the whole fact. */
+/** This tool's reader was never run, because the journal named another tool. Carries no
+ * `reason`: nothing is wrong and nothing was measured, so the status is the whole fact. */
 function notAsked(tool: AiToolId): LocalCostToolReport {
   return { tool, status: "not-asked", recordsFound: 0, recordsStored: 0, sessionsFailed: 0 };
 }
@@ -290,11 +254,9 @@ const REFUSED_REASON =
   "measurement is refused — AIDD_TELEMETRY=0 or the project switch is off; nothing read, " +
   "nothing stored";
 
-/** Reads what every locally-readable tool's own files hold for one session, normalises it
- * into the stored shape, and appends what is not already there. Which tools are readable
- * is a declaration in each tool's own `contexts/tools/domain/profiles/<tool>/profile.ts`,
- * read through the registry — this class names no tool. Which adapter serves a declared
- * tool is decided once, at the composition root, and handed in as `readers`. */
+/** Reads what every locally-readable tool's own files hold for one session, normalises it into
+ * the stored shape, and appends what is not already there. Which tools are readable is each
+ * tool's own declaration, read through the registry — this class names no tool. */
 export class ReadLocalCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
@@ -302,36 +264,25 @@ export class ReadLocalCostUseCase {
     private readonly runJournalReader: RunJournalReader,
     private readonly personIdentityReader: PersonIdentityReader,
     private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
-    /** The CLI's own version, stamped on every record this sweep stores
-     * (`stampProvenanceAndTool`) - read through the same port `current-version-adapter.ts`
-     * already resolves it through, never a second way. Production wiring
-     * (`runtime/wiring/telemetry.ts`) always supplies the real adapter; that guarantee is not
-     * just asserted here, it is enforced - `telemetry-multi-tool.e2e.test.ts` runs the real
-     * built binary through `runtime/wiring/telemetry.ts` and fails if a stored record ever
-     * lacks `cli_version`. Optional on this constructor only so a caller exercising a concern
-     * this field is not about (most unit tests) does not have to invent a version to reach
-     * it - absent, this simply omits the field from what gets stored, never guesses at a
-     * value. */
+    /** The CLI's own version, stamped on every record this sweep stores. Optional only so a
+     * caller exercising another concern need not invent one - absent, the field is omitted
+     * from what gets stored, never guessed at. */
     private readonly versionReader?: VersionReader,
-    /** Only the retention prune below writes here, and only to warn. Optional because a
-     * caller that does not care about housekeeping warnings should not have to invent a
-     * logger to read its own figures. */
+    /** Only the retention prune below writes here, and only to warn. Optional so a caller that
+     * does not care about housekeeping warnings need not invent a logger. */
     private readonly logger: Logger = { debug() {}, info() {}, warn() {} },
     private readonly retentionDays: number = DEFAULT_TELEMETRY_SINK_RETENTION_DAYS
   ) {}
 
   async execute(options: ReadLocalCostOptions): Promise<ReadLocalCostResult> {
-    // The same refusal `ReportCostUseCase` and `DiagnoseTelemetryUseCase` already resolve,
-    // checked here too since this is the sink's one remaining writer: a refusal enforced
-    // only upstream, by the hook never writing a journal, does not hold against
-    // `--session <id>`, which never reads the journal at all. Checked first, before a
-    // single reader runs, so a refused sweep touches neither the sink nor a tool's files.
+    // Re-checked here, since this is the sink's one remaining writer: a refusal enforced only by
+    // the hook never writing a journal does not hold against `--session <id>`, which never reads
+    // one. Before any reader runs, so a refused sweep touches neither the sink nor a tool's files.
     if (
       !(await this.telemetryEvidenceReader.isTelemetryEnabled(options.projectRoot, options.env))
     ) {
-      // Told once, by the caller's own display layer (printLocalCostReadReport), not here
-      // too: this.logger exists for housekeeping the figures themselves never surface, the
-      // same reason its own doc restricts it to the retention prune below.
+      // Told once, by the caller's own display layer, not here too: `this.logger` exists for
+      // housekeeping the figures themselves never surface.
       return { sessions: [], toolReports: mergeToolReports([]), refusedReason: REFUSED_REASON };
     }
     const at = options.at ?? new Date();
@@ -344,29 +295,16 @@ export class ReadLocalCostUseCase {
     for (const sessionId of sessionIds) {
       sessions.push({ sessionId, toolReports: await this.readOneSession(sessionId, at, person) });
     }
-    // A sweep prunes; a single named session does not. That was already this function's
-    // own stated reason — "once per sweep rather than per new day file, because a sweep is
-    // already the unit a person invokes" — but it ran on every call, which was harmless
-    // while `aidd telemetry read` was the only caller. It stopped being harmless the moment
-    // `report` began catching sessions up one at a time: a command that had never destroyed
-    // anything started deleting stored day files past the retention window, silently, as a
-    // side effect of being asked a question. Housekeeping belongs to the command a person
-    // runs to do housekeeping.
+    // A sweep prunes; a single named session does not: `report` catches sessions up one at a
+    // time, and a command asked a question must not delete day files as a side effect.
     if (options.sessionId === undefined) await this.pruneOldDayFiles();
     return { sessions, toolReports: mergeToolReports(sessions) };
   }
 
   /**
-   * Keeps the sink inside its retention window, once per sweep.
-   *
-   * This ran on the export receiver until that route was deleted, and it was the sink's
-   * only pruning: `read` is now the one thing that writes a day file, so it is the one
-   * thing that can bound how many there are. Once per sweep rather than per new day file,
-   * because a sweep is already the unit a person invokes.
-   *
-   * Every failure is a warning and never a throw, per file: housekeeping must not cost the
-   * figures this sweep just stored, and one undeletable file must not spare every older
-   * one behind it.
+   * Keeps the sink inside its retention window, once per sweep — the unit a person invokes.
+   * Every failure warns per file: housekeeping must not cost the figures this sweep just
+   * stored, and one undeletable file must not spare every older one behind it.
    */
   private async pruneOldDayFiles(): Promise<void> {
     let prune: readonly string[];
@@ -401,28 +339,19 @@ export class ReadLocalCostUseCase {
     at: Date,
     person: PersonIdentity | null
   ): Promise<readonly LocalCostToolReport[]> {
-    // Read once per session, never per tool: every reader's candidates for one session are
-    // joined against the same journal. A session with no journal at all — the reader's
-    // contract promises never to throw for that — yields an empty interval list, so every
-    // candidate falls through to unattributed rather than the read failing; the project is
-    // `null` for the same reason, never re-derived from wherever this process runs.
+    // Read once per session, never per tool: every reader's candidates join the same journal. No
+    // journal yields empty intervals and a `null` project, so candidates fall through to
+    // unattributed rather than the read failing, and the project is never re-derived from cwd.
     const journal = await this.runJournalReader.read(sessionId);
     const attribution: LocalReadAttribution = {
       intervals: journal ? buildStepIntervals(journal) : [],
       project: resolveSessionProject(journal),
       person,
     };
-    // Only the tool whose session this is. The journal's `session_start` names the host
-    // that wrote it, and `journalHostToAiToolId` is the one place those names and this
-    // codebase's tool ids are related — so asking the other four is guaranteed-useless
-    // work, and one of them pays for it in process spawns: the OpenCode reader shells out
-    // to its binary and waits, measured at 1.15s for a session it does not have. On a
-    // machine with that binary installed, a sweep over 200 journalled sessions spent about
-    // four minutes proving four times over what the journal already said.
-    //
-    // Fan out only when the journal cannot name a tool — `--session <id>` given by hand
-    // (no journal at all), or a host no registered tool claims. There the tool is genuinely
-    // unknown, and asking every reader is the only way to find out.
+    // Only the tool whose session this is: the journal's `session_start` names the host that
+    // wrote it, so asking the others is useless work one of them pays for in process spawns — the
+    // OpenCode reader shells out to its binary and waits. Fan out only when the journal names no
+    // tool, where the tool is genuinely unknown.
     const host = journal?.session?.tool;
     const namedTool = host === undefined ? null : journalHostToAiToolId(host);
     const toolReports: LocalCostToolReport[] = [];
@@ -432,12 +361,8 @@ export class ReadLocalCostUseCase {
     return toolReports;
   }
 
-  /** What this tool has to say about this session, and in which order the three reasons it
-   * might say nothing are considered.
-   *
-   * Coverage first, always: "nothing here can read this tool" is a fact about the tool,
-   * true of every session, and it carries the declaration's own reason. Answering
-   * `not-asked` there would trade that reason for a session-shaped one that says less. */
+  /** What this tool has to say about this session. Coverage first, always: "nothing here can read
+   * this tool" is true of every session, and it carries the declaration's own reason. */
   private async answerFor(
     tool: AiToolId,
     namedTool: AiToolId | null,
@@ -478,12 +403,8 @@ export class ReadLocalCostUseCase {
     };
   }
 
-  /** The one place this use case catches, and it catches for a reason the architecture's
-   * "use-cases throw, never catch" rule does not cover: this is a fan-out over independent
-   * sources, so a reader failing is not one operation that failed but one of several. A
-   * throw here would cost every other tool's figures for a session none of them had any
-   * trouble with — and, once a sweep reads every journalled session, every other session's
-   * too. See https://github.com/ai-driven-dev/framework/issues/689. */
+  /** The one place this use case catches: a fan-out over independent sources, where one reader
+   * failing must not cost every other tool's figures, nor every other session's. */
   private async attemptRead(
     tool: AiToolId,
     sessionId: string
@@ -497,40 +418,10 @@ export class ReadLocalCostUseCase {
     }
   }
 
-  /** Matches each candidate against what the sink already holds for this session, on
-   * `turn_id` alone — never a hash of the line, since the tool's own file keeps growing
-   * as the same record is read again. A candidate with no `turn_id` cannot be matched and
-   * is always appended: the reader's contract forbids inventing a key for it.
-   *
-   * The index grows as this appends, so two candidates for one turn in a single batch match
-   * each other and not only what an earlier invocation left behind. Measured on a live sink:
-   * 339 groups of byte-identical records, 474 extra lines, every one a subagent record —
-   * of that project's 29,741 distinct request ids, 350 appear in more than one transcript
-   * file, and one read hands both copies over as two candidates of the same batch. No
-   * reported figure ever moved, since `collapseBilledRequests` already merges them at
-   * report time; what this stops is the sink storing an observation it already holds.
-   *
-   * A candidate whose `turn_id` *is* already stored is dropped — unless it is a
-   * `kind: "request"` local-read record correcting an earlier, still-open reading of the
-   * same turn (`isLocalReadTurnCorrection`), the one case this match used to refuse
-   * outright. The correction lands as a second line, never an edit: the sink is
-   * append-only, and `cost-report.ts`'s `collapseSupersededTurns` is what later reconciles
-   * the two readings into one.
-   *
-   * **A correction is a larger counter, never a field the stored record lacks — so a
-   * record's field set is fixed the first time its turn is seen.** A reader that later
-   * learns to resolve something the earlier one could not names nothing already stored: the
-   * turn matches, the counters have not grown, and the candidate is dropped. Measured
-   * 2026-09-05 on a live sink: 844 records carry no `prompt_id` for exactly this reason,
-   * 2.75% of 30,714, and `CostReportPromptRow` states it where the figure is read.
-   *
-   * Left as it is, deliberately. Enriching would mean appending a line whose counters equal
-   * one already stored, which `collapseSupersededTurns` picks between by counter weight and
-   * then by serialized content — so the merge would have to learn a preference it does not
-   * have, to close a gap re-reading could barely close anyway: of the 811 measured, 720
-   * name a request no transcript on disk still holds. Roughly 90 records in 30,714 is the
-   * whole prize. Revisit this the day a reader learns a field that matters more than a
-   * prompt id, and that arithmetic changes. */
+  /** Matches on `turn_id` alone, never a hash of the line: the tool's own file keeps growing as
+   * the same record is read again. A stored turn is dropped unless a `request` local-read record
+   * strictly improves on it, which appends a second line for `collapseSupersededTurns` to
+   * reconcile. A correction is a larger counter, never a field the stored record lacks. */
   private async storeNewCandidates(
     tool: AiToolId,
     sessionId: string,
@@ -552,15 +443,10 @@ export class ReadLocalCostUseCase {
     return stored;
   }
 
-  /** Whether `candidate` should land as a correction to `prior` — every record already
-   * stored under this `turn_id`. Never for a `kind: "session"` record: Copilot's shutdown
-   * total shares this match (it is keyed on the shutdown event's own id), but it is a
-   * one-shot cumulative figure with no provisional reading to correct, and matching it here
-   * would let a re-read start doubling it. Otherwise, only when the candidate strictly
-   * improves on the largest already stored — never gated on whether the run journal's own
-   * `turn_end` has been seen: a strictly larger candidate is itself proof the stored reading
-   * was not final, whatever the journal says about the clock, and a re-read that brings
-   * nothing larger is already a no-op without needing to ask the journal anything. */
+  /** Never for a `kind: "session"` record: Copilot's shutdown total shares this match but is a
+   * one-shot cumulative figure, which a re-read would start doubling. Otherwise only a strict
+   * improvement on the largest stored, never gated on `turn_end` — a larger candidate is itself
+   * proof the stored reading was not final. */
   private isLocalReadTurnCorrection(
     candidate: LocalCostCandidateRecord,
     prior: readonly TelemetrySinkRecord[]
@@ -596,11 +482,9 @@ export class ReadLocalCostUseCase {
     };
   }
 
-  // Where the candidate itself carries `step`, the tool stated it directly (see
-  // claude-code-transcript.ts) — exact, and never second-guessed by an interval, which is
-  // only ever an inference. Everything else falls back to the journal, joined on the
-  // candidate's own moment; a candidate with no moment, or one earlier than every
-  // interval, comes back unattributed rather than folded into the nearest step.
+  // Where the candidate carries `step`, the tool stated it directly — exact, never second-guessed
+  // by an interval, which is only an inference. A candidate with no moment, or one earlier than
+  // every interval, comes back unattributed rather than folded into the nearest step.
   private resolveStepAttribution(
     candidate: LocalCostCandidateRecord,
     intervals: readonly StepInterval[]

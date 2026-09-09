@@ -1,11 +1,6 @@
 /**
- * A directory carries at most ten direct `.ts` source files.
- *
- * Past that size a folder stops being a place and becomes a pile: nobody can hold its
- * contents in mind at once, so files stop finding their neighbours and duplication
- * creeps in unnoticed. This is the measure of the splitting this refactor is doing,
- * not an opinion about it. Rule and limit are taken from the `gouvernail` project's
- * harness.
+ * Past ten direct `.ts` files a folder stops being a place and becomes a pile: files stop
+ * finding their neighbours and duplication creeps in unnoticed.
  */
 import { describe, expect, it } from "vitest";
 import { expectRatchet, sourceFiles } from "./helpers.js";
@@ -13,89 +8,43 @@ import { expectRatchet, sourceFiles } from "./helpers.js";
 const MAX_FILES_PER_FOLDER = 10;
 
 /**
- * Directories over the limit, each with the count it carries and the reason it is still
- * here. This list may only shrink, and an entry leaves when the defect behind it is fixed —
- * not when files are shuffled to satisfy a count.
- *
- * The count is not decoration: the test asserts it, so a reason written around a number
- * nobody measured fails here instead of surviving into four documents. That is what
- * happened to the previous version of this file, which claimed thirteen command files plus
- * two helpers and called the total fourteen.
- *
- * Three entries have left that way. `src/contexts/tools/domain` held three capability
- * classes beside the folder holding the other five; they rejoined their siblings and it
- * dropped to nine. `src/contexts/framework/application/install` held a use case whose only
- * importers inside the context live in `uninstall/`, plus four thirty-line descriptors around
- * one engine; both groupings were made explicit and it dropped to six. `src/kernel` held
- * `flat-paths.ts` and `relative-link-rewrite.ts`, read by six files and seven across tools and
- * translate — eight distinct files, five reading both — to decide where content lands and how
- * its links follow; `materialization/` names that and it dropped to nine.
- *
- * The one below will not leave, and saying so is worth more than promising a later phase
- * nobody owes.
+ * Directories over the limit, each with the count it carries and the reason it is still here.
+ * The list may only shrink, and an entry leaves when the defect behind it is fixed, not when
+ * files are shuffled. The test asserts the count, so a reason nobody measured fails here.
  */
 const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
-  // Twelve files carry the command surface — eleven register a command on the program,
-  // `menu.ts` runs the interactive loop — plus three helpers whose importers all live in
-  // this folder: `global-options.ts`, `spawn-cli-command.ts`, and
-  // `cli/src/presentation/commands/sync-native-activation.ts`, which `plugin.ts` and
-  // `marketplace.ts` both drive after their own use case to read and surface what it
-  // returns, the same shape `sync.ts` already held on its own before either needed it.
-  // That is the flattest mapping there is from the CLI's surface to its source. Moving
-  // the three helpers out would leave twelve: still over the limit, and clearer about
-  // nothing. `telemetry.ts` is the eleventh command.
+  // Twelve files carry the command surface, plus three helpers no other folder imports. That
+  // is the flattest mapping from the CLI's surface to its source; moving the helpers out
+  // would leave twelve, still over the limit and clearer about nothing.
   { path: "src/presentation/commands", count: 15 },
-  // Eleven, and staying there. The kernel gained `measurement.ts` — what a tool declares
-  // about being measured, declared by tools and read by telemetry — and the five file
-  // helpers that came with it are already grouped under `reading/`. What is left is eleven
-  // separate vocabularies with no pair among them: errors (126 importers), tool (111), file
-  // (52), source (33), paths (27), merge (22), markdown (17), measurement (10), scope (9),
-  // semver (6), describe-error (6). Reaching ten means moving one of those, and the cheapest
-  // is `describe-error` at six — into a folder holding it and nothing else. A grouping
-  // invented to satisfy a count is worse than the count.
+  // Eleven separate vocabularies with no pair among them, the file helpers already grouped
+  // under `reading/`. Reaching ten means a folder holding one file: a grouping invented to
+  // satisfy a count is worse than the count.
   { path: "src/kernel", count: 11 },
-  // Telemetry's own vocabulary: what a record is, how a report is shaped, and the five
-  // attribution rules that decide whose a figure is. They are one subject, and splitting
-  // them by shape would file `cost-report.ts` away from the envelope it fills.
-  // Twenty since `skill-name.ts`: the one place that says when two spellings name the same
-  // skill, read by step and flow attribution alike.
+  // Telemetry's own vocabulary — what a record is, how a report is shaped, whose a figure is
+  // — is one subject: splitting it by shape files `cost-report.ts` away from the envelope it
+  // fills.
   { path: "src/contexts/telemetry/domain", count: 20 },
-  // Twelve ports because measurement reads twelve different things it does not own — a
-  // sink, a journal, an identity, a backlog, per-tool cost, a host registry, hook trust,
-  // this project's installed plugins, its ignore file, its version control. One port per
-  // question asked; collapsing any two would be a port that answers two.
+  // Measurement reads that many things it does not own: a sink, a journal, an identity, a
+  // host registry, hook trust and the rest. One port per question; collapsing two answers two.
   { path: "src/contexts/telemetry/domain/ports", count: 11 },
-  // Eleven since `cli/src/contexts/tools/domain/marketplace-source-conflict.ts`: whether
-  // a marketplace name a host's own registry already holds is pointed at a different,
-  // resolved source — pure, and read by both the sync-time guard and `doctor`'s own
-  // conflict check, the same relationship `host-plugin-registration.ts` already has to
-  // `doctor` and `telemetry`. No existing grouping here fits it: `marketplace-catalog.ts`,
-  // `marketplace-entry.ts` and `marketplace-settings.ts` are each a tool-build concern this
-  // file is not, and moving one of them out to make room would be exactly the shuffle this
-  // rule refuses.
+  // `marketplace-source-conflict.ts` is read by both the sync-time guard and `doctor`, and no
+  // grouping here fits it: the marketplace files beside it are each a tool-build concern it is
+  // not, and moving one out to make room is the shuffle this rule refuses.
   { path: "src/contexts/tools/domain", count: 11 },
 
-  // `cli/src/contexts/framework/domain/marketplace-source-drift.ts` joined: deciding a version/migration drift is a
-  // fact about aidd's own migration, which belongs in `framework`, not `tools`
-  // (bloquant 12, `architecture.md`'s "concern decides placement" rule).
+  // `marketplace-source-drift.ts` decides a version/migration drift, a fact about aidd's own
+  // migration: that concern belongs to `framework`, not `tools`.
   { path: "src/contexts/framework/domain", count: 11 },
 
-  // Thirteen since `best-effort-native-call.ts`, `purge-native-marketplace-cache.ts`
-  // and `user-scope-plugin-files.ts` joined `purge-declared-cache.ts`: all four have
-  // callers in exactly two areas, `clean-use-case.ts` (project scope) and
-  // `clean/clean-user-scope-use-case.ts` (machine scope), which is what
-  // `earned-sharing.arch.test.ts` means by earned — a `clean/`-only home passed that
-  // rule by sitting outside the directory it judges, not by satisfying it. No existing
-  // grouping here fits three native-cache/host-CLI helpers: `apply-plugin-files-use-case.ts`
-  // and `ensure-built-marketplace-use-case.ts` are file-materialization use cases,
-  // `resolve-uninstall-scope.ts` and `remove-project-hooks.ts` are `plugin remove`'s own
-  // steps, `shared-source-reference-support.ts` and `host-marketplace-source-conflict.ts`
-  // read a different port each — moving one out to make room would be exactly the
-  // shuffle this rule refuses.
+  // Four native-cache and host-CLI helpers are shared by `clean` at project and machine scope
+  // both, which is what `earned-sharing.arch.test.ts` means by earned; a `clean/`-only home
+  // would pass that rule by sitting outside the directory it judges. Nothing else here groups
+  // with them.
   { path: "src/contexts/framework/application/shared", count: 13 },
 ];
 
-/** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */
+/** A subfolder counts toward itself, not toward its parent. */
 function countsByDirectory(files: readonly string[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const file of files) {

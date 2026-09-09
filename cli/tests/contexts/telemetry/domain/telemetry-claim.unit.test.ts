@@ -27,15 +27,12 @@ function evidence(overrides: Partial<TelemetryEvidence> = {}): TelemetryEvidence
     journals: [],
     toolReads: [],
     runsDirLabel: RUNS_DIR_LABEL,
-    // The conservative default every pre-existing test relies on: nothing here declares
-    // the recorder, so an empty journal reads as the failure it already did before this
-    // fact existed. A test for the declared branch sets this explicitly.
+    // Nothing declares the recorder by default, so an empty journal reads as the failure it
+    // already did. The declared branch sets this explicitly.
     recorderDeclared: false,
-    // Readable by default — a clean machine where the declaration itself was never in
-    // question. A test for the "could not be read" branch sets this to `false` explicitly.
+    // Readable by default; the "could not be read" branch sets this to `false` explicitly.
     recorderDeclarationReadable: true,
-    // Empty by default: every journal on disk states the schema this build reads, or states
-    // none. A test for the disagreement sets it explicitly.
+    // Empty by default: every journal on disk states the schema this build reads, or none.
     foreignSchemaVersions: [],
     ...overrides,
   };
@@ -98,20 +95,16 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
       })
     );
     const hookFired = claim(declared, "hook-fired");
-    // A run file existing at all is direct evidence the recorder ran, so this is a
-    // failure — not "no run file … yet, nothing to evaluate" (`--`), which the recorder's
-    // own declaration cannot turn a demonstrably-existing, unanchored file into.
+    // A run file existing at all is direct evidence the recorder ran, so this is a failure and
+    // not "no run file yet, nothing to evaluate".
     expect(hookFired?.verdict).toBe("fail");
     expect(hookFired?.reason).toBe("anchorless-run-file");
     expect(hookFired?.detail).not.toMatch(/nothing to evaluate/u);
     expect(hookFired?.detail).not.toMatch(/declared nowhere/u);
   });
 
-  // A journal the reader refused for stating a schema it does not read leaves `journals`
-  // empty, which every other branch here reads as "no run file". Two of them would then be
-  // outright false about a file that demonstrably exists and whose header parsed perfectly:
-  // "declared nowhere" claims no file, and "none carry a readable session_start" blames a
-  // torn write. The version disagreement is the fact that is actually known.
+  // A refused journal leaves `journals` empty, which every other branch reads as "no run
+  // file"; the version disagreement is the fact that is actually known.
   it("names a journal written under another schema, never a torn write or a missing file", () => {
     const result = diagnoseTelemetryClaims(
       evidence({ currentSessionId: "s-1", foreignSchemaVersions: [3] })
@@ -124,9 +117,8 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
     expect(hookFired?.detail).not.toMatch(/none carry a readable session_start/u);
   });
 
-  // Ahead of the anchorless reading, deliberately: a build that cannot read a journal's
-  // schema cannot tell whether its session_start is missing or merely shaped differently,
-  // so blaming a torn write would be asserting what it just said it cannot see.
+  // A build that cannot read a journal's schema cannot tell whether its session_start is
+  // missing or merely shaped differently, so blaming a torn write asserts what it cannot see.
   it("prefers the schema disagreement over an anchorless file when both are present", () => {
     const result = diagnoseTelemetryClaims(
       evidence({
@@ -426,15 +418,8 @@ describe("diagnoseTelemetryClaims — the whole set", () => {
   });
 });
 
-// The failure this guards against, verbatim from the plan: "A shape change whose consumer
-// is not updated in the same commit is how the cost skill was halted by a version pin,
-// twice." The consumer here is every file phase 3 named as stating the claim count in
-// prose - `02-check/SKILL.md` and `actions/02-diagnose.md`, the second added after review
-// found the first alone left the file phase 3 itself called out as "the one that hard-coded
-// 'all six claims'" still unguarded (review.md, "one route, and every sentence about it
-// true", finding 7). This reads both as text, the same way a person or an agent would,
-// rather than trusting that whoever next changes the claim count remembers to touch every
-// file that states it.
+// A shape change whose consumer is not updated in the same commit is how the cost skill was
+// halted twice, so this reads the skill's prose as text, the way a person or an agent would.
 describe("the diagnostic skill states the claims the command prints, in the number it prints them", () => {
   const SKILL_DIR = resolve(process.cwd(), "..", "plugins", "aidd-telemetry", "skills", "02-check");
   const CLAIM_COUNT_FILES = [
@@ -454,9 +439,7 @@ describe("the diagnostic skill states the claims the command prints, in the numb
   };
 
   // Every cardinal "<word> claim(s)" mention in one file, not only the first: 02-diagnose.md
-  // states the count three times in prose, and a guard that stops at the first match would
-  // leave the second and third free to drift unnoticed, which is exactly how it went stale
-  // the first time.
+  // states the count three times, and stopping at the first would leave the rest free to drift.
   function statedClaimCounts(path: string): readonly number[] {
     const text = readFileSync(path, "utf8");
     const matches = [
@@ -486,30 +469,9 @@ describe("the diagnostic skill states the claims the command prints, in the numb
   });
 });
 
-// Extends the guard above to the account phase 2 added: two readings of the same absence
-// ("no run file yet"), told apart only by the recorder's own declaration. A marker phrase
-// is read from the live code's own detail text, then required in the skill's prose too —
-// so a change on either side alone (the wording in `telemetry-claim.ts`, or the account in
-// `02-diagnose.md`) fails this test, never only a change to both together.
-/**
- * A guard that actually bites when the skill's account of a verdict disagrees with the
- * command's own reasons — the whole-file, phrase-presence-anywhere version of this guard
- * (the one this replaces) proved unable to: inverting which token `02-diagnose.md`'s own
- * step 6 pairs with which phrase left it green, because the *other* pairing survived
- * unmutated elsewhere in the same file (the Test table). Two changes fix that:
- *
- * 1. Every account below is checked against `02-diagnose.md`'s own step 6 alone — the one
- *    paragraph that actually teaches the behaviour — not the whole file, so a stray
- *    correct mention elsewhere can no longer paper over a wrong one here.
- * 2. The check ties the verdict token to the phrase *in the same sentence* (`reads
- *    \`TOKEN\`…PHRASE`, non-greedy up to the next period), so swapping which token a
- *    sentence names — even while keeping the phrase — fails, not just deleting the phrase
- *    outright.
- *
- * The account map itself is keyed by `NoRunFileReason`, `noRunFileClaim`'s own exhaustive
- * reason union: adding a sixth branch there without adding a sixth entry here is a
- * compile error (`Record<NoRunFileReason, …>` is exhaustive), not a runtime maybe.
- */
+/** A marker phrase read from the live code's own detail text is required in `02-diagnose.md`'s
+ * step 6 alone, tied to its verdict token in the same sentence, so a change on either side
+ * alone fails; a missing `NoRunFileReason` entry is a compile error. */
 describe("the diagnostic skill's account of every no-run-file reason matches the command's own reasons", () => {
   const DIAGNOSE_MD = resolve(
     process.cwd(),
@@ -523,9 +485,8 @@ describe("the diagnostic skill's account of every no-run-file reason matches the
   );
   const DIAGNOSE_TEXT = readFileSync(DIAGNOSE_MD, "utf8");
 
-  // Step 6 alone — from its own header to the next numbered step — the one place that
-  // actually teaches which token pairs with which reason, not the Test table below it
-  // (a reference row restating the same fact is not an account of it).
+  // Step 6 alone, from its header to the next numbered step: the one place that teaches which
+  // token pairs with which reason, not the Test table restating it.
   const STEP_SIX_HEADER = "No run file yet is not always a failure";
   const stepSixMatch = DIAGNOSE_TEXT.match(
     new RegExp(`${STEP_SIX_HEADER}[\\s\\S]*?\\n\\d+\\.\\s+\\*\\*`, "u")
@@ -579,11 +540,8 @@ describe("the diagnostic skill's account of every no-run-file reason matches the
     },
   };
 
-  // The bullet mentioning `phrase`, bounded by the nearest period on either side — one
-  // bullet is exactly one sentence in `02-diagnose.md`'s own step 6, but not always in the
-  // same token-then-phrase order (most read "reads `TOKEN`, phrase"; the anchorless-run-file
-  // one reads "phrase … reads `TOKEN`"), so this bounds the clause instead of assuming an
-  // order, then the caller checks which token actually appears inside it.
+  // One bullet is one sentence in step 6, but not always in token-then-phrase order, so this
+  // bounds the clause by the nearest period instead of assuming one.
   function clauseContaining(text: string, phrase: string): string {
     const idx = text.toLowerCase().indexOf(phrase.toLowerCase());
     if (idx === -1) throw new Error(`step 6 of ${DIAGNOSE_MD} never mentions "${phrase}"`);

@@ -11,12 +11,9 @@ import type { UserSourceReferences } from "../domain/ports/user-source-reference
 
 type ReferencesFile = Record<string, readonly string[]>;
 
-/** The version key `projectRoot` is recorded under, and that key's full roots list —
- * `undefined` when it is recorded nowhere. `addReference`'s own invariant (at most one
- * version per project) means at most one entry ever matches. Path equality goes through
- * `samePathSegment`, never a hand-written `===`/`.includes()`, so a case-insensitive
- * platform (Windows) still matches a project root a real `realpath` returns with
- * different casing. */
+/** The version key `projectRoot` is recorded under, and that key's full roots list — `undefined`
+ * when it is recorded nowhere. Path equality goes through `samePathSegment`, never `===`, so a
+ * case-insensitive platform still matches a root a real `realpath` returns with different casing. */
 function findVersionFor(
   references: ReferencesFile,
   projectRoot: string
@@ -52,11 +49,9 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
       (root) => !samePathSegment(root, projectRoot)
     );
     next[version] = [...existingAtVersion, projectRoot];
-    // `projectRoot` is protected from the prune below even though a real caller always
-    // passes one that exists (it is always the project currently running): what must
-    // never happen is a project vanishing between being recorded and this very write
-    // finishing, which would otherwise drop the claim `addReference` was just asked to
-    // add.
+    // `projectRoot` is protected from the prune below: a project vanishing between being recorded
+    // and this very write finishing would otherwise drop the claim `addReference` was just asked
+    // to add.
     await this.write(next, projectRoot);
   }
 
@@ -95,15 +90,10 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
     return parseReferencesFile(raw, path);
   }
 
-  /** Every write is the one place a `projectRoot` that has stopped existing is purged
-   * from the file entirely, not merely ignored at read time: a read already treats a
-   * vanished project as if it were not there (`listAllReferencingProjects`'s own
-   * `fileExists` filter), but until this the file itself never shrank, so it grew
-   * forever and every read kept `stat`-ing dead paths.
-   * Pruned here, once, rather than at every call site that happens to write, because the
-   * file is already fully in hand by the time any caller reaches this. `protectedRoot`
-   * is never pruned regardless of its own existence — `addReference` passes the root it
-   * was just asked to add, so a write can never drop the very claim it exists to record. */
+  /** Every write is the one place a `projectRoot` that has stopped existing is purged from the file
+   * entirely, not merely ignored at read time — until this the file only ever grew, and every read
+   * kept `stat`-ing dead paths. `protectedRoot` is never pruned regardless of its own existence, so
+   * a write can never drop the very claim it exists to record. */
   private async write(references: ReferencesFile, protectedRoot?: string): Promise<void> {
     const pruned = await this.pruneVanishedRoots(references, protectedRoot);
     await this.fs.createDirectory(dirname(this.path));
@@ -128,10 +118,10 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
   }
 }
 
-/** Validates the file's shape into a typed value at the adapter boundary — `unknown`
- * never leaks past this point. A version key whose value is not a list of strings is
- * exactly as unreadable as JSON that fails to parse at all: half-trusting a corrupted
- * shape is how a later write would silently drop what could not be validated. */
+/** Validates the file's shape into a typed value at the adapter boundary. A version key whose value
+ * is not a list of strings is exactly as unreadable as JSON that fails to parse at all:
+ * half-trusting a corrupted shape is how a later write would silently drop what it could not
+ * validate. */
 function parseReferencesFile(raw: string, path: string): ReferencesFile {
   let parsed: unknown;
   try {

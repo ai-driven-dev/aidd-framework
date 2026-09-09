@@ -6,10 +6,8 @@ import { STEP_ATTRIBUTION_SOURCES } from "../../../../src/contexts/telemetry/dom
 import { TASK_UNATTRIBUTED_REASONS } from "../../../../src/contexts/telemetry/domain/task-attribution.js";
 import { ARTEFACT_AXES } from "../../../../src/presentation/display/cost-report-artefact.js";
 
-// The same honesty check `metrics-contract.unit.test.ts` runs over the record: never a
-// hand-maintained list on either side, only the code's own exported values and the
-// document's own prose, both read fresh off disk. A reason a consumer can receive and the
-// contract never names is a shape nobody can parse against.
+// Never a hand-maintained list on either side: only the code's own exported values and the
+// document's own prose, both read fresh off disk.
 
 const CONTRACT_DOC_URL = new URL(
   "../../../../../aidd_docs/product/cost-report-contract.md",
@@ -24,10 +22,8 @@ describe("the cost report contract document", () => {
   it("names every reason a row with no task can carry", () => {
     const document = contractText();
 
-    // Required as a table cell, not merely somewhere in the prose: a reason can be named in
-    // a version note and still be missing from the table a reader parses against, which is
-    // exactly what happened while this document was being edited - the `"no-journal"` row
-    // was clipped out of the table while three prose mentions kept a looser check green.
+    // Required as a table cell, not merely somewhere in the prose: a reason named only in a
+    // version note is still missing from the table a reader parses against.
     const undocumented = TASK_UNATTRIBUTED_REASONS.filter(
       (reason) => !document.includes(`| \`"${reason}"\` |`)
     );
@@ -35,13 +31,8 @@ describe("the cost report contract document", () => {
     expect(undocumented).toEqual([]);
   });
 
-  // A journal file really can be read and still yield no session: `report-cost-use-case.ts`
-  // drops one whose `session_start` header is torn (`if (!journal.session) return null`),
-  // and the adapter's own "keeps a session's boundaries when its header line is torn" test
-  // proves that shape reaches it. Those records land on this reason, so a document claiming
-  // no journal was read "at all", or that nothing looked at what the session declared,
-  // states something false about a case the code produces. The word this hinges on is
-  // "usable".
+  // A journal file really can be read and still yield no session - `report-cost-use-case.ts`
+  // drops one whose `session_start` header is torn - so the word this hinges on is "usable".
   it("never claims the unattributed reason means no journal existed", () => {
     const document = contractText();
 
@@ -57,18 +48,16 @@ describe("the cost report contract document", () => {
     expect(stated?.[1]).toBe(String(COST_REPORT_ENVELOPE_VERSION));
   });
 
-  // The prose sentence above and the worked example below it drifted apart - the sentence
-  // said 10 while the example still showed 8, two versions behind. A reader parses against
-  // the example, so pinning only the sentence guards the half nobody copies.
+  // A reader parses against the worked example, so pinning only the prose sentence above it
+  // guards the half nobody copies.
   it("shows that same version in its own worked example", () => {
     const shown = /"cost_report_version": (\d+)/.exec(contractText());
 
     expect(shown?.[1]).toBe(String(COST_REPORT_ENVELOPE_VERSION));
   });
 
-  // The same drift the task-reason table already guards against: `prompt-matched` joined
-  // the code's own fixed order at `cost_report_version` 9 and never joined the table a
-  // reader parses `attribution` against.
+  // The same drift the task-reason table already guards against: a source can join the
+  // code's own fixed order and never join the table a reader parses `attribution` against.
   it("names every source a step's attribution can carry", () => {
     const document = contractText();
 

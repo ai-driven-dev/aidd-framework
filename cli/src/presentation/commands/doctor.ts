@@ -17,12 +17,8 @@ function categoryOf(toolId: ToolId): ToolCategory {
   return isAiToolId(toolId) ? "ai" : "ide";
 }
 
-/**
- * The tool inventory `doctor` gains in phase 18: which tools are equipped (present in
- * the manifest, with how much they carry), independent of whether they are healthy or
- * drifted — those are reported separately below. Versions come from the status report
- * (already fetched for drift) rather than a second manifest read.
- */
+/** Which tools are equipped and how much they carry, independent of health and drift, which
+ * are reported separately. Versions come from the status report already fetched for drift. */
 function printInventory(
   output: CLIOutput,
   label: string,
@@ -61,27 +57,17 @@ async function runFullDoctor(
   output.print("Plugins:");
   printPluginDrift(output, { pluginDrift: statusResult.pluginDrift });
 
-  // Printed before the health gate, and unconditionally: an `info` issue (an
-  // unanswerable native registration, most often) must survive a healthy run exactly
-  // as the drift section above does, never held back until something else fails.
-  // `printScopeIssues`/`printPluginIssues` are no-ops on an empty list, so a run with
-  // nothing to say here prints nothing extra.
+  // Before the health gate and unconditional: an `info` issue must survive a healthy run,
+  // never be held back until something else fails.
   if (pluginName === undefined) {
     printScopeIssues(output, "AI", doctorResult.ai);
     printScopeIssues(output, "IDE", doctorResult.ide);
   }
   printPluginIssues(output, doctorResult.pluginIssues);
 
-  // Drift is informational here, same as the `status` it absorbs: it never gates the
-  // exit code. Only structural health issues (above) do — unchanged from before this
-  // command absorbed status, which is what keeps `status` and `doctor` effect-equivalent
-  // on a project that is drifted but otherwise healthy.
-  //
-  // `--plugin` narrows the gate to that plugin's own issues, same as `plugin doctor`
-  // did: unrelated tracked-file/reference/layout warnings elsewhere in the project must
-  // not flip the exit code while this view only ever prints plugin issues for them —
-  // that mismatch was exactly the silent-exit-1 regression `plugin doctor` was scoped
-  // to prevent, and `doctor --plugin` inherits the same contract.
+  // Drift is informational and never gates the exit code; only structural health issues do.
+  // `--plugin` narrows that gate to one plugin's issues, so a warning this view never prints
+  // cannot flip the exit code — the silent-exit-1 shape the narrowing exists to prevent.
   const healthy =
     pluginName !== undefined ? doctorResult.pluginIssues.length === 0 : doctorResult.healthy;
   if (healthy) {
@@ -99,9 +85,8 @@ async function runScopedDoctor(
   pluginName: string | undefined
 ): Promise<void> {
   const category = categoryOf(toolId);
-  // DoctorUseCase only scopes by category (ai/ide), not by individual tool — same
-  // granularity `ai doctor`/`ide doctor` already had. The inventory line below still
-  // narrows to the exact tool; only the issue list stays category-wide.
+  // DoctorUseCase scopes by category, never by tool: the inventory below narrows to the exact
+  // tool, the issue list stays category-wide.
   const doctorReport = await deps.doctorUseCase.execute({ projectRoot, category, pluginName });
   const statusReport = await deps.statusUseCase.execute({
     projectRoot,
@@ -120,8 +105,7 @@ async function runScopedDoctor(
   output.print("Plugins:");
   printPluginDrift(output, { pluginDrift: statusReport.pluginDrift });
 
-  // Printed unconditionally, before the health gate — see the comment on the unscoped
-  // path above.
+  // Unconditional, before the health gate — see the unscoped path above.
   if (pluginName === undefined) {
     printScopeIssues(output, toolId, doctorReport);
   }
@@ -137,13 +121,9 @@ async function runScopedDoctor(
   process.exit(1);
 }
 
-/**
- * `--scope user` has no tracked files, merge files or layout to check — a user-scope
- * install writes nothing under any project — so this runs `doctorRegistrationUseCase`
- * alone against the user manifest, the one check that is never project-file-shaped:
- * it compares `nativeRegistrations` to a host's own registry file, exactly as it does
- * for the project-scope path, just fed a different manifest.
- */
+/** A user-scope install writes nothing under any project, so the only check left is
+ * `doctorRegistrationUseCase` against the user manifest: registrations versus a host's own
+ * registry file, the one check that is not project-file-shaped. */
 async function runUserScopeDoctor(
   deps: Deps,
   output: CLIOutput,

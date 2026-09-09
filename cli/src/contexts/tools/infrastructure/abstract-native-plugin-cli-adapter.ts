@@ -12,26 +12,20 @@ import {
 // `plugin add/install` may fetch and cache a marketplace snapshot from a git remote.
 const COMMAND_TIMEOUT_MS = 120000;
 
-/**
- * Shared shell-out machinery for a tool's plugin CLI. Subclasses declare the
- * binary and the tool-specific verbs (enable / upgrade) that differ between CLIs.
- */
+/** Shared shell-out machinery for a tool's plugin CLI. Subclasses declare the binary and the
+ * tool-specific verbs that differ between CLIs. */
 export abstract class AbstractNativePluginCliAdapter implements NativePluginActivator {
   protected abstract readonly binary: string;
 
-  /**
-   * Resolves the binary on PATH (filesystem check, no process spawn). Spawning a
-   * `--version` probe just to test presence is flake-prone under load (transient
-   * spawn failures); a PATH lookup is what "callable on PATH" actually means.
-   */
+  /** Resolves the binary on PATH by filesystem check, with no process spawn: a `--version`
+   * probe just to test presence is flake-prone under load. */
   isAvailable(): boolean {
     return resolveExecutableOnPath(this.binary, hostExecutableLookup()) !== undefined;
   }
 
-  /** The binary as the OS will run it. A `.cmd`/`.bat` shim — what npm installs on
-   * Windows — cannot be spawned directly, so it goes through the command interpreter with
-   * its arguments quoted; anything else is spawned by its bare name, the OS resolving
-   * `PATH` exactly as a person's shell would. */
+  /** The binary as the OS will run it. A `.cmd`/`.bat` shim — what npm installs on Windows —
+   * cannot be spawned directly, so it goes through the command interpreter with its arguments
+   * quoted; anything else is spawned by its bare name. */
   private spawn(
     args: readonly string[],
     stdio: ["ignore", "ignore" | "pipe", "ignore" | "pipe"]

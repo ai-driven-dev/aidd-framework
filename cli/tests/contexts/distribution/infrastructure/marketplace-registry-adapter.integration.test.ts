@@ -32,10 +32,8 @@ describe("MarketplaceRegistryAdapter", () => {
     originalConfigDir = process.env.AIDD_USER_CONFIG_DIR;
     process.env.HOME = homeDir;
     process.env.USERPROFILE = homeDir;
-    // Faking the home alone is not enough: the CLI only falls back to `homedir()` when
-    // `AIDD_USER_CONFIG_DIR` is unset, so a value leaking in from elsewhere sends this
-    // test at a real user registry. Measured — it read two marketplaces of the
-    // developer's own and expected none.
+    // Faking the home alone is not enough: the CLI falls back to `homedir()` only when
+    // `AIDD_USER_CONFIG_DIR` is unset, so a leaked value sends this test at a real registry.
     process.env.AIDD_USER_CONFIG_DIR = join(homeDir, ".config", "aidd");
     adapter = new MarketplaceRegistryAdapter();
   });
@@ -55,13 +53,8 @@ describe("MarketplaceRegistryAdapter", () => {
       expect(result).toEqual([]);
     });
 
-    // A registry file that exists but does not hold the list is not an empty registry, and
-    // reading it as one is how a person loses every marketplace they registered: `save()`
-    // reads this same list, appends to it and writes the whole file back, so one silent
-    // empty read turns into a file with one entry where there were five. Found on a real
-    // `~/.config/aidd/marketplaces.json` holding `{"version":1}`, which crashed
-    // `aidd marketplace list` with "Cannot read properties of undefined (reading 'map')" -
-    // a stack trace naming nothing a person can act on.
+    // A registry file that exists but holds no list is not an empty registry: `save()` reads
+    // that same list, appends and writes the file back, so one silent empty read loses all.
     it("refuses a registry file that carries no list, naming the file rather than crashing", async () => {
       const userFile = join(homeDir, ".config", "aidd", "marketplaces.json");
       await mkdir(join(homeDir, ".config", "aidd"), { recursive: true });

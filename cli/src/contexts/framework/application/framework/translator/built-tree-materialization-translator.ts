@@ -1,13 +1,9 @@
 import { join, posix } from "node:path";
 import { InstallationFile } from "../../../../../kernel/file.js";
 /**
- * Materializes plugin content by copying the per-target BUILT tree verbatim into the
- * tool's plugin directory — so installed bytes equal `framework build` output. Bypasses
- * the per-file content transform (build already did it). For marketplace-sourced installs
- * only; raw local-path installs fall back to flat materialization.
- *
- * componentPaths is left empty (sync does not propagate built plugins), matching the
- * existing local-marketplace behavior in PluginUpdateUseCase.
+ * Materializes plugin content by copying the per-target BUILT tree verbatim into the tool's plugin
+ * directory, bypassing the per-file transform the build already applied. Marketplace-sourced
+ * installs only; a raw local-path install falls back to flat materialization.
  */
 import { flatHooksPathWithLoaderEntry } from "../../../../../kernel/materialization/flat-paths.js";
 import { posixRelative } from "../../../../../kernel/paths.js";
@@ -84,11 +80,9 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
             join(builtDir, "plugins", dist.manifest.name),
             dist.manifest.name
           );
-    // The built tree still carries a plugin-scoped hooks/hooks.json for a capability
-    // declaring hooksDestination "project" (the marketplace build never learned that
-    // route exists) — dropped here, and materialized through the same project-hooks
-    // side channel the local-source route uses, so both land in the one place the
-    // tool's own declaration names, not wherever this particular build happened to put it.
+    // The built tree still carries a plugin-scoped `hooks/hooks.json` for a capability declaring
+    // `hooksDestination: "project"` — dropped here and materialized through the same project-hooks
+    // side channel the local-source route uses, so both land where the tool's own declaration says.
     const deliversHooksToProject = resolvePluginsCapability(toolId)?.hooksDestination === "project";
     const hooksSkips = deliversHooksToProject
       ? await this.projectHooks.materialize(dist, toolId, projectRoot)
@@ -109,8 +103,8 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     return { skipped: hooksSkips, written };
   }
 
-  // Verbatim-copies the built subtree, but skips files already matching the built
-  // content on disk so a no-op restore reports (and performs) zero writes.
+  // Skips a file already matching the built content on disk, so a no-op restore reports (and
+  // performs) zero writes.
   private async writeChangedFiles(files: InstallationFile[], baseDir: string): Promise<number> {
     let written = 0;
     for (const f of files) {
@@ -144,16 +138,12 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     );
   }
 
-  // Flat build emits the whole marketplace into one workspace. Agents are namespaced
-  // by .opencode/agents/<plugin>-<name>...; skills instead nest the whole subtree
-  // under .opencode/skills/<plugin>/... (genericFlatSkillTreePath — a skill's own
-  // script can require() a sibling by relative path, which only keeps resolving
-  // when nothing under the plugin's skills/ subtree gets renamed). Install copies
-  // only this plugin's files by whichever convention its section uses. Hooks land under
-  // flatHooksDir/<plugin>/, except the one script that is the loader's own runtime module,
-  // renamed to the plugin's name in the loader's directory (flatHooksPathWithLoaderEntry);
-  // so this plugin's hook paths are computed from its own distribution and matched by
-  // path, not by naming convention.
+  // Flat build emits the whole marketplace into one workspace. Agents are namespaced by
+  // `<plugin>-<name>`; skills instead nest the whole subtree under `skills/<plugin>/`, since a
+  // skill's own script can `require()` a sibling by relative path, which only keeps resolving while
+  // nothing under that subtree is renamed. Hooks land under `flatHooksDir/<plugin>/`, except the
+  // one script that is the loader's own runtime module, renamed to the plugin's name in the
+  // loader's directory — so hook paths are matched by path, never by naming convention.
   private async readFlatFiles(
     builtDir: string,
     dist: PluginDistribution,
@@ -177,8 +167,8 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
   private belongsToPlugin(rel: string, name: string): boolean {
     const segments = rel.split("/");
     if (segments[0] !== ".opencode" || segments.length < 3) return false;
-    // skills/ nests the whole plugin under one exactly-named segment (see the comment
-    // above); every other flat section still hyphen-prefixes the leaf segment.
+    // `skills/` nests the whole plugin under one exactly-named segment; every other flat section
+    // hyphen-prefixes the leaf segment.
     if (segments[1] === "skills") return segments[2] === name;
     return segments[2].startsWith(`${name}-`);
   }
@@ -212,8 +202,8 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
   }
 }
 
-// readBuiltFiles prefixes every path with "<name>/" (see its own comment above) — a
-// built-tree hooks file therefore always reads "<name>/hooks/<rest>".
+// `readBuiltFiles` prefixes every path with `<name>/`, so a built-tree hooks file always reads
+// `<name>/hooks/<rest>`.
 function withoutHooksPrefix(files: InstallationFile[], pluginName: string): InstallationFile[] {
   const hooksPrefix = `${pluginName}/hooks/`;
   return files.filter((f) => !f.relativePath.startsWith(hooksPrefix));

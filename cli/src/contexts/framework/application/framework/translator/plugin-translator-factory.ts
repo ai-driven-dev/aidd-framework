@@ -17,16 +17,10 @@ export interface TranslatorDeps {
 }
 
 /**
- * Resolves the appropriate translation adapter for a given PluginsCapability.
+ * Resolves the translation adapter for a `PluginsCapability`, or `null` when none applies.
  *
- * Routing priority:
- * 1. `installScope === "user"` or `translationMode === "flat"` → BuiltTreeMaterializationTranslator
- *    (user-scope tools like Cursor; project-scope flat tools like OpenCode)
- * 2. `translationMode === "marketplace"` → ModeAMarketplaceTranslator (Mode A: register in native config)
- * 3. otherwise → null (neutral native or unsupported; no translation strategy applies)
- *
- * Materializing tools copy the per-target BUILT tree verbatim so installed bytes match
- * `framework build` output; raw local-path installs fall back to flat materialization.
+ * A materializing tool copies the per-target BUILT tree verbatim, so installed bytes match the
+ * build's own output; a raw local-path install falls back to flat materialization.
  */
 export function resolveTranslator(
   plugins: PluginsCapability,

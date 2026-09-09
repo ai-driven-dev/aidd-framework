@@ -59,9 +59,8 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    // No plugin declared here, so nothing to enable — this asserts the marketplace
-    // registration path ran at all (`addedMarketplaces`), the scope-threading proof
-    // for enablePlugin itself lives in the next test, which does declare one.
+    // No plugin declared here, so nothing to enable: this asserts the marketplace
+    // registration path ran at all, and the next test declares one for enablePlugin.
     expect(activator.addedMarketplaces).toHaveLength(1);
   });
 
@@ -107,14 +106,8 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
     expect(activator.enabledPluginScopes).toEqual(["user"]);
   });
 
-  // Both tests below share one fixture: a manifest carrying a plugin whose marketplace
-  // resolves, so `syncEnabledPluginsFile` has a real entry to add to `.claude/settings.json`
-  // at project scope — never `.claude/settings.local.json`, which no aidd code path
-  // writes at all (`claude/profile.ts`'s own doc: "Never written by aidd; named here
-  // for a diagnostic alone"). `manifestWithTool()`'s empty-files, no-plugin manifest
-  // wrote nothing under either scope, which is why a mutation deleting the
-  // `scope === "project"` guard around `syncTool` went unnoticed: nothing distinguished
-  // "guarded" from "unguarded" when neither path ever wrote.
+  // A manifest carrying a plugin whose marketplace resolves, so `syncEnabledPluginsFile` has
+  // a real entry to write: an empty, no-plugin manifest wrote nothing under either scope.
   async function pluginFixture(): Promise<{
     fs: InMemoryFileAdapter;
     manifestRepo: InMemoryManifestRepository;
@@ -162,9 +155,8 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
 
     await useCase.execute({ projectRoot: PROJECT_ROOT, scope: "user" });
 
-    // resolve(): a project-scope write lands at resolve(projectRoot, settingsPath) — a
-    // drive letter on win32 — so checking the drive-less literal PROJECT_ROOT would stay
-    // empty even if a regression started writing there, proving nothing on that platform.
+    // resolve(): a project-scope write lands at resolve(projectRoot, settingsPath), which
+    // carries a drive letter on win32, so the drive-less literal would prove nothing there.
     expect(fs.listUnder(resolve(PROJECT_ROOT))).toEqual([]);
   });
 
@@ -185,9 +177,8 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    // resolve(): the use case writes at resolve(projectRoot, settings.settingsPath), which
-    // carries a drive letter on win32 — a forward-slash template literal never matches
-    // that key.
+    // resolve(): the write carries a drive letter on win32, which a forward-slash template
+    // literal never matches.
     const written = await fs.readFile(resolve(PROJECT_ROOT, ".claude", "settings.json"));
     expect(written).toContain("aidd-telemetry");
   });

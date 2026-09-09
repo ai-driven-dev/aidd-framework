@@ -6,14 +6,9 @@ import {
 } from "../../../kernel/paths.js";
 import { compareSemver, isSemver } from "../../../kernel/semver.js";
 
-/** What `marketplaceSourceDrift` needs to recognise aidd's own shared-source shape and
- * this project's own pre-migration one, without reading anything: the same three
- * facts `userBuiltMarketplaceDir` and `builtMarketplaceDir` were built from. Every path
- * a caller hands this — `userCacheRoot`, `projectRoot`, and the two sources compared
- * against them — is expected already resolved (`realpath`'d): this decides a migration
- * story about aidd's own version, not a filesystem question, so resolving belongs to
- * the caller that has a `FileReader` in hand, not here.
- */
+/** Every path a caller hands `marketplaceSourceDrift` — `userCacheRoot`, `projectRoot` and the two
+ * sources compared against them — is expected already `realpath`'d: this decides a migration story
+ * about aidd's own version, not a filesystem question. */
 export interface MarketplaceSourceDriftContext {
   readonly userCacheRoot: string;
   readonly projectRoot: string;
@@ -36,35 +31,22 @@ export type MarketplaceSourceDrift =
       readonly kind: "unmigrated-project-source";
     }
   | {
-      /** The host still points at *another* project's own pre-migration, per-project
-       * cache — the same shape as `unmigrated-project-source`, but for a project this
-       * run does not own, discovered from the registered path's own segments alone
-       * (`kernel/paths.ts`'s `parseBuiltMarketplaceDirAtAnyRoot`). A caller that can
-       * write `references.json` uses `projectRoot` to record that project's own claim
-       * on the shared source too, since migrating the host's registration away from
-       * its cache is exactly what this run's own build is about to do. */
+      /** The host still points at *another* project's own pre-migration cache, discovered from the
+       * registered path's own segments alone. A caller that can write `references.json` uses
+       * `projectRoot` to record that project's own claim on the shared source. */
       readonly kind: "unmigrated-foreign-project-source";
       readonly projectRoot: string;
     };
 
 /**
- * Whether a host's registered source names a path this project recognises as its
- * own — one CLI version behind the shared source this run would request, or still
- * the pre-migration per-project cache — decided purely from each path's own
- * segments (`kernel/paths.ts`'s parsers), never from a catalog's declared name or
- * plugin set. `undefined` when the registered path is neither shape: the generic
- * catalog-identity guard, `marketplaceSourceConflict` (`contexts/tools/domain`), is
- * what decides that case, by reading each side's own `marketplace.json`.
+ * Whether a host's registered source names a path this project recognises as its own — one CLI
+ * version behind the shared source, or still the pre-migration per-project cache — decided purely
+ * from each path's own segments, never from a catalog's declared name or plugin set. `undefined`
+ * when the registered path is neither shape: `marketplaceSourceConflict` decides that case by
+ * reading each side's own `marketplace.json`.
  *
- * Deciding this is a fact about aidd's own migration from a per-project cache to a
- * machine-shared one — which CLI version a path belongs to, and whether a path is
- * this project's own pre-migration shape — never a fact a host tool declares about
- * itself, which is why this lives in `framework`, not `tools`
- * (`aidd_docs/memory/architecture.md`'s "concern decides placement" rule).
- *
- * A version segment that is not valid semver is never compared — `isSemver` gates
- * both sides, so a hand-edited or corrupted path degrades to "no drift decided
- * here" rather than to a silently wrong comparison.
+ * A version segment that is not valid semver is never compared, so a hand-edited or corrupted path
+ * degrades to "no drift decided here" rather than to a silently wrong comparison.
  */
 export function marketplaceSourceDrift(
   registeredSource: string,

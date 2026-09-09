@@ -8,17 +8,11 @@ import { resolveScopeForInstall } from "../../plugin/plugin-target-resolution.js
 import type { PluginTranslator } from "./plugin-translator.js";
 
 /**
- * Mode A — Marketplace + plugins.
+ * Mode A — a marketplace registration, for a tool with native marketplace support.
  *
- * This class is a translator adapter (not a hexagonal port adapter).
- * Used by tools with native marketplace support: Claude, Copilot VSCode, Codex, Cursor.
- *
- * InstalledPlugin files are NOT materialized on disk. Instead, a plugin reference is added to
- * the manifest with an empty files set. MarketplaceSyncSettingsUseCase does the rest: it drives
- * the tool's own CLI to register the marketplace and enable the plugin where `nativeActivation`
- * is declared, writes `MarketplaceSettings.enabledPluginsKey` directly where it isn't, and
- * evicts `extraKnownMarketplaces` from the shared committed file either way once the tool's own
- * CLI owns that registration.
+ * Files are NOT materialized on disk: a plugin reference is added to the manifest with an empty
+ * files set, and `MarketplaceSyncSettingsUseCase` does the rest — driving the tool's own CLI where
+ * `nativeActivation` is declared, writing the enabled-plugins key directly where it is not.
  */
 export class ModeAMarketplaceTranslator implements PluginTranslator {
   readonly mode = "marketplace" as const;

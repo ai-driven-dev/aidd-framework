@@ -5,7 +5,6 @@ import {
   SilentPrompterAdapter,
 } from "../../../src/runtime/prompter/prompter-adapter.js";
 
-// Key sequences for @inquirer/prompts
 const ENTER = "\n";
 const ARROW_DOWN = "\x1b[B";
 const SPACE = " ";

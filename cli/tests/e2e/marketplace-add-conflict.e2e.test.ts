@@ -12,12 +12,8 @@ import {
 
 const PLUGIN_FIXTURE = resolve(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
 
-/** Writes a directory carrying a claude-shaped catalog at the exact relative path
- * `readMarketplaceCatalogIdentity` reads (`.claude-plugin/marketplace.json`) — good
- * enough to stand in either for a host's already-registered `installLocation`, or for
- * the source this project is about to ask the host to register instead. `pluginName`
- * is what decides identity, per `MarketplaceCatalogIdentity`'s own doc: never the
- * version, which two writes of "the same" catalog are free to disagree on. */
+/** A claude-shaped catalog at the exact path `readMarketplaceCatalogIdentity` reads.
+ * Identity is `pluginName`, never the version, which two writes of one catalog may differ on. */
 async function writeCatalog(dir: string, name: string, pluginName: string): Promise<void> {
   await mkdir(join(dir, ".claude-plugin"), { recursive: true });
   await writeFile(
@@ -38,9 +34,8 @@ async function writeCatalog(dir: string, name: string, pluginName: string): Prom
   await cp(PLUGIN_FIXTURE, join(dir, "plugins", pluginName), { recursive: true });
 }
 
-/** Stands in for what `claude plugin marketplace add` itself would have written to
- * `known_marketplaces.json` for an earlier registration — only `installLocation` is
- * read by this project's own guard. */
+/** Stands in for what `claude plugin marketplace add` would have written to
+ * `known_marketplaces.json`; only `installLocation` is read by this project's own guard. */
 async function writeKnownMarketplaces(
   fakeHome: string,
   name: string,

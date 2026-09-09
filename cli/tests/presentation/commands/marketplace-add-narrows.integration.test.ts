@@ -1,10 +1,5 @@
-/**
- * Lot 9, item C, the command side: `marketplace add <name>` must re-drive native
- * activation narrowed to the marketplace it just registered — never every registered
- * marketplace, which is what a bare `syncNativeActivation(deps, output, projectRoot)`
- * call (no fourth argument) would do. `marketplace remove | refresh` deliberately keep
- * that bare call (see `marketplace.ts`); this test pins `add` alone.
- */
+// `marketplace add <name>` re-drives native activation narrowed to the marketplace it just
+// registered; `marketplace remove | refresh` deliberately keep the bare, unnarrowed call.
 import { Command } from "commander";
 import { describe, expect, it, vi } from "vitest";
 

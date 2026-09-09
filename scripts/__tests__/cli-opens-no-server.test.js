@@ -8,24 +8,13 @@ const ROOT = path.resolve(__dirname, "../..");
 const CLI_SRC_PREFIX = "cli/src/";
 
 /**
- * "One route, and every sentence about it true"
- * (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/) deleted the one thing this
- * codebase ever ran that opened a network listener: `aidd telemetry receive`, an OTLP/HTTP
- * server bound to a local port so a tool's own export could be captured. That route is now
- * read-only history - the writer, its adapter, and the port it bound are gone - and the
- * spec's own hard constraint is that this stays true of the *code*, not a promise in a
- * document: "Nothing this system runs opens a network listener, and nothing it runs sends
- * anything anywhere."
+ * Nothing this system runs opens a network listener, and the constraint has to stay true of
+ * the code rather than of a document. This walks every tracked source file under `cli/src`
+ * and greps for the literal patterns a listener is built from, so a future listener has to be
+ * a deliberate decision — this assertion updated, with a reason — never an accident.
  *
- * This is the same kind of check `source-stays-text.test.js` runs: walk every tracked
- * source file under `cli/src`, grep for the literal patterns a listener is built from, and
- * fail loudly if one reappears - a future listener then has to be a deliberate decision
- * (this test's assertion updated, with a reason), never an accident nobody noticed.
- *
- * Deliberately narrow to *server* construction, not merely importing `node:http` or
- * `node:net` - this codebase makes plenty of outbound HTTP calls (checking for updates,
- * fetching a marketplace, downloading a release), and an outbound client is not the thing
- * this test exists to forbid.
+ * Deliberately narrow to server construction, not merely importing `node:http` or `node:net`:
+ * this codebase makes plenty of outbound calls, and a client is not what this forbids.
  */
 const FORBIDDEN_PATTERNS = [
   // No leading `\.`: `createServer` imported by name (`import { createServer } from

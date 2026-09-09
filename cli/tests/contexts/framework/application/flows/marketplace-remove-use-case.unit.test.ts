@@ -199,11 +199,8 @@ describe("MarketplaceRemoveUseCase", () => {
     );
   });
 
-  // Bloquant 4: `aidd-framework` is machine-scope, shared by every project — removing
-  // it from one project's own `marketplace remove` would silently orphan the host's
-  // own registration for every other project on the machine, with no confirmation.
-  // `marketplace add` already refuses this reserved name (`InvalidMarketplaceNameError`
-  // in `marketplace-add-use-case.ts`); `remove` gets the symmetric guard.
+  // `aidd-framework` is machine-scope: removing it from one project would orphan the host's
+  // own registration for every other project. `marketplace add` already refuses that name.
   it("refuses to remove the reserved aidd-framework marketplace, leaving the registry untouched", async () => {
     const { useCase, registry } = buildUseCase();
     await registry.save(

@@ -7,10 +7,8 @@ const SESSION = "33333333-3333-4333-8333-333333333333";
 const EMPTY_SESSION = "44444444-4444-4444-8444-444444444444";
 const CACHED_SESSION = "55555555-5555-4555-8555-555555555555";
 
-// Both fixtures are real, redacted excerpts of a captured `@github/copilot@1.0.80` file —
-// system.message, user.message, assistant.message and every reasoning field stripped, per
-// #697's acceptance criterion. See copilot-events.ts's own header comment for the
-// arithmetic this rests on.
+// Both fixtures are real, redacted excerpts of a captured Copilot session file — every
+// message and reasoning field stripped.
 function loadFixture(relativePath: string): string {
   const url = new URL(`../../../../fixtures/local-cost/${relativePath}`, import.meta.url);
   return readFileSync(fileURLToPath(url), "utf8");
@@ -41,20 +39,16 @@ describe("mapCopilotEventsToSinkRecords", () => {
   });
 
   it("stamps the vendor id it was given, never one read off the file's own content", () => {
-    // The file's own session.start names SESSION; asking for a different id still gets
-    // that different id back — the file only ever confirms it holds *a* session, never
-    // which one, and the caller's own answer is the one that must win. See the header
-    // comment on copilot-events.ts for why the two could disagree at all.
+    // The file only ever confirms it holds *a* session, never which one, so the caller's
+    // own answer is the one that must win.
     const records = mapCopilotEventsToSinkRecords(loadFixture(FULL_PATH), "some-other-id");
 
     expect(records[0]?.vendor_id).toBe("some-other-id");
   });
 
   it("still yields a record from a truncated file with no session.start line at all", () => {
-    // A capture missing its first line - a partial copy, a rotated file - carries no
-    // session.start to (wrongly) fall back to. Reading identity from the caller's own
-    // argument rather than from file content is what keeps this case from silently
-    // dropping the record - see the header comment on copilot-events.ts.
+    // A partial copy or a rotated file carries no session.start to fall back to; reading
+    // identity from the caller's own argument is what keeps the record from being dropped.
     const noSessionStart = loadFixture(FULL_PATH)
       .split("\n")
       .filter((line) => !line.includes('"session.start"'))
@@ -74,13 +68,8 @@ describe("mapCopilotEventsToSinkRecords", () => {
   });
 
   it("reads the four counters disjoint when the cached prompt is large, the case left open", () => {
-    // Measured live, @github/copilot@1.0.82, 2026-09-06: 9 (tokenDetails.input) + 42038
-    // (cache_read) + 21404 (cache_write) = 63451 = modelMetrics.<model>.usage.inputTokens,
-    // and Copilot's own terminal line for that run read `↑ 63.5k (42.0k cached, 21.4k
-    // written)`. This is the capture copilot.ts asked for by name: at cache_read 0, "input
-    // excludes the cached prompt" and "input already includes it" produce the same number
-    // and cannot be told apart. At 42038 they cannot be confused - an input that included
-    // the cached prompt would read 63451, not 9.
+    // Measured: 9 + 42038 + 21404 = 63451 = usage.inputTokens. At cache_read 0 an input that
+    // excludes the cached prompt and one that includes it read alike; at 42038 they cannot.
     const [record] = mapCopilotEventsToSinkRecords(loadFixture(CACHED_PATH), CACHED_SESSION);
 
     expect(record?.input_tokens).toBe(9);

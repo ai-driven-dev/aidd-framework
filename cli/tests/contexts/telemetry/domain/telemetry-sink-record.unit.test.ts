@@ -42,10 +42,8 @@ describe("parseTelemetrySinkLine()", () => {
     expect(sessionLine?.turn_id).toBeUndefined();
   });
 
-  // `user_id` predates the rule that an export-provenance record carries no identity, and
-  // the fixture still carries it on purpose: the sink is append-only, so a line a pre-removal
-  // build already wrote keeps the field forever. Parsing must not choke on it, and nothing
-  // reads it back out now that it is off the type.
+  // The fixture carries `user_id` on purpose: the sink is append-only, so a line an earlier
+  // build wrote keeps the field forever and parsing must not choke on it.
   it("parses a stored line that still carries the now-removed user_id, inertly", () => {
     const url = new URL("../../../fixtures/telemetry-sink/expected.jsonl", import.meta.url);
     const lines = readFileSync(fileURLToPath(url), "utf8").trim().split("\n");
@@ -69,10 +67,8 @@ describe("parseTelemetrySinkLine()", () => {
     expect(records.some((r) => r.provenance === "local-read")).toBe(true);
   });
 
-  // This fixture predates cli_version entirely - the hand-written stand-in for a record a
-  // build before this field existed actually wrote. Parsing it must not choke, and every
-  // record on it must still be there to count: an unknown version costs a field, never a
-  // figure.
+  // This fixture predates cli_version entirely: an unknown version costs a field, never a
+  // figure, so every record on it must still be there to count.
   it("parses a line written before cli_version existed, losing no figure to the gap", () => {
     const url = new URL("../../../fixtures/telemetry-sink/expected.jsonl", import.meta.url);
     const lines = readFileSync(fileURLToPath(url), "utf8").trim().split("\n");
@@ -111,11 +107,8 @@ describe("telemetrySinkRecordDayKey()", () => {
     expect(telemetrySinkRecordDayKey({ ...BASE })).toBeUndefined();
   });
 
-  // The latent defect: ten-or-more characters ending in "Z" took the fast slice path
-  // unconditionally, so a string merely shaped like a moment answered a fragment nothing on
-  // the calendar matches ("not-a-mome") instead of the `undefined` this function's own
-  // docstring promises. A day file mistakenly filed under a fragment like that would leave
-  // the record in `totals` while it vanished from `byDays` - the two silently disagreeing.
+  // A string merely shaped like a moment must not take the fast slice path: a record filed
+  // under a fragment nothing on the calendar matches stays in `totals` but leaves `byDays`.
   it("answers undefined for a string merely shaped like a moment, never a sliced fragment", () => {
     expect(
       telemetrySinkRecordDayKey({ ...BASE, event_timestamp: "not-a-momentZ" })
@@ -134,12 +127,8 @@ describe("telemetrySinkRecordDayKey() — a line holds whatever it holds", () =>
     step_attribution: "unattributed",
   };
 
-  // `parseTelemetrySinkLine` validates the schema version and casts the rest, so this field
-  // is only a string by convention. A number used to pass the absence check and be read as
-  // epoch milliseconds: the record landed on 1970-01-01, fell outside every real period,
-  // and disappeared without ever counting as undated.
-  /** Built through the real parse, which is the only way a record of the wrong shape ever
-   * reaches this function: it checks `sink_schema_version` and casts the rest. */
+  /** Built through the real parse, which checks `sink_schema_version` and casts the rest —
+   * the only way a record whose field is a string by convention alone ever gets here. */
   function recordFromLine(overrides: Record<string, unknown>): TelemetrySinkRecord {
     return parseTelemetrySinkLine(JSON.stringify({ ...BASE, ...overrides }));
   }

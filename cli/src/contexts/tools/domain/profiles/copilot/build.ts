@@ -1,9 +1,7 @@
 /**
- * Copilot's ToolBuildContract: marketplace (OpenPlugin format) and flat
- * (direct workspace materialization) modes.
- *
- * Content transforms, path computations, and merge helpers are pure functions reused
- * from domain/formats/. The contracts themselves are thin wiring.
+ * Copilot's build contracts: marketplace (OpenPlugin format) and flat (direct workspace
+ * materialization). The transforms, path computations and merges are pure functions reused from
+ * `domain/formats/`; the contracts themselves are thin wiring.
  */
 
 import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
@@ -27,10 +25,8 @@ import {
 } from "../../marketplace-catalog.js";
 import { COPILOT_VSCODE_MCP_PATH, COPILOT_WORKSPACE_DIR } from "./copilot-paths.js";
 
-/** Path where the synthesized OpenPlugin-format plugin manifest is written. */
 const OUTPUT_PLUGIN_MANIFEST_RELATIVE = ".plugin/plugin.json";
 
-/** Path where the synthesized OpenPlugin-format marketplace catalog is written. */
 const OUTPUT_MARKETPLACE_RELATIVE = ".plugin/marketplace.json";
 
 /** Output prefix for agents in flat mode: .github/agents/<plugin>/<name>.agent.md */
@@ -42,16 +38,13 @@ const FLAT_GITHUB_SKILLS_PREFIX = `${COPILOT_WORKSPACE_DIR}skills/`;
 /** Output prefix for hooks in flat mode: .github/hooks/<plugin>.hooks.json */
 const FLAT_GITHUB_HOOKS_PREFIX = `${COPILOT_WORKSPACE_DIR}hooks/`;
 
-/** Path to the VS Code workspace MCP config merged in flat mode. */
 const FLAT_VSCODE_MCP_PATH = COPILOT_VSCODE_MCP_PATH;
 
-/** File extension for agent files in flat output (workspace canonical). */
 const FLAT_AGENT_OUTPUT_EXT = ".agent.md";
 
 export function buildCopilotMarketplaceContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_PLUGIN_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
   return {
     pluginRootToken: PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
@@ -108,8 +101,6 @@ export function buildCopilotMarketplaceContract(): ToolBuildContract {
     },
   };
 }
-
-// ── Copilot flat contract (for FlatBuildStrategy) ─────────────────────────────
 
 function copilotFlatAgentPath(plugin: string, rel: string): string {
   return genericFlatAgentPath(

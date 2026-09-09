@@ -1,5 +1,3 @@
-// Called from use-cases/marketplace, use-cases/plugin, and use-cases/setup.
-
 import { marketplaceCacheDir } from "../../../kernel/paths.js";
 import type { PluginCatalog } from "../domain/catalog.js";
 import type { Marketplace } from "../domain/marketplace.js";

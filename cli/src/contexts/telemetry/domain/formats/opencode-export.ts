@@ -1,46 +1,11 @@
 import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 
-// Measured 2026-08-20 on opencode 1.14.20, providerID "anthropic": `opencode export
-// <sessionID> --sanitize` answers `{info, messages}` on stdout, and a counted message's own
-// `info` carries `tokens` (`{total, input, output, reasoning, cache:{read, write}}`),
-// `modelID` and a stable `id`. `total == input + output + cache.read + cache.write` on every
-// message captured that session (`reasoning` was `0` throughout, so it never entered the sum).
-// `info.cost` is deliberately never read here: it is `0` in every message captured, its
-// denomination (which currency, computed vs billed) has never been established, and a
-// figure whose meaning is unknown is worse than an absent one.
-// `info.providerID` (e.g. "anthropic", sitting right next to `modelID`) is deliberately
-// never read either: the stored record has no provider field — `model` everywhere else in
-// this codebase already holds a bare model id, not a `provider/model` pair — and inventing
-// one here would introduce OpenCode's own vocabulary for something no other reader names.
-//
-// Re-probed 2026-08-24 against a second, genuinely different provider obtained on this
-// machine — `opencode run --model opencode/big-pickle ...` (providerID "opencode", an
-// `@ai-sdk/openai-compatible` backend). Its `total == input + output + cache.read +
-// cache.write + reasoning` reconciled too (`14072 == 13926 + 13 + 128 + 0 + 5`), but that
-// did not settle the question then: a second, continued turn in that session showed
-// `cache.read: 0, cache.write: 0` throughout — the backend never exercised its cache — so
-// no capture put a large `cache.read` beside `input` for a non-Anthropic provider, which
-// is the one comparison that shows `input` failing to shrink if it already counted the
-// cached tokens.
-//
-// **Captured 2026-09-06** (providerID "opencode", modelID "ling-3.0-flash-fin-free" —
-// tests/fixtures/telemetry-sink/opencode-export-non-anthropic-cache.json): three billed
-// turns of one session with the cache genuinely exercised. `input` falls 28242 → 269 → 196
-// as `cache.read` climbs 640 → 28928 → 29184, and `total == input + output + reasoning +
-// cache.read + cache.write` holds on all three (29089, 29356, 29438). An `input` inclusive
-// of the cached tokens could neither shrink that way nor leave that identity standing, so
-// the counters are disjoint for this provider too. Anthropic's own exclusivity is
-// independent of this (the documented behaviour of its Messages API, corroborated elsewhere
-// in this repo against Claude Code's own `/usage`). What stays open is narrower than it
-// was: a provider that reports prompt tokens *inclusive* of cached ones, the way native
-// OpenAI's Chat Completions usage does, has still never been captured here.
-//
-// That open question does not reopen the choice above to never read `info.providerID`: a
-// per-record check would need a provider field on the stored record to hang a per-provider
-// caveat off of, which is the schema change the comment above already declines, for a
-// reason unrelated to this one. The declaration this limit needs instead is static — the
-// same shape as Cursor's `not covered`, just narrower — and `profiles/opencode/profile.ts`'s
-// `telemetryLocalRead.limitation` carries it.
+// The counters are disjoint — `total == input + output + reasoning + cache.read + cache.write`
+// held for every provider captured, with `input` shrinking as `cache.read` climbed — so nothing
+// cached is subtracted here. `info.cost` is never read: it reads `0` throughout and its
+// denomination is unestablished, a figure whose meaning is unknown being worse than an absent
+// one. `info.providerID` is never read either, the stored record carrying no provider field, so
+// the residual limit lives in `profiles/opencode/profile.ts`'s `telemetryLocalRead.limitation`.
 const VENDOR_FIELD = "sessionID";
 const TURN_FIELD = "id";
 
@@ -70,9 +35,9 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-// `time.created`, not `time.completed`: created is on every counted message measured, while
-// completed is absent on some, and a record that sometimes means "started" and sometimes
-// means "finished" is worse than one that always means the same thing. Epoch milliseconds.
+// Epoch milliseconds. `time.created`, not `time.completed`: completed is absent on some
+// counted messages, and a field meaning "started" on one record and "finished" on the next is
+// worse than one that always means the same thing.
 function isoFromEpochMillis(value: unknown): string | undefined {
   const millis = asNumber(value);
   if (millis === undefined || millis <= 0) return undefined;
@@ -112,16 +77,10 @@ function buildCounters(
   };
 }
 
-// A message OpenCode created but never billed carries `tokens` with every counter at `0`
-// and no `total` key at all — reproduced on this machine 2026-08-24 by SIGINT-ing an
-// `opencode run` mid-response and exporting the session: the interrupted assistant message
-// has `time.created` but no `time.completed`, no `finish`, and a `tokens` object with no
-// `total` — the same shape as this repo's own fixture's fourth assistant message.
-// anomalyco/opencode#33687 confirms the mechanism: a message that halts on abort is not
-// reliably given a `finish` either, so `total`'s absence is the signal, not something to
-// wait on being fixed. A message that completed with genuinely zero usage still carries a
-// `total` (`0`), and still yields a record: that is an observation, not a call that never
-// happened.
+// A message OpenCode created but never billed — an interrupted response — carries `tokens`
+// with no `total` key at all, and is not reliably given a `finish` either, so `total`'s absence
+// is the signal. A message that completed with genuinely zero usage still carries `total: 0`
+// and still yields a record: that is an observation, not a call that never happened.
 function wasBilled(tokens: OpencodeTokenCounts): boolean {
   return asNumber(tokens.total) !== undefined;
 }
@@ -143,13 +102,10 @@ function buildRecord(
   };
 }
 
-/** Every billed message in a captured `opencode export --sanitize` payload, mapped onto the
- * stored record's own field names. A message whose `info.tokens` is absent — every user turn,
- * and any turn OpenCode never measured — yields no record: never an invented zero. Nor does one
- * whose `tokens` carries no `total`: that is a message OpenCode created but never billed (see
- * `wasBilled`), and counting it would inflate the request count with a call that never happened.
- * `sessionId` is trusted as given, matching every other local reader's contract; it is not
- * re-derived from `payload.info.id`. */
+/** A message with no `info.tokens` — every user turn, and any turn OpenCode never measured —
+ * yields no record rather than an invented zero, and so does one never billed (`wasBilled`),
+ * which would otherwise inflate the request count. `sessionId` is trusted as given, matching
+ * every other local reader's contract. */
 export function mapOpencodeExportToSinkRecords(
   payload: unknown,
   sessionId: string

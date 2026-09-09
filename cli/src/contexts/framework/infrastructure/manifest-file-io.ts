@@ -5,12 +5,9 @@ import { isErrnoException } from "../../../kernel/reading/json-file.js";
 import { Manifest, type ManifestFileContext } from "../domain/manifest.js";
 
 /**
- * The one place a manifest file's bytes are read, parsed and turned into a `Manifest` —
- * shared by `ManifestRepositoryAdapter` (project scope) and `UserManifestRepositoryAdapter`
- * (user scope), which differ only in which path they read and what a version-refusal
- * message should name to fix it (`ManifestFileContext`). Reusing `Manifest.fromJSON`
- * alone, and recopying the file I/O and error wrapping around it, was still forty lines
- * of one fact with two homes; this is the single home.
+ * The one place a manifest file's bytes are read, parsed and turned into a `Manifest`. The project
+ * and user-scope adapters differ only in which path they read and what a version-refusal message
+ * should name to fix it (`ManifestFileContext`).
  */
 export async function readManifestFile(context: ManifestFileContext): Promise<Manifest | null> {
   let raw: string;
@@ -31,10 +28,8 @@ export async function readManifestFile(context: ManifestFileContext): Promise<Ma
   return Manifest.fromJSON(parsed, context);
 }
 
-/** Both adapters write the same shape at the same path-shaped rule: create the parent
- * directory, then write the serialized manifest — `dirname(path)` is `<projectRoot>/.aidd`
- * for the project adapter and `userConfigDir()` for the user one, so one function serves
- * both without either passing the other's directory convention. */
+/** `dirname(path)` is `<projectRoot>/.aidd` for the project adapter and `userConfigDir()` for the
+ * user one, so one function serves both without either passing the other's directory convention. */
 export async function writeManifestFile(path: string, manifest: Manifest): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(manifest.toJSON(), null, 2), "utf-8");

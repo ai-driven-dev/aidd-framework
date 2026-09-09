@@ -23,9 +23,7 @@ describe("the line added to a repository's own prepare-commit-msg", () => {
   });
 
   // A hook is shell, run by the `sh` Git for Windows ships, and that shell does not resolve
-  // `C:\Users\…` — inside double quotes a backslash is an ordinary character, so the path
-  // would arrive literally and name nothing. Node's `resolve` hands back backslashes there,
-  // so this is where a filesystem path stops being one.
+  // `C:\Users\…`: inside double quotes a backslash is an ordinary character.
   it("writes a Windows path with forward slashes, which is the only form sh resolves", () => {
     const line = sessionTrailerHookLine("C:\\Users\\a\\repo\\.git\\hooks\\x.sh");
 
@@ -94,10 +92,8 @@ describe("what the delegate is called on disk", () => {
 });
 
 /**
- * The job/line printed for a hand-add when lefthook or husky owns `prepare-commit-msg` and
- * regenerates it, wiping anything this CLI appended. Neither snippet may carry an absolute
- * path — these files are committed and shared across machines, and a path baked in at write
- * time on one contributor's disk would name nothing on anyone else's.
+ * Neither snippet may carry an absolute path: these files are committed and shared across
+ * machines, so a path baked in on one contributor's disk names nothing on another's.
  */
 describe("the job printed for a repository lefthook already owns", () => {
   const job = sessionTrailerLefthookJob(SESSION_TRAILER_DELEGATE_FILE);

@@ -22,11 +22,8 @@ import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory
 const USER_CONFIG_DIR = "/fake-home/.config/aidd";
 const HOME = "/fake-home";
 
-/** Records every `deleteDirectory`/`deleteFile` call, in order, tagged with a label a
- * test can compare against another recorded event — the one way to prove an ordering
- * constraint holds without inspecting the use case's own private state. Pass a shared
- * array to correlate against another recorder (`RecordingActivator` below); defaults
- * to its own, for a test that only cares what this adapter itself saw. */
+/** Records every delete in order, so an ordering constraint can be proved without reading
+ * the use case's own private state. A shared array correlates with another recorder. */
 class RecordingFileAdapter extends InMemoryFileAdapter {
   readonly order: string[];
 
@@ -46,9 +43,8 @@ class RecordingFileAdapter extends InMemoryFileAdapter {
   }
 }
 
-/** A `NativePluginActivator` that pushes into the same shared `order` log the file
- * adapter above writes to — the only way to compare "the host was asked to forget
- * this marketplace" against "its cache directory was deleted" on one timeline. */
+/** Pushes into the same shared `order` log the file adapter above writes to, so "the host was
+ * asked to forget this marketplace" and "its cache was deleted" sit on one timeline. */
 class RecordingActivator implements NativePluginActivator {
   readonly order: string[];
   readonly removedMarketplaces: string[] = [];
@@ -84,9 +80,8 @@ class RecordingActivator implements NativePluginActivator {
   }
 }
 
-/** A `Prompter` that records the last message it was asked to confirm and returns a
- * fixed answer — the only way to pin the confirmation's exact wording and prove the
- * "answered no" branch actually stops before anything is deleted. */
+/** Answers a fixed way and keeps the message, so the confirmation's exact wording and the
+ * "answered no" branch can both be pinned. */
 class RecordingPrompter implements Prompter {
   lastConfirmMessage: string | undefined;
 
@@ -124,9 +119,8 @@ function manifestWithClaude(): Manifest {
   return manifest;
 }
 
-/** Seeds the cache path claude's own profile declares (`~/.claude/plugins/cache/<hostName>/`)
- * with a marker file, so `resolveCacheCandidate` finds something real to resolve and
- * purge — an empty/non-existent directory is silently skipped rather than purged. */
+/** Seeds the cache path claude's own profile declares with a marker file: an empty or absent
+ * directory is silently skipped rather than purged. */
 function seedClaudeCache(fs: InMemoryFileAdapter, hostName = "aidd-framework"): string {
   const cachePath = join(HOME, ".claude", "plugins", "cache", hostName);
   fs.setFile(join(cachePath, "marker.json"), "{}");
@@ -181,10 +175,8 @@ describe("clean --scope user", () => {
       const info = logger.infoMessages.find((m) => m.includes("No host registration"));
       expect(info).toBeDefined();
       expect(info).toContain("/project-a");
-      // Lot 9, item D2: names both removal commands, in order — dropping the
-      // per-project `aidd clean` half (leaving only `aidd clean --scope user`) must
-      // fail this, not just a bare `.toContain("aidd clean")`, which that longer
-      // command also satisfies as a substring.
+      // Both removal commands, in order: `aidd clean --scope user` also satisfies a bare
+      // `.toContain("aidd clean")`, so the per-project half needs its own assertion.
       expect(info).toContain("`aidd clean`");
       expect(info).toContain("`aidd clean --scope user`");
       expect(info?.indexOf("`aidd clean`")).toBeLessThan(
@@ -287,9 +279,8 @@ describe("clean --scope user", () => {
         join(USER_CONFIG_DIR, "cache", "built", "1.0.0", "aidd-framework", "claude", "x"),
         "1"
       );
-      // Written by `check-update-use-case.ts` on any online command, into the same
-      // `cache/` directory `cache/built/` sits in — the one occupant that used to
-      // survive a machine-scope clean and keep the shell around it non-empty.
+      // Written by any online command into the same `cache/` directory `cache/built/` sits
+      // in — the occupant that used to survive a machine-scope clean and keep the shell alive.
       fs.setFile(join(USER_CONFIG_DIR, "cache", "update-check.json"), '{"latest":"9.9.9"}');
       // And where an older CLI wrote the same cache, before it moved under `cache/`.
       fs.setFile(join(USER_CONFIG_DIR, "update-check.json"), '{"latest":"8.0.0"}');
@@ -329,9 +320,8 @@ describe("clean --scope user", () => {
 
       await useCase.execute({ projectRoot: "/wherever", force: true });
 
-      // references.json's own candidate resolves straight back to userConfigDir()
-      // itself, which containment refuses regardless of equality — never `deleteFile`d,
-      // under its own name or a literal unresolved one.
+      // references.json's own candidate resolves straight back to userConfigDir() itself,
+      // which containment refuses regardless of equality.
       expect(fs.order).not.toContain(`deleteFile:${join(USER_CONFIG_DIR, "references.json")}`);
       expect(fs.order).not.toContain(`deleteFile:${USER_CONFIG_DIR}`);
       expect(fs.order.some((entry) => entry.endsWith(USER_CONFIG_DIR))).toBe(false);
@@ -343,10 +333,8 @@ describe("clean --scope user", () => {
     it("leaves a cursor plugin file in place when it resolves outside the user plugins boundary through a symlink", async () => {
       const fs = new RecordingFileAdapter();
       const boundary = join(HOME, ".cursor", "plugins", "local");
-      // A sibling directory sharing `boundary`'s own name as a string *prefix* —
-      // `${boundary}-evil` — not a path under it. A raw `candidate.startsWith(boundary)`
-      // check (the mutation this test guards against) would wrongly call this
-      // contained; only `relative()`-based containment sees the leading `..`.
+      // A sibling sharing `boundary`'s name as a string prefix, not a path under it: a raw
+      // `startsWith` would call it contained, where `relative()` sees the leading `..`.
       const escapeTarget = `${boundary}-evil`;
       fs.setFile(join(escapeTarget, "evil.md"), "danger");
       // The manifest's own entry names a plugin directory that, since install, became a

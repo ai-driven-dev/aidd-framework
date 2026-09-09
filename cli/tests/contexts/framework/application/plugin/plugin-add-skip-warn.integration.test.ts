@@ -1,15 +1,5 @@
-/**
- * Integration test for Phase 1: PluginAddUseCase emits logger.warn for each skip entry
- * returned by the translation adapter.
- *
- * The live example this originally used — sample-plugin's hooks/ against OpenCode —
- * stopped producing a skip once OpenCode's flat mode started accepting hooks (Phase 7,
- * see the telemetry plan's measurements.md): every registered tool now runs what a
- * plugin's hooks/ ships, so no live fixture currently exercises collectHooksSkips's
- * non-empty branch. The first two tests below assert that absence directly rather than
- * keep asserting a skip that no longer happens; the warn-format contract itself is still
- * covered, tool-agnostically, by the last test in this file.
- */
+/** Every registered tool now runs what a plugin's `hooks/` ships, so no live fixture reaches
+ * `collectHooksSkips`'s non-empty branch; the warn format is pinned tool-agnostically below. */
 import "../../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -55,7 +45,6 @@ describe("PluginAddUseCase skip warnings", () => {
 
   describe("warn message format", () => {
     it("formats skip warnings as Plugin <name>: <component> skipped for <toolId> — <reason>", () => {
-      // Validate the format directly without going through the full use-case flow
       const logger = new CapturingLogger();
       const skipped: ReadonlySkipList = [
         {

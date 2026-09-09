@@ -22,13 +22,10 @@ const CLEAN_ENV = Object.fromEntries(
 /**
  * The trailer's call site, put back after something removed it.
  *
- * Every repair case here reproduces the failure by its **shape** — a `prepare-commit-msg`
- * replaced between two commits — and never by its brand: the repair asks only whether the
- * line is there, so a test that needed a particular tool would be testing something narrower
- * than the code. The two cases that do name lefthook and husky are the opposite assertion —
- * that a manager's marker file makes the repair decline — and a brand is the whole subject
- * there. Nothing installs either tool even then; a marker file at the root is the entire
- * fixture, because it is the entire fact the code reads.
+ * Every repair case reproduces the failure by its shape — a `prepare-commit-msg` replaced
+ * between two commits — never by its brand, since the repair asks only whether the line is
+ * there. The two cases that do name lefthook and husky assert the opposite, that a marker
+ * file makes the repair decline, and a marker file at the root is the entire fixture.
  */
 function withRepo(run, nested = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-trailer-repair-"));
@@ -41,12 +38,9 @@ function withRepo(run, nested = "") {
       path.join(root, ".aidd", "config.json"),
       JSON.stringify({ telemetry: { enabled: true } })
     );
-    // Resolved against the cwd the hook is given, which is what the hook itself does — git
-    // prints `--git-path` relative to the directory it ran in. Pinning it here is the point:
-    // an earlier version resolved against the repository root instead, and a session started
-    // in a subdirectory then repaired a hooks directory two levels ABOVE the checkout. Every
-    // case below runs from `root`, where both bases coincide, so `withRepo` takes the cwd the
-    // session will use and the nested case supplies a different one.
+    // Resolved against the cwd the hook is given, which is what the hook does: git prints
+    // `--git-path` relative to the directory it ran in. Every case below runs from `root`,
+    // where both bases coincide, so the nested case supplies a different cwd.
     const hooks = String(
       spawnSync("git", ["rev-parse", "--git-path", "hooks"], {
         cwd: sessionCwd,
@@ -189,9 +183,8 @@ test("nothing is written when measurement is off for the project", () => {
 /**
  * A file the filesystem says cannot be written is left exactly as it is, and the session
  * survives. `rename` needs the *directory*, not the file, so without an explicit check a
- * `0444` hook was silently replaced and left reading `0444` — its content changed while its
- * permissions said it could not be. The old test asserted only that the session exited 0,
- * which was true either way.
+ * `0444` hook is silently replaced and left reading `0444` — its content changed while its
+ * permissions say it could not be.
  */
 test("an unwritable hook file is left alone, and costs the session nothing", () => {
   withRepo(({ root, hooksDir }) => {
@@ -209,13 +202,11 @@ test("an unwritable hook file is left alone, and costs the session nothing", () 
   });
 });
 
-// `open(2)` applies the umask to the mode it is handed, so a staged write narrowed a `0770`
-// hook to `0750`. Narrowing is as much a change to somebody else's file as widening.
+// `open(2)` applies the umask to the mode it is handed, so a staged write narrows a `0770`
+// hook to `0750`, and narrowing is as much a change to somebody else's file as widening.
 //
 // Asserted as "the mode the repair found is the mode it left", never against a literal:
-// Windows has no POSIX permission bits, and reports `0o666` for every writable file
-// whatever it was chmod'ed to. The literal made this fail there for a reason that was
-// about the platform and not about the repair.
+// Windows has no POSIX permission bits and reports `0o666` for every writable file.
 test("a repair does not narrow a hook's group permissions", () => {
   withRepo(({ root, hooksDir }) => {
     installDelegate(hooksDir);
@@ -232,12 +223,9 @@ test("a repair does not narrow a hook's group permissions", () => {
 
 /**
  * The atomicity criterion, asserted on the one thing only `rename` produces: a different
- * inode. A direct `writeFileSync` truncates and refills the file it already has, so the
- * inode survives; staging beside the target and renaming over it replaces it.
- *
- * This exists because the criterion had no test that could fail — removing the
- * stage-and-rename branch entirely left every other case green, and a test asserting only
- * that no staging file remains is equally true when nothing is ever staged.
+ * inode. A direct `writeFileSync` truncates and refills the file it already has, so the inode
+ * survives, and a test asserting only that no staging file remains is equally true when
+ * nothing is ever staged.
  */
 test("a repair replaces the hook rather than truncating it, so no reader sees it half-written", () => {
   withRepo(({ root, hooksDir }) => {
@@ -310,21 +298,19 @@ test("a read-only hooks directory holding a writable hook is still repaired", ()
 });
 
 /**
- * The defect an independent check reproduced, and the one no case above could see: every
- * one of them starts the session at the repository root, where resolving against the root
- * and against the cwd give the same answer.
+ * The one case no other can see: every other starts the session at the repository root, where
+ * resolving against the root and against the cwd give the same answer.
  *
- * `git rev-parse --git-path hooks` prints relative to the directory it ran in. Resolved
- * against the repository root instead, a session started in `sub/deep` produced
- * `<root>/../../.git/hooks` — a path two levels ABOVE the checkout, which is where the
- * repair then wrote, while the session's own repository stayed broken.
+ * `git rev-parse --git-path hooks` prints relative to the directory it ran in, so resolving
+ * against the repository root sends a session started in `sub/deep` two levels ABOVE the
+ * checkout, which is where the repair then writes.
  */
 test("a session started in a subdirectory repairs its own repository, and nothing above it", () => {
   withRepo(({ root, sessionCwd, hooksDir }) => {
     const line = installDelegate(hooksDir);
     regenerateHook(hooksDir);
-    // Two levels up, which is where the defect actually wrote: it resolved
-    // `../../.git/hooks` against the repository root. One level up would assert nothing.
+    // Two levels up, which is where resolving `../../.git/hooks` against the repository root
+    // lands. One level up would assert nothing.
     const outside = path.resolve(root, "..", "..", ".git", "hooks", "prepare-commit-msg");
 
     assert.equal(sessionStart(sessionCwd).status, 0);
@@ -335,10 +321,10 @@ test("a session started in a subdirectory repairs its own repository, and nothin
 });
 
 /**
- * `core.hooksPath` may point into the working tree — a checked-in `.githooks/` is a common
- * way to share hooks with a team. `aidd telemetry on` writing the line once was a write a
- * person asked for; this one is not, it recurs on every session, and it would dirty a
- * tracked file with a machine-absolute path nobody can commit.
+ * `core.hooksPath` may point into the working tree — a checked-in `.githooks/` is a common way
+ * to share hooks with a team. `aidd telemetry on` writing the line once is a write a person
+ * asked for; this one is not, it recurs on every session, and it would dirty a tracked file
+ * with a machine-absolute path nobody can commit.
  */
 test("a hooks directory inside the working tree is never written to", () => {
   withRepo(({ root, hooksDir }) => {
@@ -376,12 +362,10 @@ test("a prepare-commit-msg that is a symlink is left alone, target and all", () 
 });
 
 /**
- * The fallback that keeps the journal alive on an older git, which a systematic mutation
- * pass found guarded by nothing — the blocker it fixes could have come straight back.
- *
- * `rev-parse` fails atomically, so a git that does not understand `--git-path` answers
- * non-zero for every option asked with it. Without the three-option retry, the whole
- * location read returns null and the session records nothing at all.
+ * The fallback that keeps the journal alive on an older git. `rev-parse` fails atomically, so
+ * a git that does not understand `--git-path` answers non-zero for every option asked with
+ * it, and without the three-option retry the whole location read returns null and the session
+ * records nothing at all.
  */
 test("a git that rejects --git-path still journals the session", () => {
   withRepo(({ root }) => {
@@ -422,14 +406,11 @@ test("a git that rejects --git-path still journals the session", () => {
 });
 
 /**
- * Where a hook manager owns `prepare-commit-msg`, the repair adds nothing.
- *
- * These are the two cases that do name a brand, and they have to: the fault is not a
- * missing line, it is a line that must never be added. `aidd telemetry on` installs no call
- * site in such a repository — it prints the manager's own job instead — so a repair that
- * appended one would give the delegate two callers per commit, the manager's job and a
- * direct call the CLI never wrote. The marker file is the only fact that survives a
- * regeneration, which is why the decision is taken from it and not from the hook's contents.
+ * Where a hook manager owns `prepare-commit-msg`, the repair adds nothing: the fault here is
+ * not a missing line but a line that must never be added. `aidd telemetry on` installs no
+ * call site in such a repository, so a repair appending one would give the delegate two
+ * callers per commit. The marker file is the only fact that survives a regeneration, which is
+ * why the decision is taken from it and not from the hook's contents.
  */
 const MANAGER_MARKERS = [
   ["lefthook", (root) => fs.writeFileSync(path.join(root, "lefthook.yml"), "pre-commit:\n")],
@@ -453,11 +434,10 @@ for (const [manager, plant] of MANAGER_MARKERS) {
 }
 
 /**
- * The marker list is spelled twice — here and in the CLI's `detectHookManager` — for the
- * reason the call site's own line is: this hook is zero-dependency CommonJS copied into a
- * person's repository and can import nothing from `cli/`. Pinned against the CLI's own
- * declaration read as text, never against a third copy typed into this file, so a spelling
- * added on one side fails here rather than making the two sides disagree in silence.
+ * The marker list is spelled twice — here and in the CLI's `detectHookManager` — because this
+ * hook is zero-dependency CommonJS copied into a person's repository and can import nothing
+ * from `cli/`. Pinned against the CLI's own declaration read as text, never a third copy
+ * typed into this file, so a spelling added on one side fails here.
  */
 test("the manager markers are the ones the CLI decides by", () => {
   const declaration = fs.readFileSync(

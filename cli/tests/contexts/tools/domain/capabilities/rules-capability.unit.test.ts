@@ -17,12 +17,8 @@ describe("RulesCapability", () => {
     });
   });
 
-  // Where a rule *lands* is not `buildOutputPath` — that answers where the framework's own
-  // source form goes. An installed tree holds the converted file, and the one thing that
-  // knows its shape is `buildInstallPath`, which is a closure per tool: a template for
-  // three of them, `toMdc` for Cursor, a delegated handler for Copilot. Asking it with a
-  // sentinel keeps the answer where the knowledge is, instead of a reader parsing a path
-  // string back apart and becoming a second copy of it.
+  // Where a rule lands is `buildInstallPath`, not `buildOutputPath`, and it is a closure per tool.
+  // Asking it with a sentinel keeps the answer where the knowledge is, not in a path parser here.
   describe("installedLocation", () => {
     it("answers the directory and the extension an installed rule actually carries", () => {
       const cap = new RulesCapability({

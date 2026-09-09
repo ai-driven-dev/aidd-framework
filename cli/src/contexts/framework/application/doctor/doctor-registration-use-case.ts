@@ -37,9 +37,9 @@ export interface DoctorRegistrationOptions {
   allowedIds: Set<string> | null;
 }
 
-/** One plugin `doctor` expects a native-activation tool's own registry to carry, and the
- * ref to look it up by — absent exactly when nothing here can build one, which is the
- * unanswerable case a missing marketplace produces. */
+/** One plugin `doctor` expects a native-activation tool's own registry to carry, and the ref to
+ * look it up by — `ref` absent exactly when nothing here can build one, which is the unanswerable
+ * case a missing marketplace produces. */
 interface ExpectedNativeRegistration {
   readonly plugin: string;
   readonly ref?: string;
@@ -48,20 +48,12 @@ interface ExpectedNativeRegistration {
 /**
  * Checks the registrations the CLI writes but does not track.
  *
- * Two unrelated facets share this class because they share a shape: both look past a
- * tracked file's own hash, at state a tool's own CLI wrote and this CLI only observes.
- *
- * The first checks a tool's *machine-local settings file* against the marketplaces this
- * project's own registry expects — a tracked file announces its own damage by its hash
- * changing, and this file is deliberately untracked (absolute paths), so nothing else
- * would notice it being emptied, edited, or deleted.
- *
- * The second checks a *native-activation tool's own plugin registry* (Claude, Codex,
- * Copilot) against `nativeRegistrations`, the manifest's record of what that registry
- * should carry: `registered`, `not-registered`, `registered-disabled`, or `unanswerable`
- * when the registry cannot be read at all (absent binary, unreadable file). Only the
- * first two are errors — an `unanswerable` reading is a normal state on any machine that
- * has never run the tool's own binary, never a fault to fix.
+ * Two unrelated facets share this class because they share a shape: both look past a tracked
+ * file's own hash, at state a tool's own CLI wrote and this CLI only observes. A tool's
+ * machine-local settings file is deliberately untracked (absolute paths), so nothing else would
+ * notice it emptied, edited or deleted; a native-activation tool's own plugin registry answers
+ * `registered`, `not-registered`, `registered-disabled` or `unanswerable`, and only the first two
+ * are errors — `unanswerable` is the normal state on a machine that has never run that binary.
  */
 export class DoctorRegistrationUseCase {
   constructor(
@@ -72,26 +64,21 @@ export class DoctorRegistrationUseCase {
     /** Host plugin registry readers keyed by `AiToolId`, one per tool whose own CLI
      * activates plugins. */
     private readonly hostRegistries: ReadonlyMap<AiToolId, HostPluginRegistryReader> = new Map(),
-    /** Host marketplace registry readers keyed by `AiToolId` — see `checkMarketplaceSources`,
-     * the pass that reads them. Only a tool whose profile declares
-     * `NativeActivation.marketplaceRegistry` is ever looked up here, the same gate the
-     * sync-time guard in `MarketplaceSyncSettingsUseCase` uses. */
+    /** Host marketplace registry readers keyed by `AiToolId`. Only a tool whose profile declares
+     * `NativeActivation.marketplaceRegistry` is ever looked up here. */
     private readonly hostMarketplaceRegistries: ReadonlyMap<
       AiToolId,
       HostMarketplaceRegistryReader
     > = new Map(),
-    /** Root of a user-scope marketplace's built tree, mirroring
-     * `EnsureBuiltMarketplaceUseCase`'s own `userCacheRoot` — needed here to recompute
-     * the same path that use case would build, without running a build. No default: a
-     * caller with nothing real to pass here would silently recompute a path this run
-     * never built (see `currentVersion`'s own note). */
+    /** Root of a user-scope marketplace's built tree, mirroring `EnsureBuiltMarketplaceUseCase`'s
+     * own `userCacheRoot` — needed to recompute the same path that use case would build, without
+     * running a build. No default: a caller with nothing real to pass would silently recompute a
+     * path this run never built. */
     private readonly userCacheRoot: () => string,
-    /** This run's own CLI version, mirroring `EnsureBuiltMarketplaceUseCase`'s own
-     * `version` — the shared source is one directory per version, so recomputing the
-     * expected path needs the same version that use case would build with. No
-     * default: an empty version used to collapse `join(…, "", …)` to the pre-version
-     * path shape, which is a different, wrong path silently recomputed rather than a
-     * failure — every real caller already wires a real reader. */
+    /** This run's own CLI version: the shared source is one directory per version, so recomputing
+     * the expected path needs the same version a build would use. No default — an empty version
+     * collapses `join(…, "", …)` to the pre-version path shape, a different, wrong path silently
+     * recomputed rather than a failure. */
     private readonly currentVersion: VersionReader
   ) {}
 
@@ -104,23 +91,15 @@ export class DoctorRegistrationUseCase {
   }
 
   /**
-   * Whether a host's own marketplace registry already holds this project's marketplace
-   * name pointed at a source other than the one this project would register — the
-   * doctor-side half of the sync-time guard in `MarketplaceSyncSettingsUseCase`, so a
-   * conflict is visible even between two `sync` runs, not only at the moment one fails.
+   * Whether a host's own marketplace registry already holds this project's marketplace name
+   * pointed at a source other than the one this project would register — the doctor-side half of
+   * the sync-time guard, so a conflict is visible between two `sync` runs, not only when one fails.
    *
    * The expected source is **recomputed**, never stored: `builtMarketplaceDir` /
-   * `userBuiltMarketplaceDir` are the same pure functions `EnsureBuiltMarketplaceUseCase`
-   * calls to decide where it builds, so re-evaluating them here with the same inputs is
-   * not a guess at that path, it is the same path. Nothing here triggers a build.
-   *
-   * Gated on `NativeActivation.marketplaceRegistry` being declared, same as the sync-time
-   * guard — claude only, today — and silent on an unreadable registry, same as the pure
-   * `marketplaceSourceConflict` it calls: unanswerable is not a fault to report, unlike
-   * `checkNativeRegistrations`'s own `unanswerable` branch, which is `info`. A source that
-   * has never been built (nothing resolves at the computed path) is silent for the same
-   * reason — reporting a conflict against a path nothing has ever pointed at would invent
-   * the exact false positive this whole guard exists to prevent.
+   * `userBuiltMarketplaceDir` are the same pure functions `EnsureBuiltMarketplaceUseCase` calls to
+   * decide where it builds, so nothing here triggers a build. Silent on an unreadable registry and
+   * on a source that has never been built — reporting a conflict against a path nothing has ever
+   * pointed at would invent the exact false positive this guard exists to prevent.
    */
   private async checkMarketplaceSources(
     options: DoctorRegistrationOptions
@@ -141,18 +120,14 @@ export class DoctorRegistrationUseCase {
           requestedSource
         );
         if (requestedIdentity === undefined) continue;
-        // Keyed by the catalog's own declared name, never `marketplace.name` (aidd's
-        // local alias): the host's registry only ever holds an entry under the name its
-        // own catalog declares, whatever alias this project chose for it — the same
-        // fact `resolvedBuiltDir` just above stays keyed by alias for, since that path
-        // is aidd's own build location, not a host-facing lookup. `hostMarketplaceSourceConflict`
-        // is the one place that keying happens, shared with the sync-time guard, so this
-        // pass cannot key its lookup by anything else.
+        // Keyed by the catalog's own declared name, never `marketplace.name` (aidd's local
+        // alias): a host's registry only ever holds an entry under the name its own catalog
+        // declares. `resolvedBuiltDir` just above stays keyed by alias, since that path is aidd's
+        // own build location, not a host-facing lookup.
         //
-        // The drift context is handed to every `aidd-framework` entry regardless of
-        // its own recorded `scope`: an unmigrated project-scope registration is
-        // exactly the "still points at this project's own pre-migration cache" case
-        // this decides, and it can only ever be reached from that real state.
+        // The drift context is handed to every `aidd-framework` entry regardless of its own
+        // recorded `scope`: an unmigrated project-scope registration is exactly the "still points
+        // at this project's own pre-migration cache" case this decides.
         const check: HostMarketplaceSourceCheck = await hostMarketplaceSourceConflict(
           this.fs,
           toolId,
@@ -182,9 +157,8 @@ export class DoctorRegistrationUseCase {
     return issues;
   }
 
-  /** Renders the two drift cases `marketplaceSourceDrift` can decide from the path
-   * alone — both `warning`, never `error`: neither is a fault this project caused,
-   * and neither blocks anything the way a genuine different-catalog conflict does. */
+  /** Both `warning`, never `error`: neither drift is a fault this project caused, and neither
+   * blocks anything the way a genuine different-catalog conflict does. */
   private driftIssue(toolId: AiToolId, found: MarketplaceSourceDriftFound): DoctorIssue {
     const { drift } = found;
     if (drift.kind === "version-behind") {
@@ -209,19 +183,14 @@ export class DoctorRegistrationUseCase {
   }
 
   /**
-   * Where this project's build of `marketplace` for `toolId` would land, resolved —
-   * `undefined` when nothing resolves there, which means either it was never built or
-   * it no longer exists, neither of which is a fact this check may turn into a conflict.
+   * `undefined` when nothing resolves at the computed path, which means either it was never built
+   * or it no longer exists — neither a fact this check may turn into a conflict.
    *
-   * The reserved framework name always resolves to the shared, machine-scope path,
-   * never the project-scope one — even when the registry itself still records
-   * `scope: "project"`, the exact pre-migration state `aidd sync` has not yet fixed.
-   * A project-scope record for this one name is not a fact to honour here: honouring
-   * it would compute the project path as "expected", which the host's own registration
-   * already matches for a project that has never run `setup`/`sync` since the shared
-   * source existed — and doctor would report nothing wrong at all, in the one state it
-   * most needs to name. Every other marketplace still resolves by its own recorded
-   * `scope`, unaffected.
+   * The reserved framework name always resolves to the shared, machine-scope path, even where the
+   * registry still records `scope: "project"`: honouring that record would compute the
+   * pre-migration path as "expected", which the host's own registration already matches, and
+   * doctor would report nothing wrong in the one state it most needs to name. Every other
+   * marketplace still resolves by its own recorded `scope`.
    */
   private async resolvedBuiltDir(
     projectRoot: string,
@@ -252,9 +221,8 @@ export class DoctorRegistrationUseCase {
     for await (const { toolId, expected } of this.retainedToolsWithExpectedMarketplaces(options)) {
       const settings = this.untrackedSettingsOf(toolId);
       if (settings === undefined) continue;
-      // A tool that writes its own registration cannot have written one while its
-      // binary was out of reach. Reporting the absence then would be reporting that
-      // an uninstalled tool is unconfigured, which is not a fault to fix.
+      // A tool that writes its own registration cannot have written one while its binary was out
+      // of reach: reporting the absence would report that an uninstalled tool is unconfigured.
       if (!this.canRegisterItself(toolId)) continue;
       const registered = await this.registeredNames(projectRoot, settings);
       for (const marketplace of expected) {
@@ -285,13 +253,10 @@ export class DoctorRegistrationUseCase {
     return issues;
   }
 
-  /** What `doctor` expects a tool's own registry to carry: `nativeRegistrations`, the
-   * manifest's own record of what the last activation wrote, when it has one — falling
-   * back to the plugins the manifest tracks when it does not, which is the state of a
-   * manifest a `sync`-unaware installer produced. `pluginRefs` are already
-   * `<plugin>@<marketplace>` strings; the fallback assembles the same shape from a
-   * plugin's own name and marketplace, absent exactly when no marketplace was recorded
-   * for it — the one case nothing here can look up at all. */
+  /** `nativeRegistrations` when the manifest carries one, falling back to the plugins it tracks —
+   * the state a `sync`-unaware installer produced. `pluginRefs` are already `<plugin>@<marketplace>`
+   * strings; the fallback assembles the same shape, `ref` absent exactly when no marketplace was
+   * recorded for a plugin, the one case nothing here can look up at all. */
   private expectedNativeRegistrations(
     manifest: Manifest,
     toolId: AiToolId
@@ -389,9 +354,8 @@ export class DoctorRegistrationUseCase {
     return this.activators.get(activation.binary)?.isAvailable() ?? false;
   }
 
-  /** The manifest's own installed tools, narrowed to `allowedIds` when a caller named
-   * one — the one preamble all three passes open with, so `--tool <id>` narrows every
-   * one of them the same way instead of three copies free to drift apart. */
+  /** The one preamble all three passes open with, so `--tool <id>` narrows every one of them the
+   * same way. */
   private *retainedToolIds(manifest: Manifest, allowedIds: Set<string> | null): Generator<ToolId> {
     for (const toolId of manifest.getInstalledToolIds()) {
       if (allowedIds && !allowedIds.has(toolId)) continue;
@@ -399,11 +363,9 @@ export class DoctorRegistrationUseCase {
     }
   }
 
-  /** `retainedToolIds`, paired with the registered marketplaces — the preamble
-   * `checkMarketplaceSources` and `checkDeclaredMarketplaces` both open with, since
-   * both need one tool at a time *and* the full marketplace list on every iteration.
-   * Yields nothing at all when no marketplace is registered, which is the "no
-   * issues" answer both passes already gave that case on their own. */
+  /** `retainedToolIds` paired with the registered marketplaces, since both callers need one tool
+   * at a time *and* the full marketplace list. Yields nothing when no marketplace is registered,
+   * which is the "no issues" answer both passes already gave that case. */
   private async *retainedToolsWithExpectedMarketplaces(
     options: DoctorRegistrationOptions
   ): AsyncGenerator<{ toolId: ToolId; expected: readonly Marketplace[] }> {

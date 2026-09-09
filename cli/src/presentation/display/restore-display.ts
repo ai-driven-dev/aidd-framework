@@ -8,9 +8,8 @@ export function printUnrestorable(output: CLIOutput, unrestorable: readonly stri
   );
 }
 
-/** Names every tool whose own CLI `sync` could not drive because its binary was not on
- * PATH — a fact, not a failure, so it warns rather than errors. The settings this pass
- * wrote for that tool will not load until that CLI has actually run. */
+/** A binary off PATH is a fact, not a failure, so this warns: the settings written for that
+ * tool will not load until its own CLI has run. */
 export function printNativeActivation(
   output: CLIOutput,
   binaryMissing: readonly { toolId: ToolId; binary: string }[]

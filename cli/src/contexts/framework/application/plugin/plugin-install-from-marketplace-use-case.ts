@@ -41,7 +41,6 @@ interface MatchEntry {
   localPath: string;
 }
 
-/** Installing a plugin named in a marketplace catalog, as its callers need it. */
 export interface PluginInstallFromMarketplace {
   execute(
     options: PluginInstallFromMarketplaceOptions

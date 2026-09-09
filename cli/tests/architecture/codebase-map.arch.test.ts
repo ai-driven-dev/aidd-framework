@@ -1,27 +1,15 @@
 /**
- * The map matches the ground, in both directions.
- *
- * `aidd_docs/memory/codebase-map.md` is the single place that describes where things
- * live — the architecture rules deliberately carry no paths. A map maintained by hand
- * drifts silently: five real directories were missing from it when this test was written.
- *
- * It drifted the other way too, and the first version of this test could not see it. That
- * version compared directory *names*, so `application/` drawn under `contexts/tools/` read
- * as present because `application` exists elsewhere — and the map kept describing six use
- * cases as `tools`' own while they live in `framework`. Two landing-zone directories were
- * drawn as "currently empty (.gitkeep)" when they did not exist at all, and the placement
- * table sent a developer to one of them.
- *
- * So the comparison is over full paths, reconstructed from the tree block's indentation,
- * and it runs both ways. A map that invents a directory is worse than one that omits it:
- * the reader creates a file where nothing belongs.
+ * `codebase-map.md` is the single place that says where things live, and a map maintained by
+ * hand drifts both ways. The comparison is over full paths reconstructed from the tree block's
+ * indentation — comparing names alone reads `application/` as present wherever it exists — and
+ * it runs in both directions: an invented directory sends a reader to create a file there.
  */
 import { describe, expect, it } from "vitest";
 import { read, sourceFiles } from "./helpers.js";
 
 const MAP = "aidd_docs/memory/codebase-map.md";
 
-/** The fenced block that draws the source tree — the one whose first line is `src/`. */
+/** The fenced block whose first line is `src/`. */
 function sourceTreeBlock(text: string): string {
   for (const match of text.matchAll(/```[a-z]*\n([\s\S]*?)```/g)) {
     const body = match[1] as string;
@@ -34,7 +22,6 @@ function sourceTreeBlock(text: string): string {
 const TREE_ENTRY = /^([│\s]*)(?:├──|└──)\s+([A-Za-z0-9_.-]+)(\/?)/;
 const LEVEL_WIDTH = 4;
 
-/** Full paths of the directories a tree block draws, from its raw text. */
 function drawnDirectoriesInText(block: string): Set<string> {
   const drawn = new Set<string>();
   const stack: string[] = [];
@@ -53,7 +40,6 @@ function drawnDirectories(): Set<string> {
   return drawnDirectoriesInText(sourceTreeBlock(read(MAP)));
 }
 
-/** Full paths of the directories that actually hold source. */
 function realDirectories(): Set<string> {
   const real = new Set<string>();
   for (const file of sourceFiles()) {
@@ -63,7 +49,6 @@ function realDirectories(): Set<string> {
   return real;
 }
 
-/** Directories the map is silent about, and directories it invents. */
 function disagreements(
   real: ReadonlySet<string>,
   drawn: ReadonlySet<string>

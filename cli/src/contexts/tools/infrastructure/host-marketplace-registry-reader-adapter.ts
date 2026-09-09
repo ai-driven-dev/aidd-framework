@@ -9,21 +9,15 @@ import type {
 import { nativeActivationOf } from "../domain/registry.js";
 
 /**
- * One reader per host whose own profile declares `NativeActivation.marketplaceRegistry`
- * — claude only, today: Codex refuses a re-add from a different source itself and
- * Copilot refuses every re-add, so neither declares a resolver and neither gets a
- * reader here. The path itself is never repeated as a literal in this file: it comes
- * from calling that resolver, the one fact `claude/profile.ts` already carries — a
- * second hard-coded copy of the same path here is exactly what let it drift from the
- * profile unnoticed before.
+ * One reader per host whose own profile declares `NativeActivation.marketplaceRegistry` — claude
+ * only, today: Codex refuses a re-add from a different source itself and Copilot refuses every
+ * re-add, so neither declares a resolver. The path is never repeated as a literal here; it comes
+ * from calling that resolver, since a second hard-coded copy is exactly what let it drift from
+ * the profile unnoticed.
  *
- * Measured 2026-09-07, `claude plugin marketplace add <dir>` under a relocated `HOME`:
- *
- *   { "<name>": { "source": { "source": "directory", "path": "…" },
- *                 "installLocation": "…", "lastUpdated": "…" } }
- *
- * `installLocation` is the field that decides what the name currently resolves to —
- * `source.path` is what the CLI was pointed at, `installLocation` is what it kept.
+ * Of the entry a real `claude plugin marketplace add` writes, `installLocation` is the field
+ * that decides what the name currently resolves to — `source.path` is only what the CLI was
+ * pointed at.
  */
 export function hostMarketplaceRegistryReaders(
   home: string = resolveHomeDir()
@@ -75,11 +69,10 @@ function installLocationOf(value: unknown): string | undefined {
 }
 
 /**
- * Both sides of a source comparison go through `realpath` before they are compared —
- * the same `/var` → `/private/var` lesson `host-plugin-registry-reader-adapter.ts`
- * already paid for. A path that cannot be resolved, most often because its directory
- * no longer exists, falls back to itself rather than throwing: a dead registration
- * should not cost every other entry its answer.
+ * Both sides of a source comparison go through `realpath` before they are compared, the same
+ * `/var` → `/private/var` lesson the plugin-registry reader already paid for. A path that
+ * cannot be resolved falls back to itself rather than throwing: a dead registration should not
+ * cost every other entry its answer.
  */
 async function resolvedPath(path: string): Promise<string> {
   try {

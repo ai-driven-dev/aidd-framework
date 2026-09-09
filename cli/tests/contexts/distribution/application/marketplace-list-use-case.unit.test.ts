@@ -29,10 +29,8 @@ describe("MarketplaceListUseCase", () => {
     originalHome = process.env.HOME;
     originalConfigDir = process.env.AIDD_USER_CONFIG_DIR;
     process.env.HOME = homeDir;
-    // Faking HOME alone is not enough: the CLI only falls back to `homedir()` when
-    // `AIDD_USER_CONFIG_DIR` is unset, so a value leaking in from elsewhere sends this
-    // test at a real user registry. Measured — it read two marketplaces of the
-    // developer's own and expected one.
+    // Faking HOME alone is not enough: the CLI falls back to `homedir()` only when
+    // `AIDD_USER_CONFIG_DIR` is unset, so a value leaking in sends this test at a real registry.
     process.env.AIDD_USER_CONFIG_DIR = join(homeDir, ".config", "aidd");
   });
 

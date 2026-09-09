@@ -13,20 +13,8 @@ import { FileHash } from "../../../../../../src/kernel/file.js";
 const PLUGINS_DIR = resolve(process.cwd(), "..", "plugins");
 
 /**
- * Two independent code paths compute an OpenCode-flat skill path for the same plugin
- * content:
- *  - `aidd plugin install --tool opencode` (no marketplace registered) →
- *    ModeBFlatMaterializationTranslator → PluginContentTranslator.translateFlat
- *  - `aidd setup` (default marketplace registered, the common case) →
- *    BuiltTreeMaterializationTranslator → FlatBuildStrategy → buildOpencodeFlatContract
- *
- * They drifted once already (#defect): the built-tree route hyphen-prefixed every
- * immediate child of skills/ — including non-skill children like a shared helper
- * directory or a manifest file — breaking any relative `require()` that reaches a
- * sibling by its original name. This test exercises both real production functions
- * (not a restated formula of either) against a fixture whose non-skill children are
- * exactly what makes that regression visible: a fixture with only one clean
- * `hello/SKILL.md` folder would pass under either convention and prove nothing.
+ * Two independent paths compute an OpenCode-flat skill path for the same plugin content.
+ * The fixture's non-skill children under skills/ are what makes a drift between them visible.
  */
 
 const PLUGIN_NAME = "aidd-telemetry";
@@ -82,13 +70,8 @@ describe("opencode flat skills — built-tree route agrees with mode-B install r
   });
 });
 
-// The flat layout used to prefix every skill directory with its plugin's name, which made a
-// collision between two plugins' identically-named skills structurally impossible. Nesting
-// them under the plugin gives OpenCode a real directory to namespace by and shortens the
-// skill's own `name` to its leaf - better to read, and correct as long as the leaves stay
-// distinct. Nothing enforces that any more, so this does: the day someone adds a second
-// `01-commit`, it is caught here rather than by whichever of the two OpenCode happens to
-// resolve.
+// Nesting a skill under its plugin's own directory shortens its `name` to the leaf, so
+// nothing stops two plugins shipping the same leaf any more. This does.
 describe("skill names across plugins, now that the plugin prefix is a directory", () => {
   it("no two plugins ship a skill with the same leaf name", () => {
     const byLeaf = new Map<string, string[]>();

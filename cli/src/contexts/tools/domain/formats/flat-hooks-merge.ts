@@ -1,17 +1,10 @@
 /**
- * Pure shape-transform and merge helpers for per-tool flat hook config registration.
- *
- * Each function handles the structural difference between how Claude (framework source
- * format), Cursor, Copilot, and Codex expect hooks to be registered in flat mode.
- *
- * All functions are pure (no I/O). They receive and return JSON-serialisable values.
- *
- * Claude event names (source) are PascalCase; Cursor maps supported events to camelCase.
+ * Pure shape transforms between the framework's Claude-shaped hooks source and each flat
+ * tool's own registration format, no I/O. Claude event names are PascalCase; Cursor maps the
+ * events it supports to camelCase.
  */
 
 import { asPlainObject } from "../../../../kernel/reading/plain-object.js";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type ClaudeHookItem = { type?: string; command?: string; [key: string]: unknown };
 type ClaudeMatcherGroup = { matcher?: string; hooks: ClaudeHookItem[] };
@@ -29,14 +22,10 @@ type CodexHookEntry = {
 };
 type CodexHooksShape = { hooks?: Record<string, CodexHookEntry[]> };
 
-// ── Event mapping ─────────────────────────────────────────────────────────────
-
-// `Stop` fans out to two Cursor events, not one: measured (2026-08-22, see
-// measurements.md Phase 6) interactive sessions fire `stop` and headless sessions
-// fire `sessionEnd` instead — never both from the same run, but which one depends
-// on how the session ends, so both are subscribed. A run file already tolerates
-// more than one `turn_end` line (two real `stop` firings, one interactive session,
-// Phase 4 addendum), so a session that happens to fire both is not a problem.
+// `Stop` fans out to two Cursor events, not one: interactive sessions fire `stop` and headless
+// ones `sessionEnd` instead — never both from the same run, but which one depends on how the
+// session ends, so both are subscribed. A run file already tolerates more than one `turn_end`
+// line, so a session firing both is not a problem.
 const CURSOR_EVENT_MAP: Record<string, readonly string[]> = {
   SessionStart: ["sessionStart"],
   UserPromptSubmit: ["beforeSubmitPrompt"],
@@ -46,17 +35,11 @@ const CURSOR_EVENT_MAP: Record<string, readonly string[]> = {
   SubagentStop: ["subagentStop"],
 };
 
-// Codex keeps Claude's event names, with one exception it does not have: there is no
-// `Stop`. Its vocabulary, read out of the 0.149.0 binary itself, is PreToolUse,
-// PermissionRequest, PostToolUse, PreCompact, PostCompact, SessionStart, SessionEnd,
-// SubagentStart, SubagentStop - and a live probe confirmed it: a `codex exec` run with all
-// four subscribed fired SessionStart and SessionEnd and never Stop, so a turn was never
-// closed and every Codex session journalled a session_start with nothing after it.
-//
-// SessionEnd is coarser than Stop by nature: it bounds the session, not each turn. For
-// `codex exec` the two coincide, and for an interactive session one turn_end bounding the
-// whole session is the honest answer rather than none at all. The journal already tolerates
-// more than one turn_end line, so nothing downstream depends on there being exactly one.
+// Codex keeps Claude's event names but has no `Stop`: probed live, a `codex exec` run with all
+// four subscribed fired SessionStart and SessionEnd and never Stop, so a turn was never closed
+// and every Codex session journalled a session_start with nothing after it. SessionEnd bounds
+// the session rather than each turn, which the journal tolerates — one turn_end bounding the
+// whole session is the honest answer rather than none at all.
 const CODEX_EVENT_MAP: Record<string, readonly string[]> = {
   Stop: ["SessionEnd"],
 };
@@ -64,10 +47,8 @@ const CODEX_EVENT_MAP: Record<string, readonly string[]> = {
 /**
  * Renames a plugin hooks.json's events to the ones Codex delivers, without merging.
  *
- * Codex is installed two ways - a built marketplace tree and a merged project config - and
- * the two have drifted apart three times. Both call this, so the rename cannot land on one
- * route and not the other, which is exactly how a Codex session came to journal a
- * session_start with nothing after it.
+ * Codex is installed two ways — a built marketplace tree and a merged project config — and both
+ * call this, so the rename cannot land on one route and not the other.
  */
 export function renameCodexHookEvents(pluginHooksJson: string): string {
   const parsed = JSON.parse(pluginHooksJson) as ClaudeHooksShape;
@@ -81,16 +62,8 @@ export function renameCodexHookEvents(pluginHooksJson: string): string {
   return `${JSON.stringify({ ...parsed, hooks: renamed }, null, 2)}\n`;
 }
 
-// ── Claude: merge hooks into .claude/settings.json ────────────────────────────
-
-/**
- * Merges a plugin's hooks (Claude nested shape) additively into the top-level
- * `hooks` key of `.claude/settings.json`. Preserves all other settings keys.
- *
- * @param existingSettings - Current file content, or null if absent.
- * @param pluginHooksJson  - Path-rewritten plugin hooks.json content (Claude nested shape).
- * @returns { content: new settings.json content, warnings: [] }
- */
+/** Merges a plugin's hooks (Claude nested shape) additively into the top-level `hooks` key of
+ * `.claude/settings.json`, preserving every other settings key. */
 export function mergeClaudeSettingsHooks(
   existingSettings: string | null,
   pluginHooksJson: string
@@ -119,15 +92,8 @@ function appendHooksEntries(
   return result;
 }
 
-// ── Copilot: flatten nested hooks shape ───────────────────────────────────────
-
-/**
- * Flattens the Claude nested matcher-group shape into Copilot's expected flat shape:
- * `hooks.EVENT[]` of `{type, command, timeout?}`.
- *
- * @param pluginHooksJson - Raw plugin hooks.json in Claude nested shape.
- * @returns New flat-shape hooks JSON string.
- */
+/** Flattens the Claude nested matcher-group shape into Copilot's flat `hooks.EVENT[]` of
+ * `{type, command, timeout?}`. */
 export function flattenCopilotHooksShape(pluginHooksJson: string): string {
   const parsed = JSON.parse(pluginHooksJson) as ClaudeHooksShape;
   const claudeHooks = parsed.hooks ?? {};
@@ -156,18 +122,9 @@ function flattenMatcherGroups(matchers: ClaudeMatcherGroup[]): FlatHookEntry[] {
   return entries;
 }
 
-// ── Cursor: event-mapped merge into single .cursor/hooks.json ─────────────────
-
-/**
- * Merges a plugin's hooks (Claude nested shape) into the accumulated `.cursor/hooks.json`
- * with version:1, event-mapped keys, and flat `{command}` entries.
- *
- * Unmapped events are skipped and reported in the returned warnings list.
- *
- * @param existingCursorJson - Current .cursor/hooks.json content, or null.
- * @param pluginHooksJson    - Path-rewritten plugin hooks.json in Claude nested shape.
- * @returns { content, warnings }
- */
+/** Merges a plugin's hooks (Claude nested shape) into the accumulated `.cursor/hooks.json`:
+ * version 1, event-mapped keys, flat `{command}` entries. An unmapped event is skipped and
+ * reported in the returned warnings. */
 export function mergeCursorFlatHooks(
   existingCursorJson: string | null,
   pluginHooksJson: string
@@ -208,19 +165,9 @@ function extractCursorEntries(matchers: ClaudeMatcherGroup[]): CursorHookEntry[]
   return entries;
 }
 
-// ── Codex: framework plugin hooks into .codex/hooks.json ─────────────────────
-
-/**
- * Merges a plugin's hooks (Claude nested shape) into `.codex/hooks.json` using
- * Codex's nested shape WITH top-level `hooks` wrapper.
- *
- * Does NOT emit the install-mode memory hook (node .aidd/scripts/update_memory.cjs).
- * That hook belongs to HooksCapability.mergeFn (mergeCodexHooksJson) in install mode.
- *
- * @param existingJson    - Current .codex/hooks.json content, or null.
- * @param pluginHooksJson - Path-rewritten plugin hooks.json in Claude nested shape.
- * @returns { content, warnings: [] }
- */
+/** Merges a plugin's hooks (Claude nested shape) into `.codex/hooks.json`, Codex's nested shape
+ * under a top-level `hooks` wrapper. Emits no install-mode memory hook — that one belongs to
+ * `HooksCapability.mergeFn`. */
 export function mergeCodexFrameworkHooksJson(
   existingJson: string | null,
   pluginHooksJson: string
@@ -276,21 +223,13 @@ function buildCodexHookItem(item: ClaudeHookItem): {
   return entry;
 }
 
-// ── Detection: does an already-written hooks file register a command? ─────────
-
 /**
- * Every `command` string registered for `claudeEvent` in a hooks file already written in
- * any of the four shapes this module writes — Claude/Codex's nested matcher groups, or
- * Copilot/Cursor's flat `{command}` entries — plus whatever alias `CURSOR_EVENT_MAP` maps
- * `claudeEvent` to (Cursor renames `SessionStart` to `sessionStart`; Codex and Copilot
- * keep it as written). Malformed content, or a shape none of the four writers produce,
- * answers `[]` rather than throwing: a shape this module does not recognise is not
- * evidence of anything.
- *
- * The one shape-parsing routine a *reader* needs for "did a hooks block ask for this
- * command" — `telemetry-evidence-adapter.ts`'s recorder-declaration check calls this
- * rather than restating the four shapes' knowledge, so a fifth shape recognised here is
- * recognised there too.
+ * Every `command` string registered for `claudeEvent` in a hooks file already written in any of
+ * the four shapes this module writes, plus whatever alias `CURSOR_EVENT_MAP` maps that event to.
+ * Malformed content, or a shape none of the four writers produce, answers `[]` rather than
+ * throwing: an unrecognised shape is not evidence of anything. A reader asking whether a hooks
+ * block called for a command calls this rather than restating the four shapes, so a fifth shape
+ * recognised here is recognised there too.
  */
 export function hookCommandsForEvent(hooksFileContent: string, claudeEvent: string): string[] {
   let parsed: unknown;
@@ -309,10 +248,9 @@ export function hookCommandsForEvent(hooksFileContent: string, claudeEvent: stri
   return commands;
 }
 
-// Handles both known entry depths in one walk: a nested group (`{ hooks: [...] }`,
-// Claude/Codex) recurses one level into its own `hooks` array; a flat entry
-// (`{ command }` or `{ type, command }`, Copilot/Cursor) has none to recurse into and
-// contributes its own command directly.
+// Both known entry depths in one walk: a nested group (`{ hooks: [...] }`, Claude/Codex)
+// recurses one level into its own `hooks` array; a flat entry (`{ command }`, Copilot/Cursor)
+// has none and contributes its own command directly.
 function collectCommands(entry: unknown, out: string[]): void {
   const record = asPlainObject(entry);
   if (record === null) return;

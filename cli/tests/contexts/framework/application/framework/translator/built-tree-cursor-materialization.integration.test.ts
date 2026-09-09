@@ -74,7 +74,6 @@ describe("BuiltTreeMaterializationTranslator — cursor (integration)", () => {
     expect(fs.getFile(`${base}/rules/r.mdc`)).toBe("rule body");
     // .mcp.json keeps its dotted name (came from build, not remapped to mcp.json).
     expect(fs.getFile(`${base}/.mcp.json`)).toBe("{}");
-    // Manifest tracks the installed files for remove/restore.
     const installed = manifest.getPlugins("cursor").find((p) => p.name === "sample-plugin");
     expect(installed?.files.size).toBe(4);
   });
@@ -90,7 +89,6 @@ describe("BuiltTreeMaterializationTranslator — cursor (integration)", () => {
       fakeEnsureBuiltMarketplace(),
       await makeRegistry()
     );
-    // No marketplace → fallback path; empty dist → no files, no throw.
     const result = await translator.addPlugin(
       dist(),
       "cursor",

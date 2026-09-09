@@ -93,10 +93,8 @@ describe("TelemetryOffUseCase — an endpoint configuration is untouched", () =>
   });
 });
 
-// `off` cannot clear a stale export — the writer that could is gone — but silence is
-// exactly the failure this exists to close (see finding 1, review.md). Detection itself
-// lives in `TelemetryEvidenceAdapter` (a real settings file, exercised end to end); this
-// only proves `off` relays what it is told, by name, on `warn`.
+// `off` cannot clear a stale export — the writer that could is gone — so all it owes is to
+// relay what it is told, by name, on `warn`; detection lives in `TelemetryEvidenceAdapter`.
 describe("TelemetryOffUseCase — names a leftover export it cannot clear", () => {
   it("warns with the file and the keys still set, when one is found", async () => {
     const { logger, evidence, useCase } = buildUseCase();
@@ -166,10 +164,8 @@ describe("TelemetryOffUseCase — taking back what on installed", () => {
     expect(logger.allMessages.join("\n")).not.toContain(SESSION_TRAILER_TOKEN);
   });
 
-  // B-B1: a manager's own hand-added job outlives the delegate script `off` just deleted —
-  // that config is committed and shared, not this CLI's to edit on the way out any more than
-  // on the way in. Silence here would leave a person reading `lefthook.yml` believing a line
-  // that looks live is still doing something.
+  // A manager's own hand-added job outlives the delegate script `off` just deleted: that
+  // config is committed and shared, so silence leaves a live-looking line doing nothing.
   it("names the manager job left behind, and says its guard now makes it a no-op", async () => {
     const { logger, useCase } = buildWith({
       removed: true,

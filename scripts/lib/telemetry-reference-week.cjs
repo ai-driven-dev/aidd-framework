@@ -1,46 +1,21 @@
 /**
  * One week of work, measured — the scenario this repository points at when it claims the
- * telemetry core answers a period.
+ * telemetry core answers a period: two people on two machines, two projects, three tools,
+ * three days, one SDLC flow, one task that declares its backlog item and one that does not.
  *
- * Every per-axis test on this branch proves one axis on data of its own, written straight
- * into the sink by hand. None proves the axes reconcile to each other on one week, and none
- * exercises the capture half at all. This builds that: two people on two machines, two
- * projects, three tools, three days, one SDLC flow, one task that declares its backlog item
- * and one that does not.
+ * Real are the journal, written by the shipped hook spawned with a payload on stdin, and the
+ * reading — sink, identity, `telemetry read` and `telemetry report` through the built CLI.
+ * Authored are every session file (shapes taken from `cli/tests/fixtures/local-cost/`), the
+ * task folders, the git remotes, the model ids, the counters and the clock. So this proves
+ * capture-to-analysis over authored inputs, never that a tool writes what is claimed here.
  *
- * What is real and what is authored, stated plainly because the case is worth nothing
- * without the distinction:
+ * `AIDD_TELEMETRY_DIR` moves the figures and `AIDD_RUNS_DIR` the journal, while identity
+ * refuses both and resolves from `HOME` — which is what makes two sandboxed homes two people
+ * landing in one destination. Not `AIDD_USER_CONFIG_DIR`, which would work and would also
+ * relocate `auth.json`.
  *
- *   real       the journal — written by the shipped hook, spawned as a process with a
- *              payload on stdin, exactly as a tool invokes it.
- *   real       the reading — the sink, the identity file, `telemetry read` and
- *              `telemetry report`, all through the built CLI, opening the files below for
- *              themselves.
- *   authored   every session file (in its tool's own on-disk format, shapes taken from
- *              `cli/tests/fixtures/local-cost/`), the task folders and their
- *              `backlog-link.json`, the git remotes, the model ids, the counters, and the
- *              clock the hook stamps with (see `frozen-clock.cjs`).
- *
- * So this proves capture-to-analysis over authored inputs. It does not prove any tool
- * writes what is claimed here — the captured fixtures under `cli/tests/fixtures/local-cost/`
- * are what carry that, and the shapes below are taken from them.
- *
- * Two people, one destination: `AIDD_TELEMETRY_DIR` moves the figures and `AIDD_RUNS_DIR`
- * the journal, both honoured by writer and reader alike; identity refuses both and resolves
- * from `HOME` (`home-dir.ts:30`). That is what makes two sandboxed homes two people whose
- * measurements land in one place — and without it, attribution is per-checkout, which is
- * the argument for a hosted destination.
- *
- * `AIDD_TELEMETRY_DIR` and not `AIDD_USER_CONFIG_DIR`, which would also work and which the
- * plugin README used to recommend: that one relocates `auth.json` too. A demonstration of
- * sharing a destination has to demonstrate the safe way of doing it, or it teaches the
- * thing the README now warns against.
- *
- * No amount appears anywhere, and that is settled rather than pending: `supplies.amount` is
- * `false` on all five tools, and the framework holds no price table by decision — see
- * `aidd_docs/memory/internal/decisions/a-price-table-is-the-destination-s.md`. A produced
- * week therefore has counters and no currency, and will until a tool starts stating an
- * amount of its own or a destination does the multiplying.
+ * No amount appears anywhere and none is pending: `supplies.amount` is `false` on all five
+ * tools and the framework holds no price table, so a week has counters and no currency.
  */
 
 const { spawnSync } = require("node:child_process");
@@ -51,10 +26,6 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const HOOK = path.join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const FROZEN_CLOCK = path.join(__dirname, "frozen-clock.cjs");
 const CLI = path.join(REPO_ROOT, "cli", "dist", "cli.js");
-
-// ---------------------------------------------------------------------------
-// The week, as data
-// ---------------------------------------------------------------------------
 
 const PERIOD = Object.freeze({ from: "2026-03-01", to: "2026-03-07" });
 
@@ -101,20 +72,9 @@ const EXPECTED = Object.freeze({
   backlogItem: BACKLOG_ITEM,
 });
 
-// ---------------------------------------------------------------------------
-// Machinery
-// ---------------------------------------------------------------------------
-
-/** Every `GIT_*` variable removed. Git exports `GIT_DIR`, `GIT_INDEX_FILE` and friends into
- * every process it spawns, so anything run from inside a git hook — `pre-push` running the
- * test suite, most concretely — inherits a pointer to the *real* repository. The checkouts
- * below then `git init` a temp directory and immediately fail on `git remote add origin`,
- * because the origin it finds is this repository's own, which already has one.
- *
- * This suite passed run by hand and failed run from the pre-push hook, which is exactly the
- * shape that leak takes. Both sides of the system already defend against it — `repo.cjs`'s
- * own `gitEnv` in the hook, `git-environment.ts` in the CLI, and an integration test named
- * "neither side follows a leaked GIT_DIR" — and this harness was the one place that did not. */
+/** Git exports `GIT_DIR` and friends into every process it spawns, so anything run from
+ * inside a git hook inherits a pointer to the *real* repository: the checkouts below would
+ * `git init` a temp directory and then fail on `git remote add origin`. */
 function withoutGitVariables(env) {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("GIT_")));
 }
@@ -177,10 +137,6 @@ function fireHook({ event, payload, cwd, home, runsDir, at }) {
     throw new Error(`journal hook exited ${result.status}: ${result.stderr}`);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Each tool's own session file
-// ---------------------------------------------------------------------------
 
 /** One shape for every request in the week, so any number in the report traces back to a
  * count of requests rather than to arithmetic nobody can redo by hand. */
@@ -296,13 +252,8 @@ function writeCopilotEvents(home, sessionId, startedAt, endedAt) {
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// The five sessions
-// ---------------------------------------------------------------------------
-
 /** Ada, Monday, widgets: one orchestrated run. Step intervals are flat — a nested skill
- * closes its parent — so three requests under three steps all belong to one flow, which is
- * the case the flow layer exists for. */
+ * closes its parent — so three requests under three steps belong to one flow. */
 function seedAdaFlow({ projectDir, home, runsDir }) {
   const sessionId = SESSION.adaFlow;
   const base = { cwd: projectDir, home, runsDir };
@@ -331,13 +282,9 @@ function seedAdaFlow({ projectDir, home, runsDir }) {
     tool_input: { file_path: path.join(projectDir, "aidd_docs", "tasks", TASK_WITH_BACKLOG, "plan.md") },
     prompt_id: "turn-1",
   });
-  // Not redundant with the write, and the difference is why both are here: a write is
-  // recorded as `file_written` and `task-declared.cjs` stands down for it, but
-  // `buildTaskIntervals` opens intervals on `task_declared` alone. Since
-  // `cost_report_version` 12 the axis reads written files too, bounded to a session that
-  // wrote into exactly one task folder and to the span its journal witnessed - so a record
-  // before this session's own declaration lands on the task, marked `inferred` rather than
-  // `declared`. This session carries both lines so the week shows each route on one task.
+  // Not redundant with the write: a write is recorded as `file_written`, while intervals
+  // open on `task_declared` alone. Both lines are here so the week shows each route —
+  // `declared` and `inferred` — on one task.
   toolUsed("2026-03-02T08:12:00Z", {
     tool_name: "Read",
     tool_input: { file_path: `aidd_docs/tasks/${TASK_WITH_BACKLOG}/plan.md` },
@@ -469,16 +416,9 @@ function seedBoCopilot({ projectDir, home, runsDir }) {
   writeCopilotEvents(home, sessionId, "2026-03-04T13:00:00.000Z", "2026-03-04T14:00:00.000Z");
 }
 
-// ---------------------------------------------------------------------------
-// Building the week
-// ---------------------------------------------------------------------------
-
-// A minimal PATH, never the caller's own. What a spawned `aidd` can reach decides how long
-// it takes: the OpenCode reader shells out to an `opencode` binary and waits up to 10s for
-// it, per session, so a machine that happens to have the tool installed pays a cost a
-// machine without it does not. The week uses no tool binary at all, and must not depend on
-// which ones the person running it has. `git` lives here on every supported platform; node
-// is reached by absolute path.
+// A minimal PATH, never the caller's own: the OpenCode reader shells out to an `opencode`
+// binary and waits up to 10s per session, so a machine that happens to have a tool installed
+// would pay a cost a machine without it does not. `git` lives here on every platform.
 const MINIMAL_PATH = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(path.delimiter);
 
 function sandboxEnv(home, { sinkDir, runsDir }) {
@@ -544,8 +484,7 @@ function buildReferenceWeek({ root, cliPath = CLI }) {
   const bo = { home: boHome, projectDir: gadgets, person: PEOPLE.bo };
   for (const who of [ada, bo]) {
     const where = { sinkDir, runsDir, cliPath };
-    // One call: the identifier and the name it goes by are one decision, and the command
-    // surface says so now.
+    // One call: the identifier and the name it goes by are one decision.
     cli(
       ["telemetry", "identity", "use", who.person.personId, "--name", who.person.displayName],
       who,
@@ -576,8 +515,6 @@ function reportReferenceWeek(week, extraArgs = []) {
   );
 }
 
-// Three, deliberately. Everything else the week is made of reaches a caller through the
-// object `buildReferenceWeek` returns, or through `EXPECTED` — exporting the constants
-// beside them as well would be a second way to ask the same question, and the answers could
-// drift apart.
+// Three, deliberately: everything else reaches a caller through the object
+// `buildReferenceWeek` returns or through `EXPECTED`, and a second route could drift.
 module.exports = { buildReferenceWeek, reportReferenceWeek, EXPECTED };

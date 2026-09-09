@@ -12,9 +12,8 @@ import type { TelemetrySinkRecord } from "../../../src/contexts/telemetry/domain
 import { padTo, printCostReport } from "../../../src/presentation/display/cost-report-display.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 
-/** Extends the real output rather than standing in for it: a double built from an object
- * literal would have to be widened to pass as a `CLIOutput`, and a widened double stops
- * failing the day the class grows a method the printer starts calling. */
+/** Extends the real output rather than standing in for it: a widened double stops failing
+ * the day the class grows a method the printer starts calling. */
 class CapturingOutput extends CLIOutput {
   readonly lines: string[] = [];
 
@@ -36,9 +35,8 @@ function record(overrides: Partial<TelemetrySinkRecord>): TelemetrySinkRecord {
   };
 }
 
-/** What a tool can supply is not what these tests are about; they declare the minimum the
- * type requires, and the declarations' own truth is checked in
- * tests/domain/tools/telemetry-route-supply.unit.test.ts against captured files. */
+/** What a tool can supply is not what these tests are about: the minimum the type requires,
+ * whose own truth is checked against captured files elsewhere. */
 const NO_CAPABILITY = {
   localRead: null,
   export: null,
@@ -383,10 +381,8 @@ describe("printCostReport", () => {
     expect(prompts[0]).toContain("2026-08-18T09:00:00Z");
   });
 
-  // The first axis whose cardinality is unbounded: one row per turn, 12 on a session and
-  // 31,435 over the measured history. Unlike `by day` this truncates rather than suppressing
-  // every row - a partial series is a lie about continuity, a top N of a ranking is not, and
-  // it says how many it withheld.
+  // The first axis whose cardinality is unbounded, so it truncates rather than suppressing
+  // every row: a partial series is a lie about continuity, a top N of a ranking is not.
   it("names how many prompts a long period carries beyond the ones it prints", () => {
     const records = Array.from({ length: 30 }, (_, i) =>
       record({ turn_id: `t-${i}`, prompt_id: `p-${i}`, cost_usd: 30 - i })
@@ -427,10 +423,8 @@ describe("printCostReport", () => {
 });
 
 describe("printCostReport — a label wider than its column", () => {
-  // Measured on a real report: a project id is the repository's own remote, and
-  // `git@github.com:ai-driven-dev/framework.git` is 41 characters against a 26-wide column.
-  // `padEnd` returns a longer string unchanged, so the share ran straight into the label and
-  // printed `…framework.git100%`. No fixture had ever carried an identifier that long.
+  // Measured on a real report: a project id can be a remote 41 characters wide against a
+  // 26-wide column, and `padEnd` returns a longer string unchanged.
   it("keeps a separator between an overlong label and its share", () => {
     const long = "git@github.com:ai-driven-dev/framework.git";
 
@@ -443,12 +437,8 @@ describe("printCostReport — a label wider than its column", () => {
   });
 
   it("still separates a label exactly as wide as its column from what follows it", () => {
-    // 26 is `LABEL_WIDTH`, private to this module - the one length where `padTo`'s own
-    // branches diverge. Shorter, `padEnd` alone already reserves the gap; longer, both the
-    // `padEnd` branch and the "at least as wide" branch agree on a single trailing space.
-    // Exactly 26 is the only length where `>=` and `>` decide something different, and
-    // nothing above ever exercised it - the 41-character label is already past it, never
-    // sitting on the boundary itself.
+    // 26 is `LABEL_WIDTH`, private to this module: the only length where `padTo`'s `>=` and
+    // `>` decide something different, and nothing above ever sits on that boundary.
     const exact = "a".repeat(26);
 
     const padded = padTo(exact, 26);
@@ -473,11 +463,8 @@ describe("printCostReport — measurement is off", () => {
     expect(out).not.toMatch(/\bsessions\s+0\b/u);
   });
 
-  // Finding 2 (review.md, "one route, and every sentence about it true"): the sink is
-  // person-scoped, the switch is project-scoped - a genuine figure below an "off" claim is
-  // not a contradiction, it is the ordinary case of reporting from a project whose own
-  // switch never applied to work done anywhere else. The sentence must name its own scope
-  // rather than read as denying the figure beside it.
+  // The sink is person-scoped while the switch is project-scoped, so a genuine figure below
+  // an "off" claim is ordinary: the sentence must name its scope, not deny the figure.
   it("names the sink's real scope, never denying the figure it sits beside", () => {
     const out = printed({
       measurementEnabled: false,

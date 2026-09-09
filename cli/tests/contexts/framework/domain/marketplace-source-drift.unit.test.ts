@@ -36,9 +36,8 @@ describe("marketplaceSourceDrift — deciding purely from the path's own segment
     });
   });
 
-  // Bloquant 6/14: the version comparison must respect semver precedence, pre-release
-  // included — a host on the final release and a run on its own release candidate of
-  // the same version must not be told "no drift".
+  // The comparison respects semver precedence, pre-release included, so a host on the final
+  // release and a run on its own release candidate are not told "no drift".
   it("is a version-behind drift when the registered version is a release and the requested one is that release's own pre-release", () => {
     const drift = marketplaceSourceDrift(
       sharedPath("5.3.0"),

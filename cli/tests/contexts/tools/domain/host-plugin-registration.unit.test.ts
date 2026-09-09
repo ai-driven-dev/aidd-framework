@@ -29,8 +29,8 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
     expect(only(evidence()).answer).toBe("registered");
   });
 
-  // The #703 failure itself: the declaration is perfectly good and the host drops it,
-  // because the host consults its registry and nothing else.
+  // The declaration is perfectly good and the host drops it anyway, because the host
+  // consults its own registry and nothing else.
   it("is not registered when the registry was read and lacks the ref", () => {
     const entry = only(evidence({ reading: { location: REGISTRY, refs: new Map() } }));
 
@@ -39,8 +39,7 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
     expect(entry.detail).toContain("orphaned");
   });
 
-  // Folding this into `registered` would report a plugin that will not load as one that
-  // will, which is the whole defect being fixed, one layer down.
+  // Folding this into `registered` would report a plugin that will not load as one that will.
   it("tells a disabled registration from an absent one", () => {
     const reading = {
       location: REGISTRY,
@@ -63,11 +62,8 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
   });
 
   /**
-   * Two silences, two different things for a person to do, so never one sentence. A tool
-   * that drives its own CLI keeps a registry somebody could go and measure; a tool that
-   * declares no native activation has none to look for. Getting these the wrong way round
-   * sends someone hunting for a file that does not exist, or tells them nothing is knowable
-   * about a file that is sitting there.
+   * Two silences, two different things for a person to do: a tool driving its own CLI keeps a
+   * registry somebody could measure, one declaring no native activation has none to look for.
    */
   it("says a declared registry is unmeasured, not that none exists", () => {
     const entry = only(evidence({ reading: undefined, declaresNativeActivation: true }));
@@ -82,8 +78,7 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
   });
 
   // Every measured host keys its registry on `<plugin>@<marketplace>`, so a plugin with no
-  // marketplace recorded cannot be looked up anywhere — unanswerable at the source, not a
-  // lookup that came back empty.
+  // marketplace recorded is unanswerable at the source, not a lookup that came back empty.
   it("is unanswerable when no ref can be built at all, and names no ref", () => {
     const entry = only(evidence({ plugins: [{ name: "hand-copied" }] }));
 

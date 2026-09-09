@@ -41,11 +41,9 @@ export class MarketplaceRemoveUseCase {
   ) {}
 
   async execute(options: MarketplaceRemoveOptions): Promise<MarketplaceRemoveResult> {
-    // Machine-scope, shared by every project on this machine (`architecture.md`):
-    // removing it here would orphan the host's own registration for every other
-    // project, with no confirmation and no way back short of `aidd setup` running
-    // again. Nothing today retires it deliberately — it is removed with the
-    // framework itself, by `aidd clean`, once machine scope lands there.
+    // Machine-scope, shared by every project on this machine: removing it here would orphan the
+    // host's own registration for every other project, with no confirmation and no way back short
+    // of `aidd setup` running again. It is removed with the framework itself, by `aidd clean`.
     if (options.name === FRAMEWORK_MARKETPLACE_NAME) {
       throw new InvalidMarketplaceNameError(
         `"${FRAMEWORK_MARKETPLACE_NAME}" is shared by every project on this machine and is not removed with \`aidd marketplace remove\` — it is removed with the framework itself, by \`aidd clean\`, once machine scope lands there.`

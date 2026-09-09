@@ -1,17 +1,5 @@
-/**
- * `plugin remove` parity with `clean`'s own shared-ref guard (see
- * `clean-shared-ref-guard.integration.test.ts`): at a host that enables a plugin
- * machine-wide (no `NativeActivation.scopeArgs` — codex, copilot), removing a plugin
- * in one project must not disable it for another project on the same machine that
- * still references the shared source it came from.
- *
- * `PluginRemoveUseCase` never decrements `references.json` the way `clean` does — it
- * has no claim of its own to drop — so this project's own root is still in the list
- * `listAllReferencingProjects` returns and must be subtracted before counting "other"
- * projects. Forgetting that subtraction is the regression the second test below
- * catches: a project holding the *only* reference would read itself back as another
- * project and wrongly leave its own ref enabled.
- */
+/** At a host that enables a plugin machine-wide (no `NativeActivation.scopeArgs`), removing
+ * it in one project must not disable it for another still referencing the shared source. */
 import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { describe, expect, it } from "vitest";
 import {
@@ -119,19 +107,14 @@ describe("plugin remove guards a ref another project on this machine still needs
     });
 
     expect(activator.uninstalledPlugins).not.toContain(REF);
-    // N1 (lot 8 review): this test's own name promised "names the other project",
-    // but nothing ever inspected the logger it built — asserted here the same way
-    // `clean`'s own equivalent guard test does.
     expect(
       logger.warnMessages.some((m) => m.includes("left enabled") && m.includes(OTHER_PROJECT))
     ).toBe(true);
   });
 
   it("still uninstalls codex's ref when no other project references the shared source", async () => {
-    // The regression this test catches: forgetting to subtract this project's own
-    // root from `listAllReferencingProjects` would read it back as "another project"
-    // (since `plugin remove` never drops its own claim) and wrongly guard this ref
-    // even though nobody else references the shared source.
+    // `plugin remove` never drops its own claim, so a project's own root must be subtracted
+    // from `listAllReferencingProjects` or it reads itself back as another project.
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     seedReferences(fs, []);
     const activator = new FakeNativePluginActivator({ available: true });
@@ -146,16 +129,11 @@ describe("plugin remove guards a ref another project on this machine still needs
     expect(activator.uninstalledPlugins).toContain(REF);
   });
 
-  // Lot 9, item A: both the host call and this guard must address the host by
-  // `hostName`, read the same way. `refAnotherProjectStillNeeds` matches `ref`'s
-  // suffix against `sharedSourceHostName` — moving the ref to `hostName` while
-  // leaving `sharedSourceHostName` the alias would silently stop guarding anything,
-  // which is exactly the mutation this test pins.
+  // `refAnotherProjectStillNeeds` matches the ref's suffix against `sharedSourceHostName`, so
+  // a ref moved to `hostName` while that stays the alias silently stops guarding anything.
   it("guards by the host's own ref when this project's alias diverges from the catalog's declared name", async () => {
-    // The alias for the shared framework source is always the reserved
-    // `FRAMEWORK_MARKETPLACE_NAME` (`frameworkSourceIsShared` gates the guard on it) —
-    // the divergence under test is between that alias and what the catalog itself
-    // declares (`hostName`), the same divergence `nativeRegistrations` exists to record.
+    // The alias is always the reserved `FRAMEWORK_MARKETPLACE_NAME`, which gates the guard;
+    // the divergence under test is between it and what the catalog declares as `hostName`.
     const HOST_NAME = "upstream";
     const HOST_REF = `${PLUGIN_NAME}@${HOST_NAME}`;
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());

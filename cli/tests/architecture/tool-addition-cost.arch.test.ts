@@ -1,42 +1,13 @@
 /**
- * What adding a tool actually costs, measured rather than claimed.
- *
- * A tool identifier may only appear in that tool's own profile and in the shared
- * vocabulary. Everywhere else, the behaviour must be read from the profile rather than
- * branched on the name — otherwise a sixth tool means editing N files again.
- *
- * The first version of this rule was inert, and its title said "adding a tool costs one
- * file" while the real cost was ten. Two reasons, both worth naming because they are the
- * shape a guard fails in:
- *
- * 1. It matched `source.includes('"${id}"')`, so it saw only a double-quoted literal. A
- *    bare object key (`codex: { … }`), a profile's import path, and a name inside a longer
- *    string were all invisible — and the decisive one is the third: `presentation/commands/
- *    translate.ts` lists all five tools in its help text and `grep -c '"claude"'` on it
- *    returns zero.
- * 2. Its tool list was written by hand, so a *new* tool was not matched at all. A review
- *    added a real sixth profile, wrote its name into a file the rule forbids, and the whole
- *    architecture suite stayed green. The rule that bounds the cost of the next tool could
- *    not see the next tool.
- *
- * Now the tools come from the profile directories, so a new profile is subject to the rule
- * the moment it exists, and the forms below are the ones a new tool really forces an edit
- * in. Comments are stripped first: prose explaining that claude's layout differs is
- * documentation, not coupling.
- *
- * Scope is `src/`. The measured cost also includes three files under `tests/` — the
- * conformance suite's registration list, `tool-config`'s hardcoded ids, and the unit deps
- * helper — plus the golden matrix's target lists. Those are not scoped here because a test
- * naming the tool it tests is not coupling; the number is recorded so the ten below is not
- * mistaken for the whole bill.
+ * A tool identifier may only appear in that tool's own profile and in the shared vocabulary.
+ * Everywhere else behaviour is read from the profile rather than branched on the name, or a
+ * sixth tool means editing N files again. Scope is `src/`: a test naming the tool it tests is
+ * not coupling. Comments are stripped first — prose about a tool's layout is documentation.
  */
 import { describe, expect, it } from "vitest";
 import { expectRatchet, read, sourceFiles } from "./helpers.js";
 
-/**
- * The tools, from the tree. A hand-written list is what made this rule blind to the tool it
- * exists to measure.
- */
+/** The tools, from the tree: a hand-written list leaves the rule blind to the next tool. */
 function toolIds(files: readonly string[]): string[] {
   const ids = new Set<string>();
   for (const file of files) {
@@ -60,15 +31,9 @@ function code(source: string): string {
 }
 
 /**
- * Tool identifiers a file names in a way a new tool would force an edit to.
- *
- * Five forms: a quoted literal, an object key, a profile's import path, a dotfile
- * directory literal (`".cursor"`, `".codex"` — the shape a hidden per-tool directory is
- * always spelled in, which the first form misses because a bare quoted literal must
- * equal the id exactly, not the id with a leading dot), and a string that enumerates two
- * or more tools — a help line listing five targets is a list a sixth must join. A string
- * naming one tool is left alone: a message about the tool that exists is not a list
- * waiting to be extended.
+ * Five forms force an edit: a quoted literal, an object key, a profile's import path, a
+ * dotfile directory literal (`".cursor"`, which the exact-match form misses), and a string
+ * enumerating two or more tools. A string naming one tool is not a list a sixth must join.
  */
 function toolsNamedIn(source: string, ids: readonly string[]): string[] {
   const alternation = ids.join("|");
@@ -92,30 +57,10 @@ function toolsNamedIn(source: string, ids: readonly string[]): string[] {
 }
 
 /**
- * Files naming a tool outside its profile today, with how many they name. The list may only
- * shrink, and a listed file may not take on another tool.
- *
- * Three carry a reason that is not debt:
- *
- * - `tool-recommendations.ts` recommends tools to a user by name. There is no profile to
- *   read this off: the knowledge is which tool suits which stack, which belongs to nobody's
- *   profile. A sixth tool is welcome to appear in no recommendation at all.
- * - `config-refs.ts` declares `CONFIG_OPENCODE`, the name of a config artifact rather than
- *   of a tool. It is spelled like one because the artifact is that tool's config file.
- * - `plugins-capability.ts` types `NativeActivation.binary` as the CLIs this repo has
- *   measured and written activators for. An allowlist on purpose: a fourth tool driving its
- *   own CLI needs an activator registered anyway, so widening the type moves the cost.
- *
- * The other seven are the real bill, and they divide in two:
- *
- * - **Registration**, four files. `wiring/{tools,framework,translate}.ts` each repeat the
- *   same side-effect imports, and `assets/asset-loader.ts` keys a record by tool. A profile
- *   that registers itself would remove all four; nothing does that today.
- * - **Words shown to a user**, three files. `translate.ts` lists its targets in help text,
- *   `setup.ts` gives examples, `menu-use-case.ts` labels its entries. Deriving those from
- *   the registry is possible and is a presentation change, not a move.
- *
- * The dotfile-literal form (below) surfaced four more, documented beside each entry.
+ * Files naming a tool outside its profile today, with how many they name; the list may only
+ * shrink, and a listed file may not take on another tool. Three are not debt:
+ * `tool-recommendations.ts`, `config-refs.ts` and `plugins-capability.ts`, each naming a tool
+ * for a reason no profile carries. The rest is registration and words shown to a user.
  */
 const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   { path: "src/contexts/framework/domain/tool-recommendations.ts", named: 4 },
@@ -128,36 +73,23 @@ const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   { path: "src/runtime/wiring/framework.ts", named: 6 },
   { path: "src/runtime/wiring/tools.ts", named: 6 },
   { path: "src/runtime/wiring/translate.ts", named: 6 },
-  // Registration is the composition root's job. A profile cannot name the adapter that
-  // reads its transcripts without putting infrastructure in the domain, which the layer
-  // rule refuses — so the tool-to-reader map lives here, and gains one line per tool that
-  // declares `telemetryLocalRead: { kind: "declared" }`.
+  // A profile cannot name the adapter reading its transcripts without putting infrastructure
+  // in the domain, so the tool-to-reader map lives at the composition root instead.
   { path: "src/runtime/wiring/telemetry.ts", named: 4 },
-  // The same shape one layer along: which file each host keeps its plugin registry in.
-  // Called from the composition root and nowhere else; the three reader classes beside it
-  // name no tool at all.
+  // Which file each host keeps its plugin registry in, called from the composition root
+  // alone; the reader classes beside it name no tool.
   {
     path: "src/contexts/tools/infrastructure/host-plugin-registry-reader-adapter.ts",
     named: 3,
   },
-  // host-marketplace-registry-reader-adapter.ts used to name "claude" here, as its
-  // marketplace-registry sibling of the entry above — it now iterates AI_TOOL_IDS and
-  // reads `NativeActivation.marketplaceRegistry` off each tool's own profile instead,
-  // so no literal survives here for this ratchet to admit.
   // An adapter for exactly one tool, naming the binary it shells out to. A tool named in
   // its own adapter is not a list a new tool joins — a new tool brings its own adapter.
   { path: "src/contexts/telemetry/infrastructure/opencode-cost-reader-adapter.ts", named: 1 },
-  // Cursor's project hooks file, named after the tool whose file it is — the same shape
-  // `opencode-mcp-merge.ts` and `vscode-mcp-merge.ts` already have here. The directory it
+  // Cursor's project hooks file, named after the tool whose file it is: the directory it
   // writes into is Cursor's own, not a list a sixth tool joins.
   { path: "src/contexts/tools/domain/formats/cursor-hooks-project-merge.ts", named: 1 },
-  // The four below surfaced only once the dotfile-literal form existed — a bare `".opencode"`
-  // or `".codex"` was invisible to the exact-match quoted-literal form. Two are the same
-  // shape already admitted above: an adapter naming the one tool it reads a file for.
-  //
-  // Flat-mode plugin extraction, keyed to the one path prefix flat materialization ever
-  // writes today (`.opencode/`) — the same shape `opencode-cost-reader-adapter.ts` has. A
-  // second flat-mode tool would need its own prefix check here, but there is only one.
+  // Flat-mode plugin extraction, keyed to the one path prefix flat materialization writes
+  // (`.opencode/`). A second flat-mode tool would need its own prefix check; there is one.
   {
     path: "src/contexts/framework/application/framework/translator/built-tree-materialization-translator.ts",
     named: 1,
@@ -166,11 +98,8 @@ const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   { path: "src/contexts/telemetry/infrastructure/copilot-cost-reader-adapter.ts", named: 1 },
   // An adapter for exactly one tool, naming its own hook-trust config path.
   { path: "src/contexts/telemetry/infrastructure/hook-trust-reader-adapter.ts", named: 1 },
-  // Not the same shape: this one reaches into two tools' own directories from one shared
-  // file to detect whether either was ever used (Claude's settings files, Cursor's project
-  // hooks file) — real coupling a third tool would extend, not excused here. Left as found:
-  // owned by the telemetry workstream, which is mid-change on this file in this repository
-  // right now.
+  // Real coupling, not excused: one shared file reaches into two tools' own directories to
+  // detect whether either was ever used, and a third tool would extend it.
   { path: "src/contexts/telemetry/infrastructure/telemetry-evidence-adapter.ts", named: 2 },
 ];
 

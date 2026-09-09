@@ -7,19 +7,10 @@ import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import { isStrictlyWithinUserScope } from "../../domain/plugins/user-scope-containment.js";
 
 /**
- * The files of a user-scope plugin (Cursor's `~/.cursor/plugins/local/<plugin>`) that
- * are actually safe to delete — a file is safe only once its real, `realpath`-resolved
- * location, after every symlink and `..` segment is followed, still sits strictly
- * inside the tool's own declared user-scope directory. A `..` segment a corrupted
- * manifest entry carries, or a plugin directory that became a symlink after install,
- * both fail this and are left in place, named, rather than silently deleted or
- * silently kept.
- *
- * Shared by `CleanUseCase` (project scope, `plugin.scope === "user"` is the one case it
- * ever calls this for) and `CleanUserScopeUseCase` (machine scope, every plugin its own
- * manifest entry ever carries is already user-scope by construction) — the same
- * containment check either way, so a symlink escape is caught once, not twice with one
- * copy quietly drifting from the other.
+ * The files of a user-scope plugin that are actually safe to delete: safe only once the real,
+ * `realpath`-resolved location still sits strictly inside the tool's own declared user-scope
+ * directory. A `..` segment a corrupted manifest entry carries, or a plugin directory that became a
+ * symlink after install, both fail this and are left in place and named.
  */
 export async function userScopeFilesSafeToDelete(
   fs: FileReader,

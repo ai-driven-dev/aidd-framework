@@ -14,10 +14,8 @@ import {
   userManifestPath,
 } from "../../../../src/kernel/paths.js";
 
-// A build refuses to write into the tree it reads from, and the cache-rebuild path takes a
-// temp-dir detour when the two overlap. Both questions are asked here, so both are pinned
-// here - with backslash-spelled paths, which is what a Windows run actually passes and
-// what the two hardcoded "/" comparisons this replaced never recognised (#707).
+// Asked with backslash-spelled paths, which is what a Windows run passes and what a
+// hardcoded "/" comparison never recognises.
 describe("pathContainsOrEquals()", () => {
   it("sees the same directory spelled either way", () => {
     expect(pathContainsOrEquals("/a/b", "/a/b")).toBe(true);
@@ -59,9 +57,8 @@ describe("pathsOverlap()", () => {
   });
 });
 
-// The shared source is one per CLI version, so a purge of one version is a single
-// `rm -rf` on a directory aidd alone owns. Two versions must never resolve to the
-// same directory, or that purge would take the other version's registrations with it.
+// The shared source is one per CLI version, so a purge of one version is a single `rm -rf`:
+// two versions resolving to the same directory would take the other's registrations too.
 describe("userBuiltMarketplaceDir()", () => {
   it("places the version segment before the marketplace name", () => {
     expect(userBuiltMarketplaceDir("/user-cache", "5.0.0", "aidd-framework", "claude")).toBe(
@@ -127,8 +124,8 @@ describe("parseUserBuiltMarketplaceDir()", () => {
     ).toEqual({ version: "5.0.0", marketplaceName: "aidd-framework", target: "claude" });
   });
 
-  // Bloquant 5/13: a real filesystem tolerates a trailing separator on a directory —
-  // `userConfigDir()` returning one is not a corrupted path.
+  // A real filesystem tolerates a trailing separator on a directory, so `userConfigDir()`
+  // returning one is not a corrupted path.
   it("tolerates a trailing separator on the user config dir", () => {
     const path = userBuiltMarketplaceDir("/user-cache", "5.0.0", "aidd-framework", "claude");
 
@@ -139,10 +136,8 @@ describe("parseUserBuiltMarketplaceDir()", () => {
     });
   });
 
-  // Bloquant 5/13: on a case-insensitive platform (Windows), `C:\Users\A` and
-  // `c:\users\a` are the same directory — the platform is passed explicitly rather
-  // than read from `process.platform`, the same testable shape `mcp-exclusion.ts`
-  // already uses.
+  // On a case-insensitive platform `C:\Users\A` and `c:\users\a` are the same directory; the
+  // platform is passed explicitly rather than read from `process.platform`.
   it("matches a case-differing user config dir on a case-insensitive platform", () => {
     expect(
       parseUserBuiltMarketplaceDir(
@@ -251,11 +246,8 @@ describe("parseBuiltMarketplaceDirAtAnyRoot()", () => {
     });
   });
 
-  // Every other writer of `references.json` records a `realpath` result, which is
-  // backslash-separated on win32 — a forward-slash `projectRoot` here would never
-  // compare equal to one of those (`samePathSegment` folds case, never separators),
-  // so a foreign project's own claim on the shared source would never be recognised
-  // as the same project twice (#lot-6-S5).
+  // Every other writer of `references.json` records a `realpath` result, backslash-separated
+  // on win32, and `samePathSegment` folds case but never separators.
   it("keeps the platform's own separator in the returned project root on win32", () => {
     expect(
       parseBuiltMarketplaceDirAtAnyRoot(

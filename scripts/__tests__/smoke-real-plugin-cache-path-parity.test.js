@@ -7,12 +7,9 @@ const ROOT = path.resolve(__dirname, "../..");
 
 /**
  * `smoke-real.sh` cannot call into the built CLI to read `NativeActivation.pluginCacheDir`
- * back out — there is no command that prints it — so it names `~/.claude/plugins/cache`
- * and `~/.codex/plugins/cache` as bash literals instead. That is a second home of the
- * same fact `claude/profile.ts` and `codex/profile.ts` each declare, and nothing pinned
- * the two together before this: the profile's own path could drift and every "the cache
- * is gone" assertion in the script would silently stop meaning anything, watching the
- * wrong directory. This reads both source files and compares the literal path segments.
+ * back out, so it names the cache paths as bash literals — a second home of the same fact
+ * each profile declares. Unpinned, the profile's path could drift and every "the cache is
+ * gone" assertion in the script would watch the wrong directory in silence.
  */
 
 function pluginCacheDirSegments(profileFile) {

@@ -33,10 +33,8 @@ import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemet
 
 const SESSION_ID = "s-1";
 const PROJECT_ROOT = "/repo";
-// Every test in this file is about what the sink, the journal or a reader hold, not about
-// the project switch - it always answers "on" here, the same reasoning
-// `report-cost-use-case.unit.test.ts`'s own `BASE_OPTIONS` documents. The refusal itself is
-// covered on its own, below.
+// The project switch always answers "on" here: every test in this file is about what the
+// sink, the journal or a reader hold. Its refusal is covered on its own, below.
 const TELEMETRY_EVIDENCE_READER = new StubTelemetryEvidenceReader();
 
 function stubReader(records: readonly LocalCostCandidateRecord[]): SessionCostReader {
@@ -56,10 +54,8 @@ function journalWithTurnEnd(at: string): RunJournal {
   };
 }
 
-// The same real, redacted rollout excerpt codex-rollout.unit.test.ts asserts against
-// (captured 2026-08-20 on Codex CLI 0.145.0-alpha.27) — its last turn's two `token_count`
-// lines are cut down to one, to stand in for "read while the session was still running":
-// only the first of the turn's two token increments has landed on disk yet.
+// The same real, redacted rollout excerpt `codex-rollout.unit.test.ts` asserts against, its
+// last turn's two `token_count` lines cut to one: a session read while it was still running.
 const CODEX_TARGET_ID = "019fae6f-2009-7cd3-86b2-b8f83481b160";
 const CODEX_FIXTURE_PATH =
   ".codex/sessions/2026/07/29/rollout-2026-07-29T17-12-26-019fae6f-2009-7cd3-86b2-b8f83481b160.jsonl";
@@ -70,10 +66,8 @@ function loadCodexFixture(): string {
   return readFileSync(fileURLToPath(url), "utf8");
 }
 
-/** The real Codex reader, fed a different snapshot of the rollout's own bytes on each
- * successive call — exactly what `CodexCostReaderAdapter` sees re-opening the same growing
- * file. The last snapshot repeats once the sequence is exhausted, for a session that has
- * stopped changing. */
+/** The real Codex reader, fed a different snapshot of the rollout's bytes on each call, as
+ * `CodexCostReaderAdapter` sees a growing file. The last snapshot repeats once exhausted. */
 function growingCodexReader(...snapshots: readonly string[]): SessionCostReader {
   let call = 0;
   return {
@@ -86,19 +80,14 @@ function growingCodexReader(...snapshots: readonly string[]): SessionCostReader 
   };
 }
 
-// The full fixture's last turn (see codex-rollout.unit.test.ts) is `019fae71-...`'s two
-// `token_count` lines summing to input 5032 / output 3550 / cache-read 99840 / cache-write
-// 0. Dropping the fixture's own final line leaves only the first of those two increments —
-// input 2816 / output 1401 / cache-read 48896 / cache-write 0 — standing in for "read while
-// the session was still running, before the rest of this turn had landed on disk".
+// The full fixture's last turn sums to input 5032 / output 3550 / cache-read 99840; dropping
+// its final line leaves only its first increment, input 2816 / output 1401 / cache-read 48896.
 function truncatedCodexFixture(): string {
   return loadCodexFixture().split("\n").slice(0, 7).join("\n");
 }
 
-// Shaped like a real Claude Code transcript reader's output (see
-// domain/formats/claude-code-transcript.ts), but this file stubs `SessionCostReader`
-// throughout — it tests the use-case's own orchestration (dedup, status, provenance
-// stamping), independent of any tool's real reader.
+// Shaped like a real Claude Code transcript record, but this file stubs `SessionCostReader`
+// throughout: it tests the use-case's orchestration, not any tool's real reader.
 const CANDIDATE: LocalCostCandidateRecord = {
   kind: "request",
   vendor_id: SESSION_ID,
@@ -125,8 +114,7 @@ describe("ReadLocalCostUseCase", () => {
     registerTool(claudeConfig);
   });
 
-  // What this stub route supplies is not what this file is about; it declares the minimum
-  // the type requires so the use case's own orchestration is what gets tested.
+  // The minimum the type requires: what a route supplies is not what this file tests.
   const SUPPLIES_NOTHING = {
     tokenCounters: false,
     amount: false,
@@ -317,8 +305,6 @@ describe("ReadLocalCostUseCase", () => {
     expect(stored.person_display_name).toBe("Baptiste");
   });
 
-  // The spec's own line: a choice made today does not reach backwards. Re-reading an
-  // already-stored session after opting in must not retroactively name it.
   it("leaves a session stored before opting in unnamed, even on a later read", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
@@ -339,9 +325,8 @@ describe("ReadLocalCostUseCase", () => {
     expect("person_id" in stored).toBe(false);
   });
 
-  // Task 2's own criterion: the use-case names the tool it asked, never the candidate
-  // itself — `CANDIDATE` carries no `tool` field at all (the type omits it), so this is
-  // structurally impossible for the reader to have supplied.
+  // `CANDIDATE` carries no `tool` field — the type omits it — so the stamp cannot have come
+  // from the reader.
   it("stamps the tool it asked", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
@@ -359,12 +344,8 @@ describe("ReadLocalCostUseCase", () => {
     expect(stored.tool).toBe("claude");
   });
 
-  // A reader cannot name its own tool, and the proof belongs to the compiler rather than
-  // to a run: `LocalCostCandidateRecord` omits `tool`, so the attempt below does not
-  // compile. `@ts-expect-error` inverts that into an assertion — the day the field becomes
-  // settable, the directive has nothing to suppress and `tsc` fails on it. A runtime test
-  // would have had to widen the type to build the value it forbids, which is the hole
-  // being closed, not a way to check it is closed.
+  // `LocalCostCandidateRecord` omits `tool`, so the assignment below does not compile;
+  // `@ts-expect-error` inverts that into the assertion — make it settable and `tsc` fails.
   it("forbids a reader from naming its own tool, at compile time", () => {
     const candidate: LocalCostCandidateRecord = {
       ...CANDIDATE,
@@ -396,8 +377,7 @@ describe("ReadLocalCostUseCase", () => {
     const afterSecond = JSON.stringify([...sink.files.values()]);
 
     expect(afterSecond).toBe(afterFirst);
-    // Still "found", not "empty": the reader returned a record, dedup just skipped it —
-    // collapsing this into "empty" would erase the distinction task 5 exists to keep.
+    // Still "found", not "empty": the reader returned a record, dedup just skipped it.
     const claudeReport = second.toolReports.find((r) => r.tool === "claude");
     expect(claudeReport).toMatchObject({ status: "found", recordsFound: 1, recordsStored: 0 });
   });
@@ -489,12 +469,8 @@ describe("ReadLocalCostUseCase", () => {
     expect([...sink.files.values()].flat()).toHaveLength(1);
   });
 
-  // Measured 2026-09-04 on a live sink: 339 groups of byte-identical records, 474 extra
-  // lines, every one of them a subagent record. The source explains it - of 29,741 distinct
-  // requestIds in that project's transcripts, 350 appear in more than one file, and one read
-  // of the session hands both copies to this method as two candidates of the same batch. The
-  // index of what is already stored was read once, before the loop, so the first copy was
-  // appended without the second ever being matched against it.
+  // A requestId appearing in more than one transcript file hands one read both copies as two
+  // candidates of the same batch, so the index of what is stored has to stay live inside it.
   it("stores one line when a single read hands it the same turn twice", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
@@ -516,9 +492,8 @@ describe("ReadLocalCostUseCase", () => {
     expect(result.toolReports.find((r) => r.tool === "claude")?.recordsStored).toBe(1);
   });
 
-  // The correction route still works inside one batch: a second candidate for the same turn
-  // that strictly improves on the first is what `isLocalReadTurnCorrection` exists for, and
-  // making the index live must not turn it into a drop.
+  // `isLocalReadTurnCorrection` still has to fire inside one batch: a live index must not
+  // turn a strictly improving second candidate into a drop.
   it("still lands a correction when the larger reading arrives in the same read", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
@@ -536,9 +511,8 @@ describe("ReadLocalCostUseCase", () => {
     expect([...sink.files.values()].flat().map((r) => r.output_tokens)).toEqual([20, 900]);
   });
 
-  // The live index must key on a real identifier and nothing else. Folding the keyless
-  // records under one shared key would let the second of them be matched against the first
-  // and dropped - the opposite of the contract the test below states for a re-read.
+  // The live index keys on a real identifier and nothing else: one shared key for the keyless
+  // records would match the second against the first and drop it.
   it("appends every keyless candidate of one batch, never matching two of them to each other", async () => {
     declareClaudeReadable();
     const keyless: LocalCostCandidateRecord = { ...CANDIDATE, turn_id: undefined };
@@ -584,10 +558,8 @@ describe("ReadLocalCostUseCase", () => {
     }
   });
 
-  // The defect this task fixes: `codex-rollout.ts:156` flushes the pending turn
-  // unconditionally, so a Codex turn read while its session is still running is stored
-  // partial, and — before this task — `storeNewCandidates` matched the completed reading's
-  // `turn_id` against that partial record and dropped it, permanently.
+  // `codex-rollout.ts` flushes the pending turn unconditionally, so a Codex turn read while
+  // its session runs is stored partial, and its completed reading shares that `turn_id`.
   describe("a Codex turn read while it runs is not the last word", () => {
     it("lands the completed figures once the rest of the turn arrives", async () => {
       const sink = new InMemoryTelemetrySink();
@@ -630,9 +602,8 @@ describe("ReadLocalCostUseCase", () => {
         output_tokens: 3550,
         input_tokens: 5032,
       });
-      // The earlier, partial reading is still there — the sink never edits a stored line —
-      // but the built report (cost-report.ts's `collapseSupersededTurns`) is what a
-      // consumer actually reads, and it keeps only the larger of the two.
+      // The partial reading stays: the sink never edits a stored line, and it is
+      // `collapseSupersededTurns` in the built report that keeps only the larger of the two.
     });
 
     it("stops re-appending once a re-read brings nothing new", async () => {
@@ -695,16 +666,11 @@ describe("ReadLocalCostUseCase", () => {
     });
 
     it("lands the completed figures even once the run journal's own turn_end has been seen", async () => {
-      // A `turn_end` line only ever says no *more* growth is coming — it must never be
-      // read as a reason to refuse a candidate that is strictly larger than what is
-      // stored. A strictly larger candidate is itself proof the stored reading was not
-      // final, whatever the journal's clock says. (This is the exact trap the fix's first
-      // draft fell into: gating the correction on `turn_end` re-created the defect by
-      // freezing the partial reading the moment a `turn_end` line existed at all.)
+      // A `turn_end` says only that no *more* growth is coming; a strictly larger candidate is
+      // itself proof the stored reading was not final, whatever the journal's clock says.
       const sink = new InMemoryTelemetrySink();
       const journalReader = new InMemoryRunJournalReader();
-      // The last turn opens at 2026-07-29T15:15:13.692Z (codex-rollout.unit.test.ts); this
-      // turn_end lands after that.
+      // This turn_end lands after the fixture's last turn opens.
       journalReader.set(CODEX_TARGET_ID, journalWithTurnEnd("2026-07-29T15:20:00Z"));
       const reader = growingCodexReader(truncatedCodexFixture(), loadCodexFixture());
       const useCase = new ReadLocalCostUseCase(
@@ -774,8 +740,7 @@ describe("ReadLocalCostUseCase", () => {
     });
 
     // A `kind: "session"` record is a one-shot cumulative total, never a growing per-turn
-    // snapshot — a re-read matching its turn_id is dropped exactly as it always was,
-    // never treated as a correction opportunity.
+    // snapshot, so a re-read matching its turn_id is a drop and never a correction.
     expect(second.toolReports.find((r) => r.tool === "claude")?.recordsStored).toBe(0);
     expect([...sink.files.values()].flat().filter((r) => r.turn_id === "shutdown-1")).toHaveLength(
       1
@@ -882,8 +847,8 @@ describe("ReadLocalCostUseCase", () => {
       expect(stored.step).toBeUndefined();
     });
 
-    // Task 3's own criterion: a journal interval covers the same moment too, and still
-    // loses — the tool's own answer is exact, an interval is only ever an inference.
+    // A journal interval covers the same moment too, and still loses: the tool's own answer is
+    // exact, an interval is only ever an inference.
     it("prefers the tool's own stated step over a journal interval that also covers it", async () => {
       declareClaudeReadable();
       const sink = new InMemoryTelemetrySink();
@@ -908,8 +873,8 @@ describe("ReadLocalCostUseCase", () => {
       });
     });
 
-    // Task 4's own criterion: attribution is an addition, never a precondition. The same
-    // transcript, read with and without a journal beside it, must store the same figures.
+    // Attribution is an addition, never a precondition: the same transcript, read with and
+    // without a journal beside it, stores the same figures.
     it("yields identical counters whether a journal is present or not", async () => {
       declareClaudeReadable();
       const withJournalSink = new InMemoryTelemetrySink();
@@ -941,7 +906,6 @@ describe("ReadLocalCostUseCase", () => {
         cache_creation_tokens: record.cache_creation_tokens,
       });
       expect(counters(withStored)).toEqual(counters(withoutStored));
-      // The one thing that does differ is the attribution itself.
       expect(withStored.step_attribution).toBe("journal-interval");
       expect(withoutStored.step_attribution).toBe("unattributed");
     });
@@ -1122,7 +1086,6 @@ describe("a reader that fails", () => {
     );
     expect(failed.map((report) => report.status)).toEqual(["unreadable", "unreadable"]);
     expect(failed.every((report) => report.recordsFound === 0)).toBe(true);
-    // Nothing anywhere in the answer claims a tool cost zero.
     expect(result.toolReports.some((report) => report.status === "empty")).toBe(false);
   });
 
@@ -1319,9 +1282,8 @@ describe("reading every session the journal knows", () => {
 
 describe("a failure in a sweep does not disappear behind a success", () => {
   it("reports the tool as read, and still says how many sessions it could not read", async () => {
-    // Nineteen good sessions and one bad is the case that matters: the figures are real,
-    // so the status is honest, and a failure visible only in the status would vanish
-    // exactly where there is most to lose.
+    // Nineteen good sessions and one bad is the case that matters: the figures are real, so a
+    // failure visible only in the status would vanish exactly where there is most to lose.
     const journal = new InMemoryRunJournalReader();
     for (const vendorId of ["s-good", "s-bad"]) {
       journal.set(vendorId, {
@@ -1382,9 +1344,8 @@ describe("a failure in a sweep does not disappear behind a success", () => {
     expect(claude?.failureReason).toBeUndefined();
   });
 
-  // Retention had exactly one caller — the OTLP receiver — and deleting that route left
-  // the sink pruned by nothing. `read` is now the only thing that writes a day file, so
-  // it is the only thing that can bound how many there are.
+  // `read` is the only thing that writes a day file, so it is the only thing that can bound
+  // how many there are.
   it("prunes day files outside the retention window, once per sweep", async () => {
     const sink = new InMemoryTelemetrySink();
     for (const day of ["2026-01-01", "2026-01-02", "2026-01-03"]) {
@@ -1453,8 +1414,8 @@ describe("a failure in a sweep does not disappear behind a success", () => {
   });
 });
 
-// Finding 4 (review.md, "one route, and every sentence about it true"): this is the one
-// remaining writer of the sink, so a refusal that does not hold here is cosmetic.
+// This is the one remaining writer of the sink, so a refusal that does not hold here is
+// cosmetic.
 describe("a refusal holds on the one writer left", () => {
   it("reads nothing and stores nothing when the project switch is off", async () => {
     const sink = new InMemoryTelemetrySink();
@@ -1511,14 +1472,8 @@ describe("a refusal holds on the one writer left", () => {
   });
 });
 
-/**
- * Which readers a session actually reaches.
- *
- * Reading every tool for every session was pure waste the journal could already have
- * prevented, and one tool charged for it: the OpenCode reader shells out to its binary and
- * waits, measured at 1.15s for a session it does not have. Nothing guarded the behaviour
- * either way, so these tests are what make the narrowing a decision rather than a habit.
- */
+/** Which readers a session actually reaches. Reading every tool costs real time: the
+ * OpenCode reader shells out and waits 1.15s for a session it does not have. */
 describe("which readers a session reaches", () => {
   const SPIED_SESSION = "spied-session";
   const SUPPLIES = {
@@ -1635,9 +1590,8 @@ describe("which readers a session reaches", () => {
       sessionId: SPIED_SESSION,
     });
 
-    // Cursor's declaration says its files carry no counter at all — a fact about the tool,
-    // true of every session. Answering "not this session's tool" would trade the reason a
-    // person needs for one that says less.
+    // Cursor's declaration says its files carry no counter at all: a fact about the tool, true
+    // of every session, and stronger than "not this session's tool".
     const cursor = result.toolReports.find((r) => r.tool === "cursor");
     expect(cursor?.status).toBe("not-covered");
     expect(cursor?.reason).toBeTruthy();

@@ -94,9 +94,8 @@ describe("toCostReportEnvelope", () => {
     expect(envelopeOf().period).toEqual({ from_day: "2026-08-17", to_day: "2026-08-21" });
   });
 
-  // Finding 3 (review.md, "one route, and every sentence about it true"): --json had no
-  // way to say measurement was off at all, breaking the spec's own constraint that a
-  // report says whether measurement is on.
+  // --json had no way to say measurement was off at all, breaking the constraint that a
+  // report states whether measurement is on.
   it("carries measurement_enabled, the one field the terminal rendering could see and this could not", () => {
     expect(envelopeOf({ measurementEnabled: true }).measurement_enabled).toBe(true);
     expect(envelopeOf({ measurementEnabled: false }).measurement_enabled).toBe(false);
@@ -231,8 +230,7 @@ describe("toCostReportEnvelope", () => {
   });
 
   // snake_case on the wire like every other row, and `started_at` beside the id because an
-  // opaque prompt id alone is not something a person can look up. The row for records that
-  // named no prompt carries neither field - see `CostReportPromptRow`.
+  // opaque prompt id alone is not something a person can look up.
   it("carries one row per prompt, dated, and one undated row for records that named none", () => {
     const envelope = envelopeOf({
       records: [
@@ -301,22 +299,16 @@ describe("toCostReportEnvelope", () => {
     expect(source).not.toContain("Date");
   });
 
-  // The constant is bumped the moment a shape changes; the paragraph explaining why is a
-  // second edit nothing forces a person to make. A version with no paragraph is a bump a
-  // consumer cannot learn the reason for, which is the one thing this comment exists to
-  // give them.
-  it("documents the current version with its own paragraph, not just the one before it", () => {
-    const source = readFileSync(
+  // A bump is one edit; the contract naming the new version is a second one nothing forces.
+  it("is the version the product contract names as current", () => {
+    const contract = readFileSync(
       fileURLToPath(
-        new URL(
-          "../../../../src/contexts/telemetry/domain/cost-report-envelope.ts",
-          import.meta.url
-        )
+        new URL("../../../../../aidd_docs/product/cost-report-contract.md", import.meta.url)
       ),
       "utf8"
     );
 
-    expect(source).toContain(`Bumped to ${COST_REPORT_ENVELOPE_VERSION}:`);
+    expect(contract).toContain(`currently \`${COST_REPORT_ENVELOPE_VERSION}\``);
   });
 });
 

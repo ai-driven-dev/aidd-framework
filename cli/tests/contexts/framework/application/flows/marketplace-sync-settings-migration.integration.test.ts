@@ -209,12 +209,8 @@ describe("MarketplaceSyncSettingsUseCase — codex and copilot refuse the same n
     expect(activator.addedMarketplaces).toEqual([]);
   });
 
-  // `isUnguardedFrameworkMarketplace`'s third clause excludes a tool whose profile
-  // declares `NativeActivation.marketplaceRegistry` — today only claude — from this
-  // reclaim door: a registry conflict for that tool must surface as a reported error,
-  // never be silently overwritten by `remove` then `add`. Deleting that clause leaves
-  // every other test in this file green, since none of them drives claude through a
-  // conflicting `addMarketplace` at all.
+  // `isUnguardedFrameworkMarketplace` excludes a tool declaring its own marketplace registry
+  // from the reclaim door: a registry conflict is a reported error, never a silent remove-add.
   it("never reclaims the reserved framework name for a tool that declares its own marketplace registry — claude reports the conflict instead", async () => {
     const registry = new InMemoryMarketplaceRegistry();
     await registry.save(PROJECT_ROOT, frameworkAtUserScope());
@@ -240,11 +236,8 @@ describe("MarketplaceSyncSettingsUseCase — codex and copilot refuse the same n
       new CapturingLogger(),
       new Map([["claude", activator]]),
       fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR)
-      // No `hostMarketplaceRegistries` reader for claude here: `guardAgainstConflict`
-      // returns "proceed" without ever reading a registry, so the only way this run
-      // can reach a conflict at all is the same `addMarketplace` throw every other
-      // test in this file drives — proving the exclusion is decided in
-      // `reclaimOrReport`, never upstream of it.
+      // No `hostMarketplaceRegistries` reader for claude: `guardAgainstConflict` returns
+      // "proceed" without reading one, so the exclusion is decided in `reclaimOrReport`.
     );
 
     const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
@@ -293,9 +286,8 @@ describe("MarketplaceSyncSettingsUseCase — the host still tracks another, unmi
         version: CURRENT_VERSION,
         plugins: [],
       }),
-      // The foreign project's own directory still exists — a host registry pointing
-      // there implies it does — so its own claim on the shared source is worth
-      // recording.
+      // The foreign project's own directory still exists, which a host registry pointing there
+      // implies, so its claim on the shared source is worth recording.
       [`${foreignProjectCache}/${CATALOG_RELATIVE}`]: JSON.stringify({
         name: FRAMEWORK_MARKETPLACE_NAME,
         version: "1.0.0",
@@ -324,9 +316,8 @@ describe("MarketplaceSyncSettingsUseCase — the host still tracks another, unmi
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    // The host is repointed onto the shared build without ever throwing — same
-    // catalog, foreign path, which `guardAgainstConflict` already treats as an
-    // ordinary migration, not a conflict.
+    // The host is repointed onto the shared build without throwing: same catalog, foreign path,
+    // which `guardAgainstConflict` treats as an ordinary migration.
     expect(activator.addedMarketplaces).toEqual([sharedBuiltDir()]);
     const roots = added.map((a) => a.projectRoot);
     expect(roots).toContain(PROJECT_ROOT);
@@ -448,10 +439,8 @@ describe("MarketplaceSyncSettingsUseCase — purging this project's own pre-migr
     expect(fs.has(OLD_CACHE_FILE)).toBe(false);
   });
 
-  // S1: a tool whose binary is off `PATH` never reaches `activateTool` at all — its
-  // own host registration, if it still names this project's pre-migration cache, gets
-  // no chance to move off it this run. Purging the cache regardless would leave that
-  // dangling registration with nothing left to resolve.
+  // A tool whose binary is off `PATH` never reaches `activateTool`, so its host registration gets
+  // no chance to move off this project's pre-migration cache; purging it would leave it dangling.
   it("keeps the stale built tree in place, and warns, when a requested tool's binary is off PATH", async () => {
     const registry = new InMemoryMarketplaceRegistry();
     await registry.save(
@@ -494,9 +483,8 @@ describe("MarketplaceSyncSettingsUseCase — purging this project's own pre-migr
     );
   });
 
-  // A build that fails is warned about and skipped, never an error — so the host's own
-  // registration is left exactly where it was, possibly still on this project's
-  // pre-migration cache. Same hazard as a missing binary, same answer.
+  // A build that fails is warned about and skipped, never an error, so the host's registration is
+  // left where it was. Same hazard as a missing binary, same answer.
   it("keeps the stale built tree in place, and warns, when a requested tool's build failed", async () => {
     const registry = new InMemoryMarketplaceRegistry();
     await registry.save(
@@ -553,9 +541,8 @@ describe("MarketplaceSyncSettingsUseCase — purging this project's own pre-migr
       enablesPlugins: false,
       crashOnAddMarketplace: false,
     });
-    // No catalog seeded at the built dir at all: `readMarketplaceCatalogIdentity`
-    // finds nothing, `registerMarketplace` throws `UnreadableBuiltCatalogError`,
-    // which `activateNativeTools` collects as a genuine error rather than a warning.
+    // No catalog seeded at the built dir, so `registerMarketplace` throws
+    // `UnreadableBuiltCatalogError`, which `activateNativeTools` collects as a genuine error.
     const fs = new InMemoryFileAdapter({ [OLD_CACHE_FILE]: "stale content" });
     const useCase = new MarketplaceSyncSettingsUseCase(
       fs,
@@ -670,11 +657,8 @@ describe("MarketplaceSyncSettingsUseCase — purging this project's own pre-migr
 });
 
 describe("MarketplaceSyncSettingsUseCase + DoctorRegistrationUseCase — the full migration cycle", () => {
-  /** Reads live from a `Map` the test's own activator double mutates on
-   * `addMarketplace` — a real host and this CLI's own activator share exactly this
-   * relationship (one file, read by `doctor`, written by `sync`'s own native
-   * activation), so this is the one double that lets a `doctor` call made *after* a
-   * `sync` call see what that `sync` actually did, rather than a canned reading. */
+  /** Reads live from a `Map` the test's own activator double mutates on `addMarketplace`, the
+   * one double that lets a `doctor` call made after a `sync` see what that `sync` actually did. */
   class LiveHostMarketplaceRegistryReader {
     constructor(
       private readonly entries: Map<string, string>,
@@ -710,10 +694,8 @@ describe("MarketplaceSyncSettingsUseCase + DoctorRegistrationUseCase — the ful
     const PROJECT_B = "/project-b";
     const REGISTRY_LOCATION = "/home/.claude/plugins/known_marketplaces.json";
     const CURRENT_VERSION = "2.0.0";
-    // resolve(): both doctor's own resolvedBuiltDir() and the sync guard's realpath(builtDir)
-    // compare against an already-resolved path (drive letter on win32) — leaving these
-    // drive-less would seed the catalog, and compare userCacheRoot, under a key neither
-    // code path ever looks up under.
+    // resolve(): doctor's `resolvedBuiltDir()` and the sync guard's `realpath(builtDir)` both
+    // compare against a resolved path, so a drive-less key is never looked up on win32.
     const USER_CACHE_ROOT = resolve("/user-cache");
     const sharedBuiltDir = resolve(
       userBuiltMarketplaceDir(

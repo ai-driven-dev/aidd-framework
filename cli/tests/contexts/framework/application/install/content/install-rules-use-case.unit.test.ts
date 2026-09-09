@@ -1,4 +1,3 @@
-// Register the claude and copilot tools so their capabilities are accessible
 import "../../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { describe, expect, it } from "vitest";
@@ -139,7 +138,6 @@ describe("InstallRulesUseCase", () => {
       });
 
       expect(files).toHaveLength(1);
-      // serialized without frontmatter (empty object → no --- block)
       expect(files[0].content).not.toContain("paths:");
     });
 

@@ -36,13 +36,11 @@ interface Setup {
   readonly requestedVersion?: string;
   readonly requestedPluginNames?: readonly string[];
   readonly hostReader?: FakeHostMarketplaceRegistryReader;
-  /** Catalog content to pre-write at the path this test's `hostReader` names as
-   * registered — omitted entirely leaves that path with nothing readable, standing in
-   * for a dead entry (a directory that no longer exists). */
+  /** Catalog content to pre-write at the path this test's `hostReader` names as registered;
+   * omitted, that path holds nothing readable, standing in for a directory that is gone. */
   readonly registeredCatalog?: RegisteredCatalog;
-  /** Skips writing anything at the built dir this project just "built" to — standing
-   * in for a build that reported success but left nothing readable at the exact path
-   * its own tool profile probes. */
+  /** Skips writing at the built dir this project just "built" to, standing in for a build that
+   * reported success but left nothing readable where its own tool profile probes. */
   readonly omitRequestedCatalog?: boolean;
 }
 
@@ -67,10 +65,8 @@ async function sync(setup: Setup = {}) {
     })
   );
   const builtDir = `/built/${toolId}`;
-  // Written at whichever relative path this tool's own `distributionProbes.marketplace`
-  // names — codex's differs from claude's — so a mutation that skips the
-  // `marketplaceRegistry` gate is actually exercised for codex too, rather than
-  // passing by accident because nothing sits at the path it would have read.
+  // Written at whichever relative path this tool's own `distributionProbes.marketplace` names,
+  // codex's differing from claude's, so the `marketplaceRegistry` gate is exercised for codex too.
   const catalogRelative =
     toolId === "codex" ? ".agents/plugins/marketplace.json" : ".claude-plugin/marketplace.json";
   if (!setup.omitRequestedCatalog) {
@@ -156,9 +152,8 @@ describe("the sync guard against a marketplace name a host already holds", () =>
   it("does not refuse when the host's registry already holds the same resolved source", async () => {
     const hostReader = new FakeHostMarketplaceRegistryReader({
       location: REGISTRY_LOCATION,
-      // InMemoryFileAdapter.realpath is identity absent a declared symlink, so this is
-      // exactly what the guard resolves `builtDir` to — the same file both reads land
-      // on, trivially the same catalog.
+      // InMemoryFileAdapter.realpath is identity absent a declared symlink, so this is exactly what
+      // the guard resolves `builtDir` to: both reads land on the same catalog.
       entries: new Map([["probe-mkt", "/built/claude"]]),
     });
 
@@ -169,10 +164,8 @@ describe("the sync guard against a marketplace name a host already holds", () =>
   });
 
   it("does not refuse when the same catalog is registered from a different, resolved path — two projects sharing one build", async () => {
-    // The measured `smoke-tools.sh` case: two independent projects both build the
-    // same framework fixture to their own `.aidd/cache/built/…`, and both auto-register
-    // under the same name. Same name, same version, same plugin names — a different
-    // directory only because it is a different project, not a different marketplace.
+    // Two independent projects build the same framework fixture to their own cache and
+    // register under the same name: same version, same plugins, only a different directory.
     const hostReader = new FakeHostMarketplaceRegistryReader({
       location: REGISTRY_LOCATION,
       entries: new Map([["probe-mkt", "/other-project/built/claude"]]),
@@ -248,9 +241,8 @@ describe("when the catalog this project just built cannot be read back", () => {
 
     expect(activator.addedMarketplaces).toEqual([]);
     expect(result.errors).toHaveLength(1);
-    // join(), matching marketplaceCatalogProbePath's own join(dir, catalogRelative): on
-    // win32 that produces a backslash-joined path, which a forward-slash template literal
-    // would never find inside the thrown message.
+    // join(), matching `marketplaceCatalogProbePath`: on win32 it produces a backslash-joined path,
+    // which a forward-slash template literal would never find inside the thrown message.
     expect(result.errors[0]?.message).toContain(join(builtDir, catalogRelative));
     // Never written as `hostName` — a manifest that guessed the alias would go on
     // claiming a registration the host was never asked to hold.

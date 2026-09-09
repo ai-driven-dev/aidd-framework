@@ -6,15 +6,12 @@ import type {
 
 /**
  * Whether a host will actually load a plugin AIDD installed for it — the comparison
- * `telemetry`'s own diagnostic and `framework`'s `doctor` both need, and neither owns: a
+ * `telemetry`'s own diagnostic and `framework`'s `doctor` both need and neither owns. A
  * project's settings can carry a perfectly good `enabledPlugins` entry while the host's
  * registry knows nothing about it, at which point the host drops the entry as orphaned and
- * every visible signal still says healthy. `claude --debug-file` says it in one line
- * nobody passes the flag to see: `Skipping orphaned enabledPlugins entry …: marketplace
- * not registered`.
+ * every visible signal still says healthy.
  *
- * Pure, and driven from whatever the caller already resolved as expected — the manifest's
- * own record for `telemetry`, `nativeRegistrations` for `doctor` — never from a settings
+ * Pure, and driven from whatever the caller already resolved as expected, never from a settings
  * file: a plugin a settings sync skipped would otherwise be absent from both sides of the
  * comparison and read as agreement while it never loads.
  */
@@ -25,19 +22,12 @@ export interface HostRegistration {
 }
 
 /**
- * Four answers, and none of them collapses into another.
- *
- * `registered-disabled` is its own answer rather than a shade of `registered` because
- * folding it in would report a plugin that will not load as one that will — Codex records
- * `enabled` per plugin table and nothing else, so `enabled = false` is a host that knows
- * the plugin and still declines it.
- *
- * `unanswerable` is its own answer rather than a shade of `not-registered` for the rule
- * this whole layer is built on: an unknown is never a zero. A registry that cannot be read
- * — absent, unreadable, or JSONC where JSON was expected — has said nothing, and printing
- * that as "not registered" would invent a fact. Copilot's own `~/.copilot/config.json`
- * opens with two `//` comment lines, so this is not hypothetical: a naive parse throws on
- * the first registry a reader meets.
+ * Four answers, and none of them collapses into another. `registered-disabled` is not a shade
+ * of `registered`: Codex records `enabled` per plugin table, so `enabled = false` is a host that
+ * knows the plugin and still declines it. `unanswerable` is not a shade of `not-registered`: an
+ * unknown is never a zero, and a registry that is absent, unreadable, or JSONC where JSON was
+ * expected has said nothing — Copilot's own `config.json` opens with two `//` lines, so a naive
+ * parse throws on the first registry a reader meets.
  */
 export type HostRegistrationAnswer =
   | "registered"
@@ -48,9 +38,8 @@ export type HostRegistrationAnswer =
 export interface HostRegistrationEntry {
   readonly tool: AiToolId;
   readonly plugin: string;
-  /** `<plugin>@<marketplace>`, the one string all three measured hosts key their registry
-   * on and the same string `enabledPlugins` uses. Absent exactly when no marketplace was
-   * recorded for the plugin, which is the case no registry can be asked about. */
+  /** `<plugin>@<marketplace>`, the one string all three measured hosts key their registry on.
+   * Absent exactly when no marketplace was recorded, the case no registry can be asked about. */
   readonly ref?: string;
   readonly answer: HostRegistrationAnswer;
   /** One sentence naming what was read and what it said, so the answer can be acted on
@@ -59,25 +48,18 @@ export interface HostRegistrationEntry {
 }
 
 /** What one tool contributes to the comparison: the plugins expected for it, and what its
- * registry answered — `undefined` when nothing here knows how to ask that host, which is a
- * different fact from asking and getting nothing back. */
+ * registry answered — `undefined` when nothing here knows how to ask that host, a different
+ * fact from asking and getting nothing back. */
 export interface HostRegistrationEvidence {
   readonly tool: AiToolId;
   readonly plugins: readonly { readonly name: string; readonly marketplace?: string }[];
   readonly reading?: HostPluginRegistryReading;
-  /** Whether the tool declares a native activation at all — it drives its own CLI to
-   * register a plugin, so a registry exists to be found. Carried because the two silences
-   * are different problems: a tool that declares none has no registry to read, while one
-   * that declares an activation and has no reader here has a registry nobody has measured.
-   * Telling a person the first when the second is true would send them looking for a file
-   * that does not exist. */
+  /** Whether the tool declares a native activation at all. The two silences are different
+   * problems: a tool declaring none has no registry to look for, while one that declares an
+   * activation and has no reader here has a registry nobody has measured. */
   readonly declaresNativeActivation?: boolean;
 }
 
-/**
- * The comparison itself: for every plugin expected, what the host's own registry says
- * about it.
- */
 export function buildHostRegistration(
   evidence: readonly HostRegistrationEvidence[]
 ): HostRegistration {
@@ -145,18 +127,13 @@ function answerForRef(
 }
 
 /**
- * Either the refs a registry actually produced, or the reason nothing did — returned as
- * one value so the caller never has to re-narrow, and so no branch can reach a lookup
- * against a registry that never opened.
+ * Either the refs a registry actually produced, or the reason nothing did — one value, so no
+ * branch can reach a lookup against a registry that never opened.
  *
- * Three reasons, not one, because they send a person somewhere different: a tool that
- * drives its own CLI keeps a registry somebody could go and measure, a tool that declares
- * no native activation has none to look for at all, and a registry that was found and
- * could not be read names the file and the failure.
- *
- * Exported for `doctor`'s own ref-level check: it already holds fully-formed refs from
- * `nativeRegistrations` and asks this once per tool, rather than once per ref the way
- * `buildHostRegistration` does through `answerForRef` above.
+ * Three reasons, not one, because they send a person somewhere different: a tool that drives its
+ * own CLI keeps a registry somebody could go and measure, a tool that declares no native
+ * activation has none to look for, and a registry found but unreadable names the file and the
+ * failure.
  */
 export function answeredRegistry(
   tool: AiToolId,

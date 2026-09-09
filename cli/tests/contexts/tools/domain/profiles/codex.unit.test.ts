@@ -140,11 +140,8 @@ describe("codex", () => {
   describe("capabilities.plugins", () => {
     it("declares native codex CLI activation, with the verbs codex uses, and nothing else", () => {
       const activation = codex.capabilities.plugins.nativeActivation;
-      // Exhaustive, not `toMatchObject`: a field added to codex's own nativeActivation
-      // by mistake must fail this test, not escape it silently — `marketplaceRegistry`
-      // stays absent by never being listed here, `pluginCacheDir` is pinned separately
-      // below and stood in for by `expect.any(Function)` since its own reference
-      // never matches an object literal's.
+      // Exhaustive, not `toMatchObject`: a field added by mistake must fail here rather than
+      // escape. `pluginCacheDir` is `expect.any(Function)`, since a function matches no literal.
       expect(activation).toEqual({
         binary: "codex",
         upgradeVerb: "upgrade",
@@ -283,15 +280,8 @@ enabled = true
 });
 
 /**
- * What a skill's frontmatter becomes on its way to Codex.
- *
- * Codex is the only target that re-serialises skill frontmatter instead of passing the
- * file through, so its output diverges from the source bytes by design. That divergence
- * went unrecorded for a month: the golden's codex cell still held the source hashes, and
- * nothing compared it, because only `claude` was frozen. Freezing the nine surfaced it.
- *
- * These pin the transform itself, so those thirty golden hashes are not guarded solely by
- * the snapshot that recorded them.
+ * Codex is the only target that re-serialises skill frontmatter instead of passing the file
+ * through, so these pin the transform itself rather than the golden that recorded its output.
  */
 describe("a skill's frontmatter, rewritten for Codex", () => {
   const rebuild = (fm: Record<string, unknown>) =>
@@ -320,9 +310,8 @@ describe("a skill's frontmatter, rewritten for Codex", () => {
   });
 
   it("quotes a value whose colon would otherwise make the frontmatter unreadable", () => {
-    // This is not cosmetic. Two skills shipped in the pinned release carry a description
-    // containing ": " — `js-yaml` refuses the source outright with "bad indentation of a
-    // mapping entry". Re-serialising with quotes is what makes the installed file parse.
+    // Not cosmetic: a description containing ": " makes `js-yaml` refuse the source with "bad
+    // indentation of a mapping entry". Re-serialising with quotes is what makes it parse.
     expect(rebuild({ name: "aidd-context:03:context-generate", description: "Do a: thing" })).toBe(
       "---\nname: 'aidd-context:03:context-generate'\ndescription: 'Do a: thing'\n---\nbody\n"
     );

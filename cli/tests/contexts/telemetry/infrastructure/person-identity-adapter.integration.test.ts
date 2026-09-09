@@ -4,19 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PersonIdentityAdapter } from "../../../../src/contexts/telemetry/infrastructure/person-identity-adapter.js";
 
-/**
- * `PersonIdentityAdapter` on real disk.
- *
- * The first block is the guarantee "the deletion path" review found broken: `filePath` is
- * resolved once, at construction, and `forget(path)` acts on the exact `path` it is handed,
- * never re-resolving `HOME` at removal time.
- *
- * The second block exists because this file used to claim the rest was "already covered
- * indirectly through `PersonIdentityUseCase`'s own tests". It was not: those construct an
- * `InMemoryPersonIdentityStore`, so nothing exercised what this adapter actually writes to
- * disk or reads back — which is what decides whose records are whose. Every write here goes
- * through the file and is read back through it.
- */
+/** On real disk: every write here goes through the file and is read back through it, since
+ * what this adapter stores is what decides whose records are whose. */
 describe("PersonIdentityAdapter.forget — resolved once, acts on the path it is handed", () => {
   let previousHome: string | undefined;
   const homes: string[] = [];
@@ -57,11 +46,8 @@ describe("PersonIdentityAdapter.forget — resolved once, acts on the path it is
     await expect(adapter.forget(adapter.filePath)).resolves.toBe(false);
   });
 
-  // Finding 1: `HOME` relocated between the moment a person is shown `filePath` (the
-  // preview) and the moment `forget` runs (the removal) used to reach the relocated
-  // profile instead of the one shown, because the old `identityFilePath()` re-read `HOME`
-  // on every call. `filePath` is now frozen at construction, and this proves `forget`
-  // never asks `HOME` again either — it acts on whatever `path` it is handed.
+  // `filePath` is frozen at construction and `forget` never asks `HOME` again, so a
+  // relocation between the preview and the removal cannot redirect it.
   it("acts on the path it is handed, immune to HOME being relocated afterwards", async () => {
     const realHome = await freshHome();
     process.env.HOME = realHome;
@@ -171,9 +157,8 @@ describe("PersonIdentityAdapter — what it writes, and what it reads back", () 
     expect(after.alsoMe).toEqual([]);
   });
 
-  // The whole reason two reads exist: `read` is for every consumer that must not fail over
-  // one damaged file, `readStrict` is for the one caller that has to tell "nobody chose"
-  // apart from "could not be read".
+  // `read` is for every consumer that must not fail over one damaged file; `readStrict` for
+  // the one caller that has to tell "nobody chose" apart from "could not be read".
   it("reads a damaged file as nothing, and refuses it strictly", async () => {
     const adapter = await adapterInFreshHome();
     await writeFile(adapter.filePath, "{ not json");

@@ -3,23 +3,8 @@ import { describe, expect, it } from "vitest";
 import { pathDirsWithoutAidd, shellDirsWithoutAidd } from "./helpers.js";
 
 /**
- * The Windows half of `pathWithoutAidd`, provable from any platform.
- *
- * Git runs a hook by reading its shebang and looking the interpreter up by name on `PATH`:
- * `#!/bin/sh` sends it looking for `sh.exe`. That helper hands every sandboxed run a
- * deliberately narrow `PATH`; on POSIX it already carries `/bin`, so the dependency stayed
- * invisible, and on Windows there was no shell on it at all. Six commit-trailer e2e tests
- * failed there and only there with `cannot spawn …: No such file or directory`, which reads
- * like a missing hook file and is nothing of the sort.
- *
- * The layout below is not invented — it is what the runner reported when asked:
- *
- *   git.exe  C:\Program Files\Git\mingw64\bin
- *   sh.exe   C:\Program Files\Git\usr\bin, C:\Program Files\Git\bin
- *
- * which is why deriving the shell from the git directory failed: those are two levels away
- * and on a different branch. Selecting by what a directory holds needs no theory of the
- * layout and cannot be wrong about one.
+ * Git runs a hook by looking its shebang interpreter up by name on `PATH`, so a narrow
+ * `PATH` with no shell on it fails as `cannot spawn …: No such file or directory`.
  */
 const GIT_ROOT = "C:\\Program Files\\Git";
 const GIT_BIN = join(GIT_ROOT, "mingw64", "bin");

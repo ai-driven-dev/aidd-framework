@@ -47,9 +47,8 @@ describe("install cursor plugin via Mode B (integration)", () => {
       undefined
     );
 
-    // fs.listAll() returns the adapter's own "/"-normalised keys (in-memory-file-adapter.ts's
-    // `norm`) - a raw `.startsWith` needs the same convention, unlike `fs.has()` below which
-    // normalises internally.
+    // `fs.listAll()` returns the adapter's own "/"-normalised keys, so a raw `.startsWith`
+    // needs the same convention, unlike `fs.has()` below which normalises internally.
     const expectedBase = posix.join(STUB_HOME, ".cursor", "plugins", "local");
     const writtenPaths = fs.listAll();
     expect(writtenPaths.some((p) => p.startsWith(expectedBase))).toBe(true);

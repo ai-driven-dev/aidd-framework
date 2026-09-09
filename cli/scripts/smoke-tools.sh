@@ -1,31 +1,15 @@
 #!/usr/bin/env bash
-# Full-surface smoke against the REAL remote framework + real built binary.
+# Full-surface smoke against the real built binary: every leaf command, the per-tool ones
+# looped over every AI tool and IDE tool, reported as a measured coverage percentage.
 #
-# Goal: exercise EVERY leaf command in the CLI surface, with the per-tool
-# commands looped over every AI tool (claude, cursor, copilot, codex, opencode)
-# and IDE tool (vscode). Prints a measured command-coverage percentage.
+# Hermetic by default — every setup reads the local framework fixture, so a run needs neither
+# the network nor a token and coverage never depends on one being reachable. SMOKE_REMOTE=1
+# adds the remote-fetch block at the end, which counts toward neither PASS/FAIL nor coverage
+# and is the only thing that exercises the fetch -> cache -> catalog-load path a fixture
+# cannot reach.
 #
-# Born from a production crash a user hit on install:
-#   Error: Invalid plugin manifest: "plugins" must be an array
-# The hermetic suites never touch the GitHub fetch -> cache -> catalog-load
-# path; this smoke does, including deliberate cache corruption.
-#
-# Hermetic by default: every setup uses the local framework fixture, so a run needs
-# neither the network nor a token, and coverage never depends on one being reachable.
-# Set SMOKE_REMOTE=1 to additionally exercise the opt-in remote-fetch block near the
-# end, which is skipped otherwise and counts toward neither PASS/FAIL nor coverage.
-#
-# Phase 18 moved the surface: `ai`/`ide` folded into `--tool`, `status`/`ai doctor`/
-# `ide doctor`/`plugin doctor` folded into `doctor`, `restore` renamed `sync`,
-# `self-update` renamed `update`, `framework build` renamed `translate`; `framework rules`
-# joined later. 33 leaf commands today — this file's ALL_COMMANDS below is the same count
-# `derived_leaves`
-# reads live off the built binary, `telemetry identity`'s four verbs (`use`/`off`/
-# `link`/`unlink`) included as their own leaves rather than folded into one.
-#
-# Measured 2026-08-21 (pre-phase-18): hermetic run 92s, 98 checks, 37/37 leaf commands.
-# The remote-gated version it replaces took 7 min 11 s and covered 11 invocations
-# when no GitHub token happened to be reachable.
+# `ALL_COMMANDS` below is compared against what `derived_leaves` reads live off the binary,
+# `telemetry identity`'s four verbs counted as leaves of their own.
 
 set -uo pipefail
 
@@ -60,9 +44,7 @@ skip() { SKIP=$((SKIP+1)); echo "  ~ $1"; }
 section() { echo; echo "=== $1 === [$(date +%H:%M:%S)]"; }
 
 PARENTS=" plugin marketplace auth framework telemetry "
-# `telemetry identity` is itself a parent, one level deeper than PARENTS above:
-# its own leaves are `use`/`off`/`link`/`unlink`, so a covered key needs three
-# words there, not two.
+# A parent one level deeper than PARENTS, so a covered key needs three words there, not two.
 GRANDPARENTS=" telemetry identity "
 derive_key() {
   local first="$1" second="${2:-}" third="${3:-}"
@@ -78,12 +60,9 @@ derive_key() {
 CMD_TIMEOUT="${SMOKE_CMD_TIMEOUT:-180}"   # hard ceiling per command (seconds)
 
 # run <name> <expect_exit(s, pipe-separated, e.g. "0" or "0|1")> <expect_substr|""> <cwd> -- <cli args...>
-# Timeout is enforced by perl's SIGALRM, which survives exec: perl arms alarm(),
-# execs node (replacing its own image), and the still-pending timer kills the node
-# process if it overruns. This is synchronous — no background job, no watchdog
-# subshell, no `wait` — so a hung or slow command can never wedge the harness; it
-# just surfaces as a TIMEOUT. Output goes to a tempfile (not a `$(...)` pipe), so a
-# grandchild that outlives the CLI cannot block on an inherited fd.
+# perl's SIGALRM survives the exec into node, so the timeout is synchronous — no background
+# job to wedge the harness. Output goes to a tempfile, never a `$(...)` pipe, so a grandchild
+# outliving the CLI cannot block on an inherited fd.
 run() {
   local name="$1" expect_exit="$2" expect="$3" cwd="$4"; shift 4
   [[ "${1:-}" == "--" ]] && shift
@@ -92,20 +71,17 @@ run() {
   tmpout=$(mktemp)
   ( cd "$cwd" && exec perl -e 'alarm shift; exec @ARGV' "$CMD_TIMEOUT" node "$CLI" "$@" ) >"$tmpout" 2>&1
   rc=$?
-  # Content guards scan the captured FILE with grep (C-level, O(n)). Do NOT fold the
-  # output into a bash var and test it with `${out//[[:space:]]/}`: bash 3.2's global
-  # pattern substitution with a character class is pathological (100% CPU, minutes)
-  # on a multi-KB report — e.g. `doctor`/`ai doctor` exiting 1 with a large drift
-  # report — and would wedge the entire harness instead of the command it guards.
+  # Content guards grep the captured FILE. Never fold it into a bash var and test with
+  # `${out//[[:space:]]/}`: bash 3.2's global pattern substitution with a character class is
+  # pathological on a multi-KB report and wedges the harness rather than the command.
   local silent=0 missing=0
   if [[ "$rc" -ne 0 ]] && ! grep -q '[^[:space:]]' "$tmpout"; then silent=1; fi
   if [[ -n "$expect" ]] && ! grep -qF -- "$expect" "$tmpout"; then missing=1; fi
   out=$(cat "$tmpout"); rm -f "$tmpout"
   # SIGALRM from perl's alarm surfaces as 142 (128+14) — a real overrun, not a normal exit.
   if [[ "$rc" -eq 142 ]]; then bad "$name (TIMEOUT >${CMD_TIMEOUT}s)" "$out"; return 1; fi
-  # Universal guard: any non-zero exit that prints NOTHING is a silent failure,
-  # whatever the command. Generalized form of the plugin-doctor bug (exit 1, empty
-  # stdout+stderr) — depends on no framework-specific strings.
+  # Any non-zero exit printing nothing is a silent failure, whatever the command — a guard
+  # that depends on no framework-specific string.
   if [[ "$silent" -eq 1 ]]; then bad "$name (silent exit $rc, no output)" "$out"; return 1; fi
   if [[ "|$expect_exit|" != *"|$rc|"* ]]; then bad "$name (exit $rc, want $expect_exit)" "$out"; return 1; fi
   if [[ "$missing" -eq 1 ]]; then bad "$name (missing '$expect')" "$out"; return 1; fi
@@ -118,23 +94,17 @@ new_project() { local p; p=$(mktemp -d "$TMPROOT/proj.XXXXXX"); (cd "$p" && git 
 # Deterministic pick from an unsorted listing: sort, then take the first line.
 first_file() { LC_ALL=C sort | head -1; }
 
-# Only the marketplaces catalog — NOT the per-target built-marketplace cache
-# (.aidd/cache/built/.../marketplace.json), which also matches a bare *marketplace.json glob.
-# `find` answers in directory order, which is neither sorted nor the same on two machines,
-# so the result goes through `first_file` rather than being trusted raw.
+# The marketplaces catalog alone, never the per-target built cache a bare `*marketplace.json`
+# glob would also match. `find` answers in directory order, so `first_file` decides.
 cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | first_file; }
 
-# The drift every restore case writes, and the string its check looks for again afterwards.
 # A marker rather than a bare newline: a blank line is invisible to `grep`, so a case that
 # appended one could only ever assert an exit code.
 DRIFT_MARK="SMOKE_DRIFT"
 
-# The file a case damages: the first regular file the manifest tracks, in a fixed order
-# (the `.sort()` below), for one tool or for all of them. Every case that drifts a file
-# reads its target from here, never from `find`, so the pick is the same on every machine.
-# Reading the manifest rather than `find`ing a `.md` survives a tool whose content its own
-# CLI registers and whose project directory holds nothing but settings; a tracked settings
-# file drifts and is repaired the same way.
+# The file a case damages, picked from the manifest in a fixed order rather than by `find`,
+# so it is the same on every machine — and so it survives a tool whose project directory
+# holds nothing but a settings file its own CLI registered.
 tracked_file() {
   node -e '
     const manifest = JSON.parse(require("fs").readFileSync(process.argv[1], "utf-8"));
@@ -144,8 +114,8 @@ tracked_file() {
   ' "$1/.aidd/manifest.json" "${2:-}"
 }
 
-# A restore that exits 0 having restored nothing is the exact failure #762 fixed in the
-# command. The exit code is checked by `run`; this is what checks the repair.
+# A restore exiting 0 having restored nothing is the failure this guards. `run` checks the
+# exit code; this checks the repair.
 repaired() {
   local name="$1" file="$2"
   if [[ -z "$file" ]]; then bad "$name (nothing was drifted to repair)"; return 1; fi
@@ -154,9 +124,8 @@ repaired() {
 }
 
 # ── build ───────────────────────────────────────────────────────
-# `pnpm smoke`/`pnpm smoke:full` already ran `pnpm build` before this script — this
-# script has no other caller — so rebuilding here would just be a second build of
-# the same source. Check the artifact exists instead of rebuilding it.
+# `pnpm smoke`/`pnpm smoke:full`, this script's only callers, already built. Check the
+# artifact exists instead of building it twice.
 [[ -f "$CLI" ]] || { echo "FATAL: $CLI missing — run 'pnpm build' first"; exit 1; }
 echo "Using built CLI: $CLI"
 
@@ -169,15 +138,10 @@ TOKEN="${AIDD_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 export AIDD_TOKEN="$TOKEN"
 
 # Only now, never earlier: `gh auth token` above reads the REAL home, and moving it first
-# makes every authenticated case silently unauthenticated.
-#
-# Three of the tools this harness loops over activate plugins through their own CLI, and
-# those write into the USER's home, not the project directory - a fresh /tmp project
-# isolates nothing there. Until this existed the harness sandboxed AIDD_USER_CONFIG_DIR for
-# every case and HOME for exactly one, so `plugin install --tool codex|copilot|claude` ran
-# against the real ~/.claude, ~/.codex and ~/.copilot of whoever typed `pnpm smoke`.
-# CODEX_HOME is separate because HOME does not move Codex: it reads that variable, and falls
-# back to the real ~/.codex when it is unset.
+# makes every authenticated case silently unauthenticated. Three of the tools looped over
+# below activate plugins through their own CLI, which writes into the user's home and not the
+# project, so a temp project isolates nothing without this. CODEX_HOME is separate because
+# HOME does not move Codex: it reads that variable and falls back to the real `~/.codex`.
 export HOME="$TMPROOT/home"; mkdir -p "$HOME"
 export CODEX_HOME="$TMPROOT/codex-home"; mkdir -p "$CODEX_HOME"
 
@@ -195,8 +159,7 @@ FW_OUT="$TMPROOT/fw-out"
 if run "translate --to claude" 0 "" "$ROOT" -- \
      translate "$FRAMEWORK_FIXTURE" --to claude --out "$FW_OUT"; then :; fi
 
-# --as flat: the other build mode. Phase 5 removes it for the four native tools, so this
-# invocation is the "before" that removal is compared against.
+# `--as flat` is the other build mode.
 FW_FLAT=$(mktemp -d "$TMPROOT/fw-flat.XXXXXX")
 run "translate --as flat" 0 "" "$ROOT" -- \
   translate "$FRAMEWORK_FIXTURE" --to claude --as flat --out "$FW_FLAT" --force
@@ -209,8 +172,7 @@ run "auth status (no creds)" 0 "" "$P_AUTH" -- auth status
 out=$(cd "$P_AUTH" && env HOME="$AUTH_HOME" node "$CLI" auth login --token deadbeefdeadbeef --level project 2>&1); rc=$?
 if [[ "$rc" -eq 0 || "$rc" -eq 1 ]]; then mark_covered "auth login"; ok "auth login (bogus token, no crash, exit $rc)"; else bad "auth login crashed (exit $rc)" "$out"; fi
 run "auth logout" 0 "" "$P_AUTH" -- auth logout
-# --gh asks the GitHub CLI for a token. With none reachable it must refuse cleanly
-# rather than hang or crash; that refusal is what is pinned here.
+# With no `gh` token reachable, `--gh` must refuse cleanly rather than hang or crash.
 run "auth login --gh (no credentials)" "0|1" "" "$P_AUTH" -- auth login --gh --level project
 
 
@@ -218,8 +180,8 @@ section "update --check"
 out=$(cd "$ROOT" && node "$CLI" update --check 2>&1); rc=$?
 if [[ "$rc" -eq 0 || "$rc" -eq 1 ]]; then mark_covered "update"; ok "update --check (exit $rc)"; else bad "update crashed (exit $rc)" "$out"; fi
 
-# --dry-run must not write. Running it in a set-up project and comparing the file
-# list before and after is the only assertion that proves it.
+# Comparing the file list before and after is the only assertion that proves `--dry-run`
+# wrote nothing.
 P_DRY=$(new_project)
 (cd "$P_DRY" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
 before_dry=$(cd "$P_DRY" && find . -type f | sort | md5)
@@ -234,24 +196,18 @@ fi
 section "marketplace add/list/remove (local source)"
 P_MKT=$(new_project)
 MKT_SRC="$TMPROOT/mkt-src"; mkdir -p "$MKT_SRC/.claude-plugin"
-# `owner` is required by the real claude binary's own marketplace schema — absent here,
-# every native registration against this fixture silently failed (best-effort, so aidd's
-# own exit code stayed 0) and was masked by aidd-framework's own project-scope local
-# registration landing in the same `.claude/settings.local.json`. Machine-scope
-# aidd-framework (`aidd-framework`'s scope is now `user`, so it no longer writes there)
-# stopped masking it, surfacing this fixture's own pre-existing defect.
+# `owner` is required by the real claude binary's own marketplace schema; without it every
+# native registration against this fixture fails best-effort, aidd still exiting 0.
 printf '%s' '{"name":"local-mkt","owner":{"name":"smoke"},"version":"1.0.0","plugins":[]}' > "$MKT_SRC/.claude-plugin/marketplace.json"
 (cd "$P_MKT" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
 run "marketplace add (local)" 0 "" "$P_MKT" -- marketplace add local "$MKT_SRC" --yes
 run "marketplace list" 0 "" "$P_MKT" -- marketplace list
 run "marketplace check" 0 "" "$P_MKT" -- marketplace check
 run "marketplace refresh" 0 "" "$P_MKT" -- marketplace refresh
-# --overwrite replaces a marketplace already registered under the same name; without
-# it the second add must refuse.
+# `--overwrite` replaces a name already registered; without it the second add must refuse.
 run "marketplace add (duplicate, no --overwrite)" 1 "" "$P_MKT" -- marketplace add local "$MKT_SRC" --yes
 run "marketplace add --overwrite" 0 "" "$P_MKT" -- marketplace add local "$MKT_SRC" --yes --overwrite
-# --scope decides where the registration lands. Passing it is not enough: the two
-# values must write to different places, which is what this compares.
+# Passing `--scope` is not enough: the two values must write to different places.
 P_SCOPE=$(new_project)
 (cd "$P_SCOPE" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
 run "marketplace add --scope project" 0 "" "$P_SCOPE" -- marketplace add scoped "$MKT_SRC" --yes --scope project
@@ -261,10 +217,8 @@ if [[ -f "$proj_reg" ]] && grep -q "scoped" "$proj_reg"; then
 else
   bad "--scope project did not write $proj_reg"
 fi
-# A second source, with its own manifest name: the tool keys its registry by the name
-# inside the marketplace, not by the name AIDD gave it, so two AIDD marketplaces sharing
-# a source cannot both be declared — and this check would then measure that collision
-# rather than the scope.
+# A second source with its own manifest name: the tool keys its registry by the name inside
+# the marketplace, so two aidd marketplaces sharing a source would collide rather than scope.
 USER_MKT_SRC="$TMPROOT/user-mkt-src"; mkdir -p "$USER_MKT_SRC/.claude-plugin"
 printf '%s' '{"name":"user-mkt","owner":{"name":"smoke"},"version":"1.0.0","plugins":[]}' > "$USER_MKT_SRC/.claude-plugin/marketplace.json"
 run "marketplace add --scope user" 0 "" "$P_SCOPE" -- marketplace add userscoped "$USER_MKT_SRC" --yes --scope user
@@ -273,20 +227,15 @@ if grep -q "userscoped" "$proj_reg" 2>/dev/null; then
 else
   ok "--scope user stays out of the project registry"
 fi
-# The checks above read AIDD's own registry. What actually matters is where the
-# registration reached the TOOL: claude declares a project marketplace at its local
-# scope, beside the project, and a user one in the home settings. Nothing else in the
-# suite sees this, and the e2e nets are blind to it by design — they strip the tool
-# binaries from PATH so their output does not depend on what is installed.
+# Where the registration reached the TOOL, which the checks above cannot see: claude declares
+# a project marketplace at local scope and a user one in the home settings. The e2e nets are
+# blind here by design — they strip the tool binaries from PATH.
 if command -v claude >/dev/null 2>&1; then
   claude_local="$P_SCOPE/.claude/settings.local.json"
   claude_home="$HOME/.claude/settings.json"
-  # Names the marketplace itself rather than the generic `extraKnownMarketplaces` key,
-  # which any declaration at all would satisfy, this one included by accident. Keyed by
-  # `local-mkt`, the catalog's own declared name — measured against a real run: this
-  # file is written keyed by `hostName`, never `scoped`, aidd's own local alias for this
-  # entry (`marketplace-entry.ts`'s `claudeStyleMarketplaceKey`, the same fact
-  # `nativeRegistrations` records `hostName` for elsewhere).
+  # Names the marketplace, not the generic `extraKnownMarketplaces` key any declaration would
+  # satisfy. Keyed by `local-mkt`, the catalog's own declared name: this file is written by
+  # `hostName`, never by `scoped`, aidd's local alias for the same entry.
   if [[ -f "$claude_local" ]] && grep -q '"local-mkt"' "$claude_local"; then
     ok "claude declares the project marketplace at local scope"
   else
@@ -297,14 +246,10 @@ if command -v claude >/dev/null 2>&1; then
   else
     bad "claude wrote no user-scope declaration in $claude_home"
   fi
-  # Match the marketplace NAME only. The path would match too, but for the wrong
-  # reason: a user-scope marketplace is built inside the project that registered it,
-  # so the home settings legitimately name that project's directory.
-  #
-  # Requires `"user-mkt"` present as well as `"local-mkt"` absent: a negative grep
-  # alone passes vacuously against a $claude_home that never got written at all (a
-  # native registration that silently failed end to end), which would report a leak
-  # was avoided when nothing was ever proven registered in the first place.
+  # The NAME only: a user-scope marketplace is built inside the project that registered it, so
+  # the home settings legitimately name that project's directory. `"user-mkt"` must be present
+  # as well as `"local-mkt"` absent, or a negative grep passes vacuously against a
+  # $claude_home nothing ever wrote.
   if [[ -f "$claude_home" ]] && grep -q '"user-mkt"' "$claude_home" \
     && ! grep -q '"local-mkt"' "$claude_home"; then
     ok "the project registration stayed out of the home settings"
@@ -321,16 +266,14 @@ run "marketplace remove" 0 "removed" "$P_MKT" -- marketplace remove local --yes
 # ════════════════════════════════════════════════════════════════
 # MAIN MATRIX — local fixture, no network, no token
 # ════════════════════════════════════════════════════════════════
-# Everything below runs against the local fixture, always. Coverage no longer depends
-# on whether a GitHub token happens to be available on the machine, which is what lets
-# this suite gate a build. The genuinely remote path is opted into separately, at the end.
+# Always the local fixture: coverage cannot depend on a token being available, or this suite
+# could not gate a build. The genuinely remote path is opted into separately, at the end.
 if true; then
   section "setup — full AI+IDE matrix (--ai all --ide all)"
   BASE=$(new_project)
   run "setup --ai all --ide all --plugins recommended" 0 "Installed" "$BASE" -- \
     setup --source local --path "$FRAMEWORK_FIXTURE" --ai all --ide all --plugins recommended --yes
-  # --release names a marketplace release tag; a local source ignores it, so this pins
-  # that passing it is accepted rather than rejected.
+  # A local source ignores `--release`, so this pins that passing it is accepted.
   P_REL=$(new_project)
   run "setup --release (local source)" 0 "" "$P_REL" -- \
     setup --source local --path "$FRAMEWORK_FIXTURE" --release v1.0.0 --ai claude --plugins none --yes
@@ -339,25 +282,18 @@ if true; then
       && ok "$t dir present" || bad "$t dir missing after --ai all"
   done
   [[ -d "$BASE/.vscode" ]] && ok "vscode dir present" || bad "vscode dir missing"
-  # Cursor is user-scope (installScope "user"): its plugin files never land under the
-  # project at all, only under $HOME. Every other tool above is checked inside "$BASE";
-  # nothing until now ever read $HOME/.cursor, so a regression there passed silently.
-  # The literal path is what this exact `--plugins recommended` run produces for the
-  # fixture's own "aidd-test" plugin, not a `find`: the isolation test forbids one.
+  # Cursor is `installScope: "user"`, so its plugin files land under $HOME and never under
+  # the project every other tool is checked in. The path is a literal of what this exact
+  # `--plugins recommended` run produces, never a `find`: the isolation test forbids one.
   cursor_plugin_file="$HOME/.cursor/plugins/local/aidd-test/.cursor-plugin/plugin.json"
   [[ -f "$cursor_plugin_file" ]] \
     && ok "cursor user-scope plugin file present under \$HOME" \
     || bad "cursor user-scope plugin file missing: $cursor_plugin_file"
 
-  # opencode-and-scope.md, Lot B: a plugin's hooks now trigger through a generated
-  # bridge under .opencode/plugin/ (the directory OpenCode's own loader imports
-  # in-process — nothing but a real plugin module belongs there), while every hook
-  # script itself is namespaced under .opencode/hooks/<plugin>/ instead. This counts
-  # non-.js files rather than picking one, so it never depends on find's own order.
-  # $FRAMEWORK_FIXTURE's own plugin ships only a PreToolUse hook — a mapped event
-  # (SessionStart/Stop/PostToolUse) generates no bridge for it, matching production's
-  # aidd-context — so .opencode/plugin/ existing at all is not asserted, only what it
-  # holds when it does.
+  # OpenCode's loader imports `.opencode/plugin/` in-process, so nothing but a real plugin
+  # module belongs there; hook scripts are namespaced under `.opencode/hooks/<plugin>/`.
+  # Counting non-.js files never depends on find's order, and the directory existing at all
+  # is not asserted: this fixture's plugin maps no bridged event.
   oc_plugin_dir="$BASE/.opencode/plugin"
   oc_hooks_dir="$BASE/.opencode/hooks"
   if [[ -d "$oc_plugin_dir" ]]; then
@@ -373,9 +309,8 @@ if true; then
     || bad "opencode .opencode/hooks/ missing or empty"
 
   section "global read-only commands (no crash)"
-  # doctor exits 1 by design when it finds drift/issues (e.g. framework-shipped broken
-  # references on a fresh --ai all install); 0 or 1 are both non-crash here, and
-  # the silent-exit guard above still rejects an exit 1 that prints nothing.
+  # doctor exits 1 by design on drift, so 0 and 1 are both non-crash here; the silent-exit
+  # guard above still rejects an exit 1 that prints nothing.
   run "doctor" "0|1" "" "$BASE" -- doctor
   for t in "${AI_TOOLS[@]}" vscode; do
     run "doctor --tool $t" "0|1" "" "$BASE" -- doctor --tool "$t"
@@ -428,26 +363,22 @@ if true; then
   for t in "${AI_TOOLS[@]}"; do
     run "plugin install aidd-test → $t" 0 "" "$P_PLUG" -- plugin install aidd-test --tool "$t" --yes
     run "plugin remove → $t" 0 "" "$P_PLUG" -- plugin remove aidd-test --tool "$t"
-    # --from names the marketplace explicitly; --scope must match what the tool supports.
+    # `--from` names the marketplace explicitly.
     run "plugin install --from → $t" 0 "" "$P_PLUG" -- \
       plugin install aidd-test --tool "$t" --from aidd-framework --yes
   done
   run "plugin remove aidd-test (claude)" 0 "" "$P_PLUG" -- plugin remove aidd-test --tool claude
 
-  # ── #286 update conflict guard ────────────────────────────────
-  # The hermetic e2e proves the guard on a fake tree; this pins it against the
-  # REAL remote framework files: a user-modified tracked file must BLOCK update
-  # in non-TTY (exit 1, demand --force) and --force must overwrite it (exit 0).
-  # `update` (bare) is self-update now and never touches project files — the
-  # project-wide sweep this guards lives at `framework update` since phase 18.
+  # ── update conflict guard ─────────────────────────────────────
+  # A user-modified tracked file must block `framework update` in a non-TTY (exit 1, demanding
+  # --force) and --force must overwrite it. Bare `update` is self-update and touches no
+  # project file, so the project-wide sweep this guards lives at `framework update`.
   section "framework update conflict guard (#286) — modified file blocks, --force overwrites"
   P_GUARD=$(new_project)
   (cd "$P_GUARD" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --ide vscode --plugins none --yes >/dev/null 2>&1)
-  # The blocking half runs outside `run()`: the drift plant that precedes a repair must sit
-  # directly above the run that repairs it, or `repaired` cannot be told which run to trust
-  # (the isolation test pairs the two by source position). The blocking command still gets
-  # its own exit-code and message assertions, plus the one thing `repaired` cannot check
-  # before a repair happens - that the file is still drifted, not silently cleaned.
+  # The blocking half runs outside `run()`: a drift plant must sit directly above the run that
+  # repairs it, since the isolation test pairs the two by source position. It keeps its own
+  # exit-code and message assertions, plus the check that the file is still drifted.
   gc=$(tracked_file "$P_GUARD" claude)
   if [[ -z "$gc" ]]; then
     bad "no tracked claude file in manifest (#286 guard)"
@@ -492,9 +423,8 @@ if true; then
   section "clean"
   P_CLEAN=$(new_project)
   (cd "$P_CLEAN" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
-  # Machine-local file install writes outside the manifest (never tracked, so a clean
-  # rejoining only tracked files used to leave it behind — measured in
-  # scope-native-clean-plan.md §1.2).
+  # A machine-local file is installed outside the manifest, so a clean that reads only tracked
+  # files leaves it behind.
   mkdir -p "$P_CLEAN/.claude" && echo '{}' > "$P_CLEAN/.claude/settings.local.json"
   run "clean --force" 0 "" "$P_CLEAN" -- clean --force
   [[ ! -d "$P_CLEAN/.aidd" ]] && ok ".aidd removed after clean" || bad ".aidd survived clean"
@@ -503,8 +433,7 @@ if true; then
     || bad ".claude/settings.local.json survived clean"
 
   # ── telemetry ────────────────────────────────────────────────
-  # The switch and everything it gates, against the real binary. HOME and
-  # AIDD_USER_CONFIG_DIR are both under TMPROOT, so `forget` deletes a sandbox and
+  # HOME and AIDD_USER_CONFIG_DIR are both under TMPROOT, so `forget` deletes a sandbox and
   # never a person's own profile.
   section "telemetry"
   P_TEL=$(new_project)
@@ -513,8 +442,7 @@ if true; then
   [[ -f "$P_TEL/.aidd/config.json" ]] && ok "telemetry on writes the switch" || bad "no .aidd/config.json after telemetry on"
   run "telemetry identity use" 0 "" "$P_TEL" -- telemetry identity use
   run "telemetry identity off" 0 "" "$P_TEL" -- telemetry identity off
-  # link/unlink both require a real identifier to act on; --help pins that the leaf
-  # exists and parses, without fabricating one that would mutate the profile.
+  # link/unlink need a real identifier, so `--help` pins the leaf without mutating a profile.
   run "telemetry identity link --help" 0 "" "$P_TEL" -- telemetry identity link --help
   run "telemetry identity unlink --help" 0 "" "$P_TEL" -- telemetry identity unlink --help
   run "telemetry read" 0 "" "$P_TEL" -- telemetry read
@@ -522,11 +450,9 @@ if true; then
   run "telemetry off" 0 "" "$P_TEL" -- telemetry off
   run "telemetry forget --yes" 0 "" "$P_TEL" -- telemetry forget --yes
 
-  # A repository lefthook owns regenerates prepare-commit-msg from lefthook.yml on every
-  # install, wiping any line `telemetry on` would otherwise append. It must print the job to
-  # add by hand instead of a false "commits will carry a trailer" promise — hermetic, a
-  # marker file is all detection reads, never a real lefthook binary. Same leaf command
-  # ("telemetry on") the cell above already covers, so leaf-command coverage stays honest.
+  # A lefthook-owned repository regenerates prepare-commit-msg on every install, wiping any
+  # line `telemetry on` appends, so it must print the job to add by hand instead of promising
+  # a trailer. Detection reads a root marker file, never a real lefthook binary.
   P_TEL_LEFTHOOK=$(new_project)
   cat > "$P_TEL_LEFTHOOK/lefthook.yml" <<'LEFTHOOK_YML'
 pre-commit:
@@ -536,12 +462,9 @@ pre-commit:
 LEFTHOOK_YML
   run "telemetry on --yes (lefthook-owned hook)" 0 "prepare-commit-msg:" "$P_TEL_LEFTHOOK" -- telemetry on --yes
 
-  # B-B1 (lot 9 review): `on` writes the delegate to the common git dir once a manager owns
-  # prepare-commit-msg, ignoring core.hooksPath — husky routes that setting under `.husky/`.
-  # `off` used to resolve through the core.hooksPath-following path instead, so under this
-  # exact divergence it found nothing to delete and reported nothing removed. Real built
-  # binary, real `git config core.hooksPath`, no fake lefthook/husky binary needed since
-  # detection reads a root marker only.
+  # Once a manager owns prepare-commit-msg, `on` writes the delegate to the common git dir and
+  # ignores core.hooksPath, which husky routes under `.husky/`; `off` must resolve the same way
+  # or it finds nothing to delete under exactly this divergence.
   P_TEL_HUSKY=$(new_project)
   mkdir -p "$P_TEL_HUSKY/.husky"
   cat > "$P_TEL_HUSKY/.husky/prepare-commit-msg" <<'HUSKY_HOOK'
@@ -564,21 +487,17 @@ fi
 # ════════════════════════════════════════════════════════════════
 # REMOTE — opt-in, proves the fetch path only
 # ════════════════════════════════════════════════════════════════
-# Everything above uses the local fixture. This one section is what a fixture cannot
-# prove: that fetching a framework from a real remote source works. It is opted into
-# explicitly rather than triggered by whatever credentials the machine happens to hold.
+# What a fixture cannot prove: that fetching a framework from a real remote source works.
+# Opted into explicitly, never triggered by whatever credentials the machine happens to hold.
 if [[ -n "${SMOKE_REMOTE:-}" ]]; then
   section "remote fetch (opt-in)"
   P_REMOTE=$(new_project)
   run "setup --source remote" 0 "" "$P_REMOTE" -- setup --source remote --ai claude --plugins none --yes
 
-  # Kept remote on purpose: it corrupts the FETCHED catalog cache
-  # (.aidd/cache/marketplaces), which only a remote source populates. A local source
-  # is read directly, and its built cache is regenerated rather than trusted — verified
-  # by corrupting it and watching the install succeed anyway.
-  # ── corrupt-cache fault injection (seed regression) ───────────
-  # aidd-dev, not the fixture plugin: this section installs from the really published
-  # marketplace, which does not serve aidd-test. --plugins none above leaves it absent.
+  # ── corrupt-cache fault injection ─────────────────────────────
+  # Remote on purpose: it corrupts the fetched catalog cache, which only a remote source
+  # populates — a local source is read directly and its built cache regenerated. The plugin is
+  # `aidd-dev` because the published marketplace does not serve the fixture's own.
   section "corrupt-cache fault injection × malformed shapes"
   BAD_SHAPES=(
     '{"message":"API rate limit exceeded"}'
@@ -588,26 +507,19 @@ if [[ -n "${SMOKE_REMOTE:-}" ]]; then
   )
   for shape in "${BAD_SHAPES[@]}"; do
     p=$(new_project)
-    # --plugins none on purpose: with the plugin already installed, the install below
-    # refuses on "already installed" and never reads the corrupt catalog, which is how
-    # this scenario silently stopped testing anything.
+    # `--plugins none` on purpose: an already-installed plugin makes the install below refuse
+    # before it ever reads the corrupt catalog.
       (cd "$p" && node "$CLI" setup --source remote --ai claude --plugins none --yes >/dev/null 2>&1)
     catalog=$(cache_catalog "$p")
     if [[ -z "$catalog" ]]; then bad "no cached catalog (shape: $shape)"; continue; fi
     printf '%s' "$shape" > "$catalog"
     out=$(cd "$p" && node "$CLI" plugin install aidd-dev --yes 2>&1); rc=$?
-    # A fetched catalog is a cache, and the rule for CLI-owned files is to regenerate
-    # rather than to error. So recovering from a corrupt one is the behavior to pin,
-    # not an error message to demand. This used to assert the opposite, and stopped
-    # holding without anyone noticing.
-    #
-    # Either outcome is acceptable as long as it is coherent: recover silently, or
-    # fail with a message that says what to run. Failing with neither is the defect.
+    # A fetched catalog is a cache, and a CLI-owned file is regenerated rather than errored
+    # over. Either outcome is coherent — recover silently, or fail naming what to run —
+    # and failing with neither is the defect.
     if [[ "$rc" -eq 0 ]]; then
-      # Assert what a user sees, not whether the cache file was rewritten: the CLI
-      # must keep working with the corrupt catalog still on disk. Three of the four
-      # shapes do rewrite it, `{ truncated` does not — an internal difference that
-      # would make a cache-file assertion flap for no user-visible reason.
+      # What a user sees, never whether the cache file was rewritten: only some shapes rewrite
+      # it, an internal difference that would make such an assertion flap.
       if (cd "$p" && node "$CLI" plugin list >/dev/null 2>&1); then
         ok "corrupt → recovered, CLI still usable (${shape:0:22})"
       else
@@ -627,13 +539,9 @@ else
 fi
 
 # ── coverage report ─────────────────────────────────────────────
-# The list above is written by hand; the binary is what a person actually gets. A command
-# added to the CLI and not to that list reads as 100% covered while nothing ever ran it —
-# which is exactly what twelve telemetry commands did through a whole merge, with this
-# report saying 22/22 the entire time. Genuinely recursive, not one level deep: a parent
-# whose own children are themselves parents (`telemetry identity`, one level under
-# PARENTS) used to read as a single leaf, so its four real leaves (`use`/`off`/`link`/
-# `unlink`) went unlisted and uncovered under one name nothing in ALL_COMMANDS matched.
+# `ALL_COMMANDS` is written by hand and the binary is what a person gets, so a command added
+# to one and not the other reads as covered while nothing ever ran it. Recursive rather than
+# one level deep: a parent whose own children are parents would otherwise read as one leaf.
 has_subcommands() {
   node "$CLI" "$@" --help 2>/dev/null | grep -q '^Commands:'
 }
@@ -680,8 +588,8 @@ echo "PASS: $PASS   FAIL: $FAIL   SKIP: $SKIP   ·   coverage ${pct}%"
 if [[ "$FAIL" -gt 0 ]]; then
   echo; echo "Failures:"; for f in "${FAILURES[@]}"; do echo "  • $f"; echo; done
 fi
-# Fail the smoke if anything broke OR coverage fell below 95%. Neither check is
-# gated on a token: the hermetic matrix above runs the same either way.
+# Neither the failure check nor the 95% coverage floor is gated on a token: the hermetic
+# matrix above runs the same either way.
 if [[ "$FAIL" -gt 0 ]]; then exit 1; fi
 if [[ "$pct" -lt 95 ]]; then echo "Coverage below 95% threshold."; exit 1; fi
 exit 0

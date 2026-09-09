@@ -1,36 +1,25 @@
 /**
- * Generates OpenCode's event bridge for one plugin's hooks.json (opencode-and-scope.md,
- * Lot B). OpenCode's loader scans no "hooks" family (F3, opencode-paths.ts) and this
- * profile writes no hooks.json at all (build.ts's `skipHooksJson`) — without this module a
- * plugin's declared hooks have no trigger on OpenCode whatsoever. The generated file is a
- * real OpenCode plugin (`export const`, only one function-valued export — F6): it spawns
- * the same scripts every other host's hooks.json already names, over the stdin-JSON
- * contract those scripts already read (`hook_event_name`, `session_id`, `cwd`, and for a
- * tool event `tool_name`/`tool_input` — plugins/aidd-context/hooks/update_memory.js reads
- * only `cwd` via its own `process.cwd()`, which the spawn's `cwd` option sets correctly).
+ * Generates OpenCode's event bridge for one plugin's hooks.json. OpenCode's loader scans no
+ * "hooks" family and this profile writes no hooks.json, so without this module a plugin's
+ * declared hooks have no trigger on OpenCode at all. The generated file is a real OpenCode
+ * plugin, one function-valued export, spawning the same scripts every other host's hooks.json
+ * already names over the stdin-JSON contract those scripts already read.
  *
- * Only three hooks.json events are mapped; anything else is dropped, because OpenCode's
- * plugin surface delivers no event these hooks could otherwise ride on:
+ * Only three events map; anything else is dropped, OpenCode's plugin surface delivering no
+ * event those hooks could ride on:
  *
- * - `SessionStart` runs once, when the generated plugin's own factory is called — this is
- *   an approximation, not "once per session". OpenCode's `session.created` is published on
- *   its bus but was never observed delivered to a plugin's `event` hook (measured
- *   2026-08-31, plugins/aidd-telemetry/hooks/opencode-plugin.js:53-56 and its own README),
- *   and the factory itself runs once per server/directory, not once per session. Safe only
- *   for an idempotent hook: every `SessionStart` hook this generator sees today is
- *   (`update_memory.js` rewrites a fixed delimited block, so replaying it changes nothing).
+ * - `SessionStart` runs when the generated plugin's own factory is called — once per
+ *   server/directory, not once per session, since `session.created` is published on OpenCode's
+ *   bus but was never observed delivered to a plugin's `event` hook. Safe only for an
+ *   idempotent hook, which every `SessionStart` hook this generator sees today is.
  * - `Stop` maps to `session.idle`, delivered once per turn.
- * - `PostToolUse` maps to `message.part.updated` whose `part.state.status === "completed"`
- *   — the one shape measured live against a running OpenCode (opencode-plugin.js:100-106,
- *   scripts/__tests__/fixtures/opencode-tool-part-completed.json: `part.tool` names the
- *   tool, `part.state.input` is its arguments). `tool.execute.after` reads cleaner in
- *   OpenCode's own docs (https://opencode.ai/docs/plugins/, "Tool Events") but is a
- *   separate named hook `(input, output)`, not an `event({event})` payload, and nothing in
- *   this repository has ever captured it — not adopted (opencode-and-scope.md, Lot B).
+ * - `PostToolUse` maps to `message.part.updated` whose `part.state.status === "completed"`, the
+ *   one shape measured live: `part.tool` names the tool, `part.state.input` its arguments.
+ *   `tool.execute.after` reads cleaner in OpenCode's own docs but is a separate named hook
+ *   `(input, output)`, never an `event({event})` payload, and nothing here has captured it.
  *
  * A `matcher` on a `PostToolUse` group filters by tool name, exact or pipe-separated
- * alternation — the same convention profiles/codex/profile.ts's own SessionStart matcher
- * ("startup|resume") already uses; absent, every tool matches.
+ * alternation; absent, every tool matches.
  */
 
 interface ParsedHookCall {
@@ -63,8 +52,7 @@ interface ClaudeHooksShape {
 }
 
 // Only a command this generator can actually replay: `node ${CLAUDE_PLUGIN_ROOT}/hooks/<rel>
-// [args...]`. A hooks.json entry invoking anything else (a shell script run directly, no
-// "node " prefix) is a shape only Claude's own settings.json target ever runs, and is
+// [args...]`. Anything else is a shape only Claude's own settings.json target ever runs, and is
 // dropped here rather than guessed at.
 const COMMAND_PATTERN = /^node\s+\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/(\S+)(.*)$/;
 
@@ -89,11 +77,10 @@ function parseGroups(groups: readonly ClaudeMatcherGroup[] | undefined): ParsedP
   return calls;
 }
 
-/** Pure: a plugin's raw hooks.json (still carrying `${CLAUDE_PLUGIN_ROOT}`, unrewritten —
- * the generated bridge resolves its scripts from its own `import.meta.url`, so the
- * outDir-relative rewrite every other flat target needs buys this one nothing) reduced to
- * the three mapped events. Exported for the generator's own unit test, never used outside
- * this module otherwise. */
+/** A plugin's raw hooks.json — still carrying `${CLAUDE_PLUGIN_ROOT}`, since the generated
+ * bridge resolves its scripts from its own `import.meta.url` and the outDir-relative rewrite
+ * every other flat target needs buys this one nothing — reduced to the three mapped events.
+ * Exported for the generator's own unit test. */
 export function parseHooksJsonForBridge(rawHooksJson: string): OpencodeHookTable {
   const parsed = JSON.parse(rawHooksJson) as ClaudeHooksShape;
   const hooks = parsed.hooks ?? {};
@@ -104,9 +91,8 @@ export function parseHooksJsonForBridge(rawHooksJson: string): OpencodeHookTable
   };
 }
 
-// Every plugin this generator sees is already named "aidd-<something>", so hardcoding an
-// "Aidd" prefix here would stutter ("AiddAiddContextHooks") rather than name anything a
-// prefix wouldn't already say — the plugin's own name, PascalCased, already carries it.
+// Every plugin this generator sees is already named "aidd-<something>", so an "Aidd" prefix
+// here would stutter rather than name anything the plugin's own PascalCased name does not.
 function toIdentifier(plugin: string): string {
   const pascal = plugin
     .split("-")
@@ -120,10 +106,9 @@ function callTableLiteral(calls: readonly ParsedHookCall[]): string {
   return JSON.stringify(calls);
 }
 
-/** Pure: a plugin's raw hooks.json + its name -> the full text of its generated OpenCode
- * bridge module, or `null` when none of the three mapped events named anything replayable
- * (an empty hooks.json, or one carrying only an unmapped event such as `PreToolUse`) — a
- * bridge with nothing to spawn is not a file worth writing. */
+/** A plugin's raw hooks.json + its name -> the full text of its generated OpenCode bridge
+ * module, or `null` when none of the three mapped events named anything replayable — a bridge
+ * with nothing to spawn is not a file worth writing. */
 export function generateOpencodeHooksBridge(rawHooksJson: string, plugin: string): string | null {
   const table = parseHooksJsonForBridge(rawHooksJson);
   if (

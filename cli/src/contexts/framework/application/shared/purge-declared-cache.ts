@@ -6,21 +6,11 @@ import type { Logger } from "../../../../kernel/ports/logger.js";
 import { isStrictlyWithinUserScope } from "../../domain/plugins/user-scope-containment.js";
 
 /**
- * The one containment whitelist every purge of a host's own declared cache shares:
- * `clean`'s marketplace-level purge (`CleanUseCase.purgeOneMarketplaceCache`) and
- * `plugin remove`'s own plugin-level purge (`PluginRemoveUseCase.removeCachedPlugin`)
- * both call this before either decides *when* it is safe to delete, so the containment
- * check has one home instead of two copies drifting apart.
- *
- * Returns `<cacheRoot>/<relativeSegments>` once its real, `realpath`-resolved location
- * is proven to sit strictly inside `cacheRoot` — never on the manifest's word alone,
- * since `relativeSegments` (a `hostName`, or `hostName/pluginName`) is data a corrupted
- * entry could carry a `..` segment in, or a path a symlink could have escaped through
- * after install. `null` for a `cacheRoot` or candidate that does not exist (silent — a
- * cache path `clean` cannot even find is nothing to purge) or a `realpath` call that
- * failed for any other reason (EACCES, ELOOP… — named and kept, never left to abort
- * whatever else the caller still has to do), or one that resolves outside `cacheRoot`
- * (named and kept).
+ * Returns `<cacheRoot>/<relativeSegments>` once its real, `realpath`-resolved location is proven to
+ * sit strictly inside `cacheRoot` — never on the manifest's word alone, since `relativeSegments` is
+ * data a corrupted entry could carry a `..` segment in, or a path a symlink could have escaped
+ * through after install. `null` for a root or candidate that does not exist (silent), a `realpath`
+ * that failed for any other reason (named and kept), or one resolving outside it (named and kept).
  */
 export async function resolveCacheCandidate(
   fs: FileReader,
@@ -51,12 +41,10 @@ export async function resolveCacheCandidate(
 }
 
 /**
- * Deletes an already-`resolveCacheCandidate`d path once two proofs both hold, neither
- * one alone: `confirmed` — the host's own CLI actually reported success removing
- * whatever this path names, never assumed from the manifest's word — and, only then,
- * the directory itself proven empty, recursively, the one fact this function can read
- * back without a registry to reread. Either missing keeps the path in place and names
- * why. A directory that no longer exists is nothing to purge either, silently.
+ * Deletes an already-`resolveCacheCandidate`d path once two proofs both hold, neither one alone:
+ * `confirmed`, the host's own CLI reporting success, and the directory itself proven empty — the
+ * one fact this can read back without a registry to reread. Either missing keeps the path and names
+ * why; a directory that no longer exists is nothing to purge, silently.
  */
 export async function purgeCacheIfEmptyAndConfirmed(
   fs: FileReader & FileWriter,

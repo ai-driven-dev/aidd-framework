@@ -20,11 +20,8 @@ interface HooksDeclaringTool {
 }
 
 /**
- * A tool declares whether it runs a delivered hook once, on its own PluginsCapability
- * (acceptsHooks). The flat build contract used by `aidd setup` and `aidd framework build`
- * has to agree — this is the state OpenCode was in: acceptsHooks: true declared, and a
- * build contract that still hard-coded `hooks: { supported: false }` on a route no
- * declaration change could reach.
+ * A tool declares whether it runs a delivered hook once, on its own `acceptsHooks`. A build
+ * contract hard-coding its own answer would sit on a route no declaration can reach.
  */
 const FLAT_CONTRACTS: ReadonlyArray<[HooksDeclaringTool, () => ToolBuildContract]> = [
   [claude, buildClaudeFlatContract],

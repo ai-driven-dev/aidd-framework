@@ -104,17 +104,15 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       }),
       plugins: new PluginsCapability({
         mode: "native",
-        // Empty pluginsDir so translateNativeWithPaths computes pluginRoot = "<pluginName>/"
-        // (base-relative keys like "aidd-context/commands/foo.md" per D2).
+        // Empty so the translator computes pluginRoot as `<pluginName>/`, giving base-relative
+        // keys such as "aidd-context/commands/foo.md".
         pluginsDir: "",
         pluginManifestRelativePath: null,
-        // plugin-local: Cursor auto-discovers mcp.json at the plugin root, but never a
-        // plugin-scope hooks.json — three probes (headless/interactive, auto-discovered
-        // and explicit --plugin-dir, with and without a manifest) fired zero of seven
-        // events. Only a project-scope .cursor/hooks.json is ever observed firing, so
-        // hooksDestination routes hooks there instead of here; hooksRelativePath and
-        // hooksContentFormat stay declared for the shape they still describe but are no
-        // longer read for Cursor's own install.
+        // Cursor auto-discovers mcp.json at a plugin's root but never a plugin-scope
+        // hooks.json — three probes fired zero of seven events. Only a project-scope
+        // .cursor/hooks.json is ever observed firing, so `hooksDestination` routes hooks there;
+        // `hooksRelativePath` and `hooksContentFormat` stay declared for the shape they
+        // describe but are no longer read for Cursor's own install.
         acceptsHooks: true,
         pluginRootToken: CURSOR_PLUGIN_ROOT_TOKEN,
         hooksRelativePath: "hooks.json",

@@ -41,7 +41,6 @@ async function installPlugin(
   });
 }
 
-/** RecordingPrompter for tracking resolveConflict calls */
 class RecordingPrompter extends OverwritePrompter {
   readonly calls: Array<{ relativePath: string; reason: "deleted" | "modified" }> = [];
   private readonly response: "keep" | "overwrite";

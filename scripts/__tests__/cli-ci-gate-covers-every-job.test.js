@@ -9,11 +9,9 @@ const root = path.resolve(__dirname, "../..");
 const cliCiWorkflow = () =>
   yaml.load(fs.readFileSync(path.join(root, ".github/workflows/cli-ci.yml"), "utf8"));
 
-// #757 and #759 both merged with `cli CI`'s real jobs red, because no required check
-// named a single one of them — the rulesets only required `lefthook` and `Commitlint`.
-// `gate` fans every job in, so a future job silently missing from its `needs` is the same
-// bug again with a different name. Written once, kept true by construction: this reads
-// the job list live off the workflow rather than duplicating it by hand.
+// A pull request merges with `cli CI`'s real jobs red when no required check names one of
+// them. `gate` fans every job in, so a job silently missing from its `needs` is that bug
+// again: this reads the job list live off the workflow rather than duplicating it by hand.
 test("cli-ci.yml's gate job needs every other job in the workflow", () => {
   const jobs = cliCiWorkflow().jobs;
   const everyOtherJob = Object.keys(jobs)

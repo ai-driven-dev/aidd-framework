@@ -35,8 +35,8 @@ class RecordingFileAdapter extends InMemoryFileAdapter {
   }
 }
 
-// Cursor Mode B: file key is base-relative (no absolute prefix, relative to the
-// resolved user plugins dir) — same shape as status-plugin-user-scope.unit.test.ts.
+// Cursor Mode B: the file key is base-relative — no absolute prefix, resolved against
+// the user plugins dir.
 const PLUGIN_KEY = "aidd-context/commands/hello.md";
 
 describe("clean", () => {
@@ -368,10 +368,8 @@ describe("clean", () => {
 
       expect(activator.uninstalledPlugins).toEqual([REF]);
       expect(activator.removedMarketplaces).toEqual([]);
-      // Bloquant/dette 9: the message used to name only one of the three things that
-      // actually survive — the host's own registration. `userConfigDir()/marketplaces.json`
-      // (the entry `MarketplaceRegisterFrameworkUseCase` wrote) and the tool's own
-      // plugin cache both survive it too, and neither was named.
+      // The message must name all three survivors: the host's own registration,
+      // `userConfigDir()/marketplaces.json`, and the tool's own plugin cache.
       const message = logger.warnMessages.find(
         (m) => m.includes(MARKETPLACE) && m.includes("shared by every project")
       );
@@ -421,13 +419,8 @@ describe("clean", () => {
         return registry;
       }
 
-      // The regression itself: before scope threading existed, `enablePlugin` carried
-      // no scope argument at all, so a real `claude` binary always registered at its
-      // own implicit default, `"user"`, regardless of what the manifest recorded for
-      // the plugin's own files (`"project"`, since claude's files always install to
-      // the project). `clean`'s default-scope uninstall used to try `"project"` only,
-      // which a real `claude` binary refuses outright for an entry registered at a
-      // different scope — the plugin survived every `clean` run silently.
+      // A real `claude` binary registers at its own implicit default `"user"` whatever the
+      // manifest recorded, so a `"project"`-only uninstall left the plugin behind silently.
       it("falls back to the other scope when the manifest's own scope does not match what was actually registered, with no host registry to ask", async () => {
         const manifest = seedClaudeManifest("project");
         const fs = new InMemoryFileAdapter();
@@ -536,9 +529,8 @@ describe("clean", () => {
         // The host-side guard already in place: the shared marketplace is never
         // unregistered from claude/codex/copilot by a single project's own `clean`.
         expect(activator.removedMarketplaces).toEqual([]);
-        // The project-side bookkeeping this lot adds: only this project's own claim
-        // is dropped, and the other project — reading the very same registry — still
-        // finds the marketplace registered.
+        // Only this project's own claim is dropped, and the other project — reading the
+        // very same registry — still finds the marketplace registered.
         expect(await userSourceReferences.listAllReferencingProjects()).toContain(
           OTHER_PROJECT_ROOT
         );
@@ -584,10 +576,8 @@ describe("clean", () => {
         expect(message).toContain("Still referenced by 1 other project on this machine.");
       });
 
-      // Decision 4: the singular case above pins "1 other project"; nothing pinned the
-      // plural until now, and a verb-agreement bug hides exactly there ("2 ... reference"
-      // reads fine only because English rarely conjugates a plural verb visibly — the
-      // passive phrasing sidesteps the question for either count).
+      // A verb-agreement bug hides in the plural alone: the passive phrasing sidesteps the
+      // question for either count, so only the plural case can pin it.
       it("names the plural correctly when more than one other project still references the source", async () => {
         const manifest = seedManifestWithNativeRegistrations();
         const fs = new InMemoryFileAdapter();
@@ -714,12 +704,8 @@ describe("clean", () => {
         );
       });
 
-      // S2 (lot 8 review): the preview used to read `countReferencesForProject`, scoped
-      // to this project's own version key alone — with the two projects synced under
-      // two different CLI versions, the other project's own claim, recorded under a
-      // key this project never touches, would never be counted at all.
-      // `listAllReferencingProjects()` reads across every key, matching what the guard
-      // and the survival warning both already act on.
+      // Two projects synced under different CLI versions record their claims under two
+      // different keys, so only a read across every key sees the other project's.
       it("names the other project in a dry-run even when the two projects were recorded under different CLI versions", async () => {
         const manifest = seedManifestWithNativeRegistrations();
         const fs = new InMemoryFileAdapter();
@@ -757,13 +743,8 @@ describe("clean", () => {
         expect(result.preview.sharedSourceOtherProjects).toEqual([OTHER_PROJECT_ROOT]);
       });
 
-      // Bloquant found in review: `clean` used to ask a `VersionReader` for "the current
-      // CLI version" and decrement that key — wrong whenever the running binary has
-      // self-updated since the `sync` that wrote the reference (the ordinary case, not
-      // an edge case), since the reference sits under the *older* version it was
-      // recorded at. `CleanUseCase` no longer has a version reader to ask at all: this
-      // seeds the reference under an old build's version key with no "current version"
-      // wired in anywhere, and proves `clean` still finds and drops it.
+      // A reference sits under the CLI version that wrote it, which the running binary may
+      // have moved past; `CleanUseCase` has no version reader and must still find it.
       it("drops this project's reference even though it was recorded under an older CLI version", async () => {
         const manifest = seedManifestWithNativeRegistrations();
         const fs = new InMemoryFileAdapter();
@@ -780,9 +761,8 @@ describe("clean", () => {
           })
         );
         const userSourceReferences = seedReferences(fs, [PROJECT_ROOT, OTHER_PROJECT_ROOT]);
-        // Both projects registered while the CLI was still at 0.9.0 — the machine may
-        // since have self-updated any number of times, and this use case has no way
-        // to know or care what version is "current" today.
+        // Both projects registered at an older CLI version — this use case has no way to
+        // know or care what version is "current" today.
         await userSourceReferences.addReference("0.9.0", PROJECT_ROOT);
         await userSourceReferences.addReference("0.9.0", OTHER_PROJECT_ROOT);
         const logger = new CapturingLogger();
@@ -810,10 +790,8 @@ describe("clean", () => {
         expect(message).toContain("Still referenced by 1 other project on this machine.");
       });
 
-      // Bloquant found in review: `references.json` is a help, not an authority — a
-      // corrupted copy must never block the destructive command that does not depend
-      // on it. Before the guard, both the dry-run preview and the `--force` drop threw
-      // `UnreadableUserSourceReferencesError` straight out of `execute`.
+      // `references.json` is a help, not an authority — a corrupted copy must never block
+      // the destructive command that does not depend on it.
       it("warns and still previews a dry-run when references.json is corrupted", async () => {
         const manifest = seedManifestWithNativeRegistrations();
         const fs = new InMemoryFileAdapter();
@@ -915,9 +893,8 @@ describe("clean", () => {
 
       expect(activator.uninstalledPlugins).toEqual([]);
       expect(activator.removedMarketplaces).toEqual([]);
-      // The cache `purgeNativeCaches` never even gets to consider — this tool's
-      // absent binary means `undone` never carries it — must still be named, the
-      // same absolute path the dry-run preview would have announced.
+      // The cache `purgeNativeCaches` never gets to consider — this tool's absent binary
+      // keeps it out of `undone` — must still be named, by the same absolute path.
       const survivingCache = join(homedir(), ".codex", "plugins", "cache", MARKETPLACE);
       expect(
         logger.warnMessages.some(
@@ -1227,9 +1204,8 @@ describe("clean", () => {
   });
 });
 
-/** Records `uninstallPlugin`/`removeMarketplace` calls in the order they happen, so a
- * test can assert one came before the other without depending on `FakeNativePluginActivator`'s
- * two separate arrays. */
+/** Records `uninstallPlugin`/`removeMarketplace` calls in the order they happen, so a test
+ * can assert one came before the other. */
 class OrderRecordingActivator implements NativePluginActivator {
   constructor(private readonly calls: string[]) {}
   isAvailable(): boolean {
@@ -1253,8 +1229,7 @@ class OrderRecordingActivator implements NativePluginActivator {
 }
 
 /** Runs `onRemoveMarketplace` at the exact moment `removeMarketplace` is called, so a test
- * can inspect filesystem state as of that call — proving native undo happens before the
- * built marketplace tree it depends on is deleted. */
+ * can prove native undo happens before the built tree it depends on is deleted. */
 class AssertingActivator implements NativePluginActivator {
   constructor(private readonly onRemoveMarketplace: () => void | Promise<void>) {}
   isAvailable(): boolean {

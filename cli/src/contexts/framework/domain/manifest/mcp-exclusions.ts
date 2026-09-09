@@ -1,10 +1,5 @@
 import { type McpExclusion, mcpExclusionEquals } from "../../../tools/domain/mcp-exclusion.js";
 
-// ── McpExclusion set operations ─────────────────────────────────────────────
-// Extracted from Manifest's four exclusion methods: add (deduped), remove, and their
-// shared serialization shape. `clear` and `get` are trivial enough to stay inline at
-// the call site.
-
 export interface McpExclusionData {
   configPath: string;
   entryKey: string;

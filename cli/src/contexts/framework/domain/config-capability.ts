@@ -8,14 +8,12 @@ export type ConfigCapability = McpCapability | HooksCapability | SettingsCapabil
 export function extractConfigCapabilities(config: ToolConfig): ConfigCapability[] {
   const result: ConfigCapability[] = [];
 
-  // IDE tools expose settings directly
   if ("settings" in config) {
     const s = (config as { settings: unknown }).settings;
     if (s instanceof SettingsCapability) result.push(s);
     else if (Array.isArray(s)) result.push(...(s as SettingsCapability[]));
   }
 
-  // AI tools expose capabilities bag
   if (config.kind === "ai") {
     const aiCaps = config.capabilities as Record<string, unknown>;
     if (typeof aiCaps === "object" && aiCaps !== null) {

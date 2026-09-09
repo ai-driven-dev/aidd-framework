@@ -51,7 +51,8 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
     try {
       await rm(path, { force: true });
     } catch {
-      // No error if missing
+      // `force` already covers absence; what is swallowed here is a refusal to delete
+      // something that is there, which must not fail an uninstall midway.
     }
   }
 
@@ -194,8 +195,7 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
   }
 }
 
-// Intentionally shallow: each key's value is taken wholesale from either existing or incoming.
-// No deep merge — nested objects are replaced, not recursively merged.
+// Intentionally shallow: a nested object is replaced wholesale, never merged into.
 function mergePerKey(
   existing: Record<string, unknown>,
   incoming: Record<string, unknown>,
@@ -228,7 +228,7 @@ function deepMerge(
     const existing = result[key];
 
     if (Array.isArray(value) && Array.isArray(existing)) {
-      // Deduplicate arrays by JSON-serialized key — works for both primitives and objects
+      // A JSON-serialized key, so objects deduplicate as well as primitives.
       const combined = [...existing, ...value];
       result[key] = [...new Map(combined.map((v) => [JSON.stringify(v), v])).values()];
     } else if (isPlainObject(value) && isPlainObject(existing)) {
@@ -237,7 +237,6 @@ function deepMerge(
         value as Record<string, unknown>
       );
     } else {
-      // Scalars from new data override
       result[key] = value;
     }
   }

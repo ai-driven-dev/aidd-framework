@@ -1,24 +1,9 @@
-/**
- * Pure helper that rewrites ${CLAUDE_PLUGIN_ROOT}/<rel> → ./<rel> in every
- * string value of an arbitrary parsed JSON structure (spec §"Hooks" and §"MCP").
- *
- * Recurses through arrays and objects. Rewrites only string VALUES, never keys,
- * so that key names containing the pattern are left untouched (spec §M-v2.4 risk note).
- *
- * No I/O, no path math — plain string prefix substitution.
- */
-
 // Written as a split literal to avoid biome's noTemplateCurlyInString warning.
 const CLAUDE_ROOT_PREFIX = "$" + "{CLAUDE_PLUGIN_ROOT}/";
 const DEFAULT_RELATIVE_PREFIX = "./";
 
-/**
- * Rewrites ${CLAUDE_PLUGIN_ROOT}/<suffix> in every string value of a parsed JSON
- * structure. The optional `substitute` function receives the suffix (the part after
- * the prefix) and returns the replacement string.
- *
- * Defaults to `(s) => "./" + s` (Mode A behaviour).
- */
+/** String values only, never keys: a key name carrying the same prefix is left untouched.
+ * `substitute` receives the suffix and returns its replacement, defaulting to `./<suffix>`. */
 export function rewriteClaudeRootInJson(
   parsed: unknown,
   substitute?: (suffix: string) => string

@@ -170,9 +170,8 @@ function resolveInstalledPath(path: string): string {
     if (subPath === "" || subPath.endsWith("/")) return `${DIRECTORY}skills/${subPath}`;
     return skillsHandler.buildFilePath(subPath) ?? `${DIRECTORY}${path}`;
   }
-  // Unknown section: fall back to raw directory-prefixed path.
-  // If a new section is added to the framework, this produces a predictable
-  // default rather than silently dropping the reference.
+  // Unknown section: a predictable directory-prefixed default rather than a silently dropped
+  // reference when a new section is added to the framework.
   return `${DIRECTORY}${path}`;
 }
 
@@ -213,14 +212,8 @@ export const copilot: AiTool<
   toolId: "copilot",
   distributionProbes: {
     manifest: [".plugin/plugin.json", ".github/plugin/plugin.json", "plugin.json"],
-    // `.github/plugin/plugin.json` is the manifest's own second-choice location, not
-    // a marketplace catalog at all — `build.ts`'s own `OUTPUT_MARKETPLACE_RELATIVE`
-    // is `.plugin/marketplace.json`, which is where a real build actually leaves one.
-    // Wrong until `readMarketplaceCatalogIdentity` first tried to read it for real
-    // (measured: a fresh `.aidd/cache/built/.../.plugin/marketplace.json` exists,
-    // `.github/plugin/plugin.json` does not) — every earlier caller of this field
-    // tolerated an unreadable catalog by falling back to this project's own local
-    // alias, so nothing had noticed the path itself was never right.
+    // `.github/plugin/plugin.json` is the manifest's own second-choice location, never a
+    // marketplace catalog: a real build leaves one at `.plugin/marketplace.json`.
     marketplace: [".plugin/marketplace.json"],
   },
   directory: DIRECTORY,
@@ -229,14 +222,11 @@ export const copilot: AiTool<
   telemetryLocalRead: {
     kind: "declared",
     supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
-    // The exclusivity of `input` against `cache_read` is measured, on the capture the
-    // earlier comment here asked for by name: a session with a non-zero `cache_read`
-    // (1.0.82, 2026-09-06, tests/fixtures/local-cost/.copilot/session-state/55555555-…).
-    // 9 (`input`) + 42038 (`cache_read`) + 21404 (`cache_write`) = 63451, exactly
-    // `modelMetrics.<model>.usage.inputTokens`, so the four counters this reader stores are
-    // disjoint and the report is right to add them. It mattered because an `input` that
-    // included `cache_read` would have over-counted every Copilot session by its cached
-    // share — 42038 of 63451 in this one.
+    // `input` is measured exclusive of `cache_read`: on a session carrying a non-zero
+    // `cache_read`, 9 (`input`) + 42038 (`cache_read`) + 21404 (`cache_write`) = 63451, exactly
+    // `modelMetrics.<model>.usage.inputTokens`. The four counters this reader stores are
+    // therefore disjoint and the report is right to add them; an `input` that included
+    // `cache_read` would have over-counted every Copilot session by its cached share.
     limitation:
       "Its own file names outputTokens per turn, but session.shutdown carries all four " +
       "counters for the whole session — a session total, never a sum of requests. Its four " +
@@ -309,15 +299,13 @@ export const copilot: AiTool<
       pluginRootToken: PLUGIN_ROOT_TOKEN,
       acceptsMcp: true,
       translationMode: "marketplace",
-      // Copilot treats enabledPlugins in settings.json as a recommendation, not an
-      // auto-install (github/copilot-cli#2249); the project marketplace is also not
-      // installable from project scope (#3088). Drive `copilot plugin install` to
-      // actually load plugins — the settings file below still surfaces recommendations.
-      // Copilot's registry is global to the user and keyed by name, so a name can be
-      // held by a project that no longer exists — measured, and it then breaks every
-      // other project's plugin installs. `update` is what tells the two apart: it exits
-      // 1 on a local path that is gone and 0 otherwise, so a dead name can be reclaimed
-      // with `--force` without ever taking one that still resolves.
+      // Copilot treats enabledPlugins in settings.json as a recommendation, not an auto-install,
+      // and a project marketplace is not installable from project scope: `copilot plugin install`
+      // is what actually loads a plugin, while the settings file below surfaces recommendations.
+      // Its registry is global to the user and keyed by name, so a name held by a project that
+      // no longer exists breaks every other project's installs — measured; `update` exits 1 on a
+      // local path that is gone and 0 otherwise, which is what lets a dead name be reclaimed with
+      // `--force` without ever taking one that still resolves.
       nativeActivation: {
         binary: "copilot",
         upgradeVerb: "update",
@@ -325,24 +313,17 @@ export const copilot: AiTool<
         disableVerb: "uninstall",
         sourceCheckVerb: "update",
         forceRemoveArgs: ["--force"],
-        // Where `copilot plugin marketplace add`/`install` land — measured against the
-        // real binary in a relocated HOME. Never written by aidd; named here for a
-        // diagnostic alone.
+        // Where `copilot plugin marketplace add`/`install` land, measured against the real
+        // binary. Never written by aidd; named here for a diagnostic alone.
         userSettingsPath: (h) => join(h, ".copilot", "settings.json"),
       },
-      // VS Code Copilot reads this file, not the `copilot` CLI — measured: `copilot
-      // plugin marketplace add` writes ~/.copilot/settings.json and leaves this one
-      // untouched. `chat.plugins.marketplaces` cannot stand in for it either: it has
-      // application scope and VS Code rejects it in workspace .vscode/settings.json.
-      // Source: https://code.visualstudio.com/docs/copilot/customization/agent-plugins
-      //
-      // That documentation also states what the file is for: "Projects can recommend
-      // plugins for team members by configuring plugin settings in the workspace
-      // settings". It is a shared, committed recommendation — so `enabledPlugins`,
-      // which names plugins, belongs in it, and the marketplace registrations, which
-      // name an absolute path on the machine that ran the install, do not. Copilot
-      // offers no machine-local project file to hold them, hence `null`: this CLI
-      // writes them nowhere, and drives `copilot plugin install` to register for real.
+      // VS Code Copilot reads this file, not the `copilot` CLI, which writes
+      // ~/.copilot/settings.json and leaves this one untouched. `chat.plugins.marketplaces`
+      // cannot stand in for it: it has application scope and VS Code rejects it in a workspace
+      // .vscode/settings.json. This file is a shared, committed recommendation, so
+      // `enabledPlugins`, which names plugins, belongs in it, while a marketplace registration
+      // naming an absolute path on one machine does not — hence `null`, with the registration
+      // driven through `copilot plugin install` instead.
       marketplaceSettings: {
         settingsPath: ".github/copilot/settings.json",
         settingsKey: "extraKnownMarketplaces",

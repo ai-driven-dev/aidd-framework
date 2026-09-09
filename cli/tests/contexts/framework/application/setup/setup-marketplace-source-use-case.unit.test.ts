@@ -149,10 +149,8 @@ describe("SetupMarketplaceSourceUseCase", () => {
       const result = await uc.execute({ projectRoot: PROJECT_ROOT, interactive: true });
 
       expect(result.kind).toBe("local");
-      // The use-case runs the prompted path through resolve(), which — on Windows — fills in
-      // the current drive letter for a rootless absolute path like "/abs/framework". Resolve
-      // it the same way here so the expectation is the same location, spelled how the platform
-      // spells it.
+      // resolve() fills in the current drive letter on Windows for a rootless absolute path,
+      // so the expectation has to be resolved the same way to name the same location.
       expect(result.path).toBe(resolve("/abs/framework"));
     });
 
@@ -167,9 +165,8 @@ describe("SetupMarketplaceSourceUseCase", () => {
       const result = await uc.execute({ projectRoot: PROJECT_ROOT, interactive: true });
 
       expect(result.kind).toBe("local");
-      // A leading-slash regex assumes an absolute path always starts with a separator, which
-      // misses a Windows drive letter (e.g. "D:\..."). isAbsolute() is the platform-correct
-      // check for "resolved to absolute" on every OS.
+      // A leading-slash regex misses a Windows drive letter ("D:\..."), so isAbsolute() is
+      // the platform-correct check for "resolved to absolute" on every OS.
       expect(isAbsolute(result.path)).toBe(true);
     });
   });

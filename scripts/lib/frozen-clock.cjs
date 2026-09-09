@@ -1,9 +1,7 @@
 // Preloaded with `node --require` in front of the journal hook, nowhere else.
 //
 // `record.cjs`'s `nowIso()` reads the wall clock, so a three-day scenario run in one second
-// would land every session in the same instant, collapse every interval, and drop every
-// derived axis onto its unattributed row while staying green. The clock is the one input
-// this harness supplies.
+// would collapse every interval onto one instant and stay green while doing it.
 //
 // `Date.now()` moves with the constructor: `record.cjs`'s ULID takes its prefix from it.
 const frozen = process.env.AIDD_FROZEN_CLOCK;

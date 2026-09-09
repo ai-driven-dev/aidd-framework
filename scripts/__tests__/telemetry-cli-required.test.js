@@ -7,10 +7,8 @@ const ROOT = path.resolve(__dirname, "../..");
 const PLUGIN = path.join(ROOT, "plugins/aidd-telemetry");
 
 /**
- * The three places this plugin requires `aidd` to answer, each the first numbered step of
- * its own action file. A fourth skill, or a fourth wording, is exactly what this guards
- * against: phase 1 wrote the rule once, phase 3 reused it, and nothing before this pinned
- * all three together.
+ * The three places this plugin requires `aidd` to answer, each the first numbered step of its
+ * own action file. A fourth skill, or a fourth wording, is what this guards against.
  */
 const LOCATING_ACTIONS = [
   "skills/00-init/actions/01-check.md",

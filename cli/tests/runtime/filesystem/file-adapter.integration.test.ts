@@ -39,11 +39,8 @@ describe("FileAdapter", () => {
       expect(content).toBe("nested");
     });
 
-    // A crash mid-write must never leave a truncated file at `path`: two concurrent
-    // `aidd setup` runs on the same machine both write `references.json`, by design.
-    // `rename` is the one POSIX-atomic step that makes that safe — writing straight
-    // to `path` is not. What is checkable in-process is that the mechanism is the
-    // one actually used, not merely that the end state happens to look right.
+    // A crash mid-write must never leave a truncated file at `path`, and two concurrent `aidd
+    // setup` runs both write `references.json`: `rename` is the one POSIX-atomic step.
     it("writes through a temporary file and renames it into place", async () => {
       const path = join(tempDir, "atomic.txt");
       await writeFile(path, "old content", "utf-8");
@@ -126,9 +123,8 @@ describe("FileAdapter", () => {
 
       const files = await fs.listDirectory(tempDir);
       expect(files).toContain("a.txt");
-      // FileAdapter.listDirectory() deliberately normalizes every relative path to "/"
-      // (see its own `.split(sep).join("/")`) — this is what a manifest, read on every
-      // platform, stores — so the expectation is the POSIX literal, never join().
+      // `listDirectory()` normalizes every relative path to "/" — what a manifest read on every
+      // platform stores — so the expectation is the POSIX literal, never `join()`.
       expect(files).toContain("sub/b.txt");
       expect(files).toContain("sub/deep/c.txt");
     });
@@ -390,11 +386,9 @@ describe("FileAdapter", () => {
 
       const files = await fs.listDirectory(tempDir);
 
-      // symlink must NOT appear
       const posixFiles = files.map((f) => f.split("\\").join("/"));
       expect(posixFiles).not.toContain("skills/secret-link.txt");
 
-      // regular file inside skills/ must still appear
       expect(posixFiles.some((f) => f.includes("normal"))).toBe(true);
     });
   });

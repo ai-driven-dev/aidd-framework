@@ -1,20 +1,8 @@
 /**
- * No file under tests/ resolves a path into the shared dist/ build output.
- *
- * tests/e2e/helpers.ts used to define cliPath() by resolving process.cwd() into the
- * shared dist/cli.js, and two more e2e files repeated the same line. pnpm test ran tsup
- * (clean: true) before every vitest invocation, so a second concurrent run deleted and
- * rewrote the binary the first run's golden suites were still reading mid-capture — the
- * golden suites capture the same command twice and compare bytes, which is exactly the
- * assertion a rewrite between the two captures breaks. tests/e2e/global-setup.ts now
- * builds a private binary per run and publishes its path through provide/inject; this
- * test holds that boundary so the shared path cannot come back silently.
- *
- * The scope is `tests/` on purpose, and a review proposed widening it to `scripts/`. Declined,
- * measured: the two remaining readers of the shared path are `scripts/smoke-tools.sh` and
- * `scripts/check-bundle-size.mjs`, and exercising the shipped binary is what both exist for.
- * Both build before they read. Forbidding them would forbid the only thing that tests what a
- * user installs.
+ * The build cleans its output directory, so a second concurrent run rewrites the binary a
+ * first run's golden suites are reading mid-capture. `tests/e2e/global-setup.ts` builds a
+ * private binary per run instead. The scope is `tests/` alone: `scripts/` reads the shipped
+ * binary on purpose, and builds before it reads.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -52,8 +40,8 @@ describe("no test resolves a path into the shared dist/ build output", () => {
   });
 
   it("flags process.cwd() resolved into dist/, not an unrelated temp dist dir", () => {
-    // Built from two pieces so this file's own text never contains the literal
-    // "dist/cli.js" — otherwise this example would trip the rule above on itself.
+    // Built from two pieces so this file's own text never carries the literal the rule
+    // above forbids, which would trip it on itself.
     const violation = `resolve(process.cwd(), "di${""}st/cli.js")`;
     expect(CWD_INTO_DIST.test(violation)).toBe(true);
     expect(CWD_INTO_DIST.test('join(tempDir, "dist")')).toBe(false);

@@ -1,11 +1,8 @@
 /**
- * Codex's ToolBuildContract: marketplace (native plugin tree) and flat
- * (direct workspace materialization) modes.
- *
- * `mergeCodexConfigToml` and `stripCodexSkillFrontmatter` live here rather than in
- * `profile.ts` because the build contracts need them (marketplace skill transform,
- * flat `config.toml` merge) as much as the installed-content capabilities do; the
- * profile imports them back from here.
+ * Codex's build contracts: marketplace (a native plugin tree) and flat (direct workspace
+ * materialization). `mergeCodexConfigToml` and `stripCodexSkillFrontmatter` live here because
+ * both contracts need them as much as the installed-content capabilities do; the profile
+ * imports them back from here.
  */
 
 import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
@@ -32,8 +29,6 @@ import {
 import { parseToml, stringifyToml } from "./toml.js";
 
 type FsType = FileReader & FileWriter;
-
-// ── config.toml merge (shared by the codex profile's mcp capability and the flat contract) ──
 
 type TomlRecord = Record<string, unknown>;
 
@@ -86,8 +81,6 @@ export function mergeCodexConfigToml(existing: string, aiddPayload: string): str
   return stringifyToml(result);
 }
 
-// ── Skill frontmatter (shared by the codex profile's skills capability and the marketplace transform) ──
-
 export function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   if (fm.name !== undefined) result.name = fm.name;
@@ -95,8 +88,6 @@ export function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<
   if (fm.allowed_tools !== undefined) result.allowed_tools = fm.allowed_tools;
   return result;
 }
-
-// ── Codex marketplace contract ─────────────────────────────────────────────────
 
 const CODEX_MANIFEST_STRING_KEYS = [
   "name",
@@ -126,9 +117,9 @@ function buildCodexManifest(
 ): Record<string, unknown> {
   const manifest: Record<string, unknown> = {};
   copyCodexManifestStringFields(source, manifest);
-  // agents field intentionally omitted: Codex plugin schema does not support it
-  // Codex requires `skills` as a STRING dir (like the official gmail plugin); the array
-  // form makes `codex plugin add` fail with "missing or invalid plugin.json".
+  // The agents field is omitted: the Codex plugin schema has no such key. `skills` must be a
+  // STRING directory — the array form makes `codex plugin add` fail with "missing or invalid
+  // plugin.json".
   if (presence.skillsList.length > 0) manifest.skills = "./skills";
   if (presence.hasHooksJson) manifest.hooks = "./hooks/hooks.json";
   if (presence.hasMcpJson) manifest.mcpServers = "./.mcp.json";
@@ -143,7 +134,6 @@ function transformCodexSkill(content: string): string {
 export function buildCodexContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CODEX_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CODEX_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
   return {
     pluginRootToken: PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
@@ -173,8 +163,8 @@ export function buildCodexContract(): ToolBuildContract {
         source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
         path: (_p, rel) => rel,
         // The same rename the merged install route applies. Codex has no `Stop`, so without
-        // this the built tree subscribes the turn-end hook to an event that never arrives
-        // and the turn is never closed, in silence.
+        // this the built tree subscribes the turn-end hook to an event that never arrives and
+        // the turn is never closed, in silence.
         transform: (content, _plugin, base) =>
           base === "hooks.json" ? renameCodexHookEvents(content) : content,
       },
@@ -194,12 +184,9 @@ export function buildCodexContract(): ToolBuildContract {
   };
 }
 
-// ── Codex flat contract ────────────────────────────────────────────────────────
-
-// Codex scans `.agents/skills/` (cwd → repo root) for workspace skills — the documented
-// project skill root (developers.openai.com/codex/skills). Verified live on codex-cli 0.136:
-// a SKILL.md there appears in Codex's "Available skills" context. (`.codex/skills/` also
-// resolves on 0.136 but is undocumented, so we target the documented root.)
+// Codex scans `.agents/skills/` (cwd to repo root) for workspace skills, the documented project
+// skill root; verified live, a SKILL.md there appears in Codex's "Available skills" context.
+// `.codex/skills/` also resolves but is undocumented, so the documented root is what is used.
 const CODEX_SKILLS_PREFIX = ".agents/skills/";
 
 function codexFlatSkillPath(plugin: string, rel: string): string {

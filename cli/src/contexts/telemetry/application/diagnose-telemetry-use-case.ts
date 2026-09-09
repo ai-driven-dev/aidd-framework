@@ -47,15 +47,9 @@ export interface DiagnoseTelemetryUncoveredTool {
   readonly reason: string;
 }
 
-/** What `aidd telemetry check` answers with. `gate`, when present, is a reason the run
- * stopped before judging any claim at all — measurement off, or no repository — and is
- * mutually exclusive with `claims`: a gated run judges nothing, the same rule that keeps
- * absent evidence from ever producing an `ok`. `leftoverExportConfig` is neither a claim
- * nor gated by one: a stale export lives in a tool's own settings file, independent of
- * whether the local switch is on, so it is gathered and reported either way. `setup` is
- * gathered the same way, on both sides of the gate: what is in place is exactly what a
- * person switched off still needs to see, never reduced to the one-line gate message
- * alone. */
+/** What `aidd telemetry check` answers with. `gate` is mutually exclusive with `claims`: a gated
+ * run judges nothing. `leftoverExportConfig` and `setup` are gathered either side of the gate — a
+ * stale export lives in a tool's own settings file, whatever this project's switch says. */
 export type DiagnoseTelemetryResult =
   | {
       readonly gate: string;
@@ -70,9 +64,8 @@ export type DiagnoseTelemetryResult =
       readonly leftoverExportConfig: readonly TelemetryExportLeftover[];
     };
 
-/** How far back the trailer count looks. Twenty rather than a date: the cost is the same on
- * any repository, and it is enough that a person measuring for a week sees whether their
- * commits are being stamped without the answer drowning in history from before they were. */
+/** How far back the trailer count looks. A count rather than a date: the cost is the same on any
+ * repository, and enough to show whether recent commits are being stamped. */
 const COMMITS_EXAMINED_FOR_TRAILER = 20;
 
 export interface DiagnoseTelemetryOptions {
@@ -106,14 +99,9 @@ function uncoveredTools(): readonly DiagnoseTelemetryUncoveredTool[] {
   });
 }
 
-/** The plugin version the hook itself stamped, taken from the most recently opened session
- * that carries one.
- *
- * The most recent, not the first: a plugin upgraded mid-period leaves older lines naming
- * the older build, and what a person asking "which version is running" wants is the one
- * running now. Sessions that carry none are skipped rather than counted as an absence — one
- * line written before the field existed must not hide a later line that has it.
- */
+/** The plugin version the hook stamped, from the most recently opened session carrying one: an
+ * upgrade mid-period leaves older lines naming the older build. A session carrying none is
+ * skipped, never counted as an absence. */
 function pluginVersionFrom(journals: readonly RunJournal[]): TelemetryPluginVersionSetup {
   const sessions = journals.map((journal) => journal.session).filter(isPresent);
   if (sessions.length === 0) return { kind: "nothing-journalled" };
@@ -131,10 +119,8 @@ function isPresent<T>(value: T | undefined): value is T {
 }
 
 /**
- * Gathers every claim's evidence from the one route this system reads, then hands it to
- * the pure judge in `domain/telemetry-claim.ts`. Never writes anywhere — unlike
- * `ReadLocalCostUseCase`, this never stores a record, since the question is only ever
- * "would a read of this session's figures work", not "read them".
+ * Gathers every claim's evidence, then hands it to the pure judge in `domain/telemetry-claim.ts`.
+ * Never writes: the question is only ever "would a read of this session's figures work".
  */
 export class DiagnoseTelemetryUseCase {
   constructor(
@@ -151,12 +137,8 @@ export class DiagnoseTelemetryUseCase {
   ) {}
 
   async execute(options: DiagnoseTelemetryOptions): Promise<DiagnoseTelemetryResult> {
-    // Gathered before the gate, and regardless of it: a stale export in a tool's own
-    // settings file exports whether or not this project's own switch is on, so a person
-    // whose switch is off must still be told about it. `setup` follows the same rule —
-    // what is in place is exactly what a person switched off still needs to see.
-    // Read once and passed down: `gatherSetup` needs it for the plugin version, and a
-    // gated run stops before `gatherEvidence` would ever ask for it again.
+    // Gathered before the gate and regardless of it: a stale export exports whether or not this
+    // project's switch is on, and setup is what a person switched off still needs to see.
     const journals = await this.runJournalReader.list();
     const leftoverExportConfig = await this.evidence.findLeftoverExportConfig(options.projectRoot);
     const setup = await this.gatherSetup(options, journals);
@@ -194,29 +176,17 @@ export class DiagnoseTelemetryUseCase {
     };
   }
 
-  /** Every plugin AIDD's own manifest records, against what each host's registry says.
-   *
-   * Driven from the manifest and never from a settings file: `mergeEnabledPlugins` skips a
-   * plugin silently when it records no marketplace or when that marketplace does not
-   * resolve, so a settings-first comparison would find both sides absent and read it as
-   * agreement while the plugin never loads.
-   *
-   * A tool with no reader in the map contributes its plugins with no reading at all, which
-   * `buildHostRegistration` turns into `unanswerable` — never into agreement. A manifest
-   * that cannot be loaded contributes nothing, the same normal state as a project with no
-   * plugins installed. */
+  /** Every plugin the manifest records, against what each host's registry says. Driven from the
+   * manifest, never from a settings file: a plugin whose marketplace does not resolve is skipped
+   * silently there, so a settings-first comparison would read absence as agreement. */
   private async readHostRegistration(projectRoot: string): Promise<TelemetryHostRegistrationSetup> {
     let recorded: Awaited<ReturnType<InstalledPluginsReader["read"]>>;
     try {
       recorded = await this.installedPlugins.read();
     } catch (error) {
-      // `Manifest`'s parser maps over fields it does not guard, so a damaged manifest throws
-      // rather than returning null. Reported, never swallowed and never fatal: this is the
-      // command a person runs precisely when something is wrong.
-      // Names the file, because the row directly above says `recorder declared: yes` about
-      // the same one: that row scans the raw JSON for a declaration while this goes through
-      // the manifest's own validation, so a file that parses but fails validation makes the
-      // two rows disagree. Naming it is what tells a person they are one file, read twice.
+      // A damaged manifest throws rather than returning null: reported, never fatal, and named —
+      // the `recorder declared` row scans the same file's raw JSON while this goes through the
+      // manifest's own validation, so the two rows can disagree about one file.
       return {
         ...buildHostRegistration([]),
         manifestUnreadable: `${this.installedPlugins.path} — ${describeError(error)}`,
@@ -224,9 +194,8 @@ export class DiagnoseTelemetryUseCase {
     }
     if (recorded === null) return buildHostRegistration([]);
     const evidence = await Promise.all(
-      // Filtered before the read, never after: a tool with no plugin recorded contributes no
-      // entry, so opening its registry would be a home-directory read whose result is thrown
-      // away on every `check`.
+      // Filtered before the read, never after: a tool with no plugin recorded would otherwise pay
+      // a home-directory read whose result is thrown away on every `check`.
       AI_TOOL_IDS.filter((tool) => (recorded.get(tool) ?? []).length > 0).map(async (tool) => ({
         tool,
         plugins: (recorded.get(tool) ?? []).map((plugin) => ({
@@ -240,10 +209,8 @@ export class DiagnoseTelemetryUseCase {
     return buildHostRegistration(evidence);
   }
 
-  // `PersonIdentityStore.readStrict()` promises to throw on a damaged file, unlike the
-  // plain `read()` every other identity consumer uses — this is the one caller that must
-  // tell "nobody chose" apart from "could not be read", so it catches rather than letting
-  // one damaged file cost every other stated fact its own answer.
+  // `readStrict()` throws on a damaged file, unlike the `read()` every other consumer uses: this
+  // caller must tell "nobody chose" apart from "could not be read", so it catches.
   private async readIdentitySetup(): Promise<TelemetryIdentitySetup> {
     const path = this.personIdentityStore.filePath;
     try {
@@ -317,9 +284,8 @@ export class DiagnoseTelemetryUseCase {
     return reads;
   }
 
-  // A reader's own contract promises never to throw, and this catches anyway — a
-  // diagnostic that crashed on the one tool whose file is unreadable would answer nothing
-  // about every other claim it could still judge.
+  // A reader's contract promises never to throw, and this catches anyway: a diagnostic that
+  // crashed on one unreadable file would answer nothing about every other claim.
   private async readOneTool(
     tool: AiToolId,
     sessionId: string,

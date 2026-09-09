@@ -1,12 +1,6 @@
 /**
- * Where a fetched plugin lands, and what the CLI says when the fetch fails.
- *
- * The cache key is invisible until it is wrong: a key that changes between two runs
- * re-clones every time, and a key two sources share hands one plugin's tree to the other.
- * The failure messages are the only thing a user sees when a private source will not clone
- * — and they must not contain the credential the user typed into the URL.
- *
- * `simple-git` and `execFile` are stubbed so every clone is observed, never run.
+ * A cache key that changes between two runs re-clones every time, and one two sources share
+ * hands one plugin's tree to the other; a failure message must not carry the user's token.
  */
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -73,7 +67,6 @@ function adapter(token?: string, files: Record<string, string> = {}): PluginFetc
   return new PluginFetcherAdapter(lastFs, provider);
 }
 
-/** The directory the clone was told to write into. */
 function clonedInto(): string {
   return mockCloneFn.mock.calls[0]?.[1] as string;
 }

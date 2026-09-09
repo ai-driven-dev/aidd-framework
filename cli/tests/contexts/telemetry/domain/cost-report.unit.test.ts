@@ -32,9 +32,8 @@ function sessionMeasure(overrides: Partial<TelemetrySinkRecord> = {}): Telemetry
   return { ...BASE, kind: "session", ...overrides };
 }
 
-/** What a tool can supply is not what these tests are about; they declare the minimum the
- * type requires, and the declarations' own truth is checked in
- * tests/domain/tools/telemetry-route-supply.unit.test.ts against captured files. */
+/** The minimum the type requires; what a tool can really supply is not what these tests
+ * are about. */
 const NO_CAPABILITY = {
   localRead: null,
   export: null,
@@ -42,9 +41,8 @@ const NO_CAPABILITY = {
   taskAttributable: false,
 } as const;
 
-/** A tool whose local read does name the agent that ran - what tells "the main thread" apart
- * from "a tool that could never have said". Only a declaration says which; `NO_CAPABILITY`
- * declares no route at all, so a record of that tool can support neither reading. */
+/** A tool whose local read does name the agent that ran - what tells "the main thread"
+ * apart from "a tool that could never have said". */
 const NAMES_AGENTS = {
   localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: true },
   export: null,
@@ -53,8 +51,7 @@ const NAMES_AGENTS = {
 } as const;
 
 /** Codex's real shape: a declared local read that supplies token counters and names no
- * agent. Distinct from `NO_CAPABILITY`, which declares no route at all - the reading must
- * be the same for both, and only a route that says `agentName` can support a main thread. */
+ * agent. Only a route that says `agentName` can support a main thread. */
 const READS_BUT_NAMES_NO_AGENT = {
   localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
   export: null,
@@ -127,25 +124,8 @@ describe("buildCostReport — the two kinds are never summed", () => {
   });
 });
 
-// A user who enables the OTLP export and also runs the local read sees every billed
-// request line twice: once from each route. The export route (the OTLP receiver, the
-// mapper, and the two payloads these three records were originally mapped from —
-// `otlp-logs-claude-code.json` and `otlp-logs-claude-code-subagent.json`) was deleted in
-// "one route, and every sentence about it true"
-// (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/): three billed calls, matching
-// the defect report's own worked count. These three records are the exact output the real
-// production mapper produced from those two payloads, hand-transcribed here rather than
-// mapped live, because a stored line outlives the code that wrote it — this test proves the
-// double-count rule still holds against a record shaped exactly like one an earlier version
-// of this tool actually wrote to someone's real sink. The local-read half is what
-// `read-local-cost-use-case.ts` would produce for those exact same three billed calls: same
-// `billed_request_id` (Claude Code's `requestId`, carried by both routes for the same
-// call), no `cost_usd` (no local reader has ever captured one), a tool-stated `step` the
-// export route never carried at all. `requests` and `inputTokens` below reproduce the
-// defect report's own figures exactly (6 naive, 3 collapsed; 12 naive, 6 collapsed);
-// `outputTokens`/`cacheReadTokens` do not — these two payloads carried smaller figures than
-// whatever fuller session the report was written against, so this test checks its own
-// union's true totals rather than asserting numbers these payloads never produced.
+// Both routes stored the same three billed calls: the export half carries the money, the
+// local half a tool-stated step, and both carry the same `billed_request_id`.
 describe("buildCostReport — one billed call, seen by both routes, counts once", () => {
   function exportedApiRequests(): readonly TelemetrySinkRecord[] {
     return [
@@ -239,8 +219,7 @@ describe("buildCostReport — one billed call, seen by both routes, counts once"
     const local = exported.map(localCounterpartOf);
 
     // What a naive reader gets by concatenating every route's records with no collapse:
-    // six request lines for three real billed calls — money and tokens read double. Six
-    // and twelve are the defect report's own figures, from these same two fixtures.
+    // six request lines for three real billed calls — money and tokens read double.
     const naiveUnion = [...exported, ...local];
     expect(naiveUnion).toHaveLength(6);
     const naiveInputTokens = naiveUnion.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0);
@@ -259,8 +238,7 @@ describe("buildCostReport — one billed call, seen by both routes, counts once"
     const built = report({ records: union });
 
     // One billed call, counted once, whichever route or routes saw it — never the naive
-    // union's six, and never the true figures doubled. 3 requests and 6 input tokens match
-    // the defect report's own worked numbers exactly.
+    // union's six, and never the true figures doubled.
     expect(built.totals.requests).toBe(3);
     expect(trueInputTokens).toBe(6);
     expect(built.totals.costMicroUsd).toBe(trueCostMicroUsd);
@@ -269,24 +247,20 @@ describe("buildCostReport — one billed call, seen by both routes, counts once"
     expect(built.totals.cacheReadTokens).toBe(trueCacheReadTokens);
 
     // Neither route's own strength is thrown away for the other's: the export's money
-    // survives, and so does the local read's tool-stated step — which the export record
-    // alone could never have supplied (metrics-contract.md, "Step attribution").
+    // survives, and so does the local read's tool-stated step.
     const toolStated = built.attributionMix.find((row) => row.attribution === "tool-stated");
     expect(toolStated?.totals.requests).toBe(3);
     expect(toolStated?.totals.costMicroUsd).toBe(trueCostMicroUsd);
 
-    // Order-independent, the same guarantee `accumulate` already gives every other record:
-    // a re-read's line order is never something a consumer controls, and neither is which
-    // of two duplicate deliveries for one billed call arrives first.
+    // Order-independent: a re-read's line order is never something a consumer controls,
+    // and neither is which of two duplicate deliveries for one billed call arrives first.
     const reversed = report({ records: [...union].reverse() });
     expect(JSON.stringify(reversed)).toBe(JSON.stringify(built));
   });
 });
 
-// A Codex turn read while it was still open, then read again once more of it had arrived —
-// the exact shape `storeNewCandidates` can now leave in the sink (phase-1, "A turn read
-// while it runs is not the last word"): two `kind: "request"`, `provenance: "local-read"`
-// lines sharing one `tool`/`vendor_id`/`turn_id`, neither an edit of the other.
+// A Codex turn read while it was still open, then read again once more of it had arrived:
+// two local-read request lines sharing one turn_id, neither an edit of the other.
 describe("buildCostReport — a still-open local-read turn is superseded, never doubled", () => {
   const partial = request({
     turn_id: "turn-1",
@@ -331,8 +305,7 @@ describe("buildCostReport — a still-open local-read turn is superseded, never 
 
   it("never collapses the export route's own turn_id, which several billed calls share", () => {
     // prompt.id-shaped: a main-agent request and a subagent request under one turn_id,
-    // each its own billed call — collapsing here the same way would merge two real calls
-    // into one, exactly the trap task 1's plan warns against.
+    // each its own billed call — collapsing here would merge two real calls into one.
     const mainAgent = request({
       provenance: "export",
       turn_id: "prompt-1",
@@ -354,10 +327,8 @@ describe("buildCostReport — a still-open local-read turn is superseded, never 
   });
 
   it("never collapses a kind: 'session' record sharing a turn_id (Copilot's shutdown total)", () => {
-    // Copilot's own session-kind record is keyed on the shutdown event's own id, which a
-    // re-read matches on the same way every other reader's turn_id is matched — but it is
-    // a one-shot cumulative figure, never a growing per-turn snapshot, and must never be
-    // treated as one more corrigible turn.
+    // Copilot's own session-kind record is keyed on the shutdown event's own id, matched
+    // like any turn_id — but it is a one-shot cumulative total, never a corrigible turn.
     const first = sessionMeasure({ turn_id: "shutdown-1", cache_read_tokens: 5 });
     const second = sessionMeasure({ turn_id: "shutdown-1", cache_read_tokens: 7 });
 
@@ -370,20 +341,8 @@ describe("buildCostReport — a still-open local-read turn is superseded, never 
   });
 
   it("prefers an observed zero over an unmentioned counter when two readings tie on weight", () => {
-    // Codex sometimes omits `cache_write_input_tokens` from its earliest events for a turn
-    // and starts reporting it as `0` once a later event states it explicitly (see
-    // codex-rollout.ts's own "omits a counter never observed" test). Two readings of that
-    // turn can end up with the same `counterWeight` — 0 contributes nothing either way —
-    // so the weight alone cannot break the tie, and picking the wrong side would report
-    // "unknown" for a counter the tool actually measured as zero.
-    // `model` is set on both, deliberately smaller on the less-defined reading: appending a
-    // key to an otherwise-identical object always makes its serialization sort first (a
-    // `,"key":…` continuing the string sorts below the `}` that would have closed it), so
-    // without the tie-break `pickDeterministically`'s plain JSON-string sort would already
-    // happen to favor whichever record has the extra key — masking exactly the bug this
-    // test exists to catch. Giving the less-defined reading the earlier-sorting `model`
-    // value forces the ordinary sort to prefer *it*, so only `definedCounterCount` can save
-    // the observed zero.
+    // Two readings of one turn tie on `counterWeight`, since a zero weighs nothing either
+    // way; `model` is set so the plain sort favours the reading the tie-break must reject.
     const missesTheCounter = request({
       turn_id: "turn-2",
       model: "aaa",
@@ -579,11 +538,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     }
   });
 
-  // 93% of a real session's tokens are a subagent's: measured on a live transcript, 432M of
-  // 466M, across ten subagent files. Every one of those lines names its agent
-  // (`attributionAgent`, 100% of subagent tokens) and almost never its skill (2.7%), which is
-  // why `by_step` reads 3.7% while the spend is elsewhere. The record already carried
-  // `agent_name` — 924 of 1018 stored records hold one — and nothing exposed it.
+  // Almost all of a real session's tokens are a subagent's, and every one of those lines
+  // names its agent while almost none names its skill - so `by_step` reads near-empty.
   it("breaks the period down by the agent that ran, main thread included as its own row", () => {
     const built = report({
       declaredTools: TOOL_THAT_NAMES_AGENTS,
@@ -602,11 +558,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     ]);
   });
 
-  // The reading this axis used to give every tool: `agent_name` absent was read as the main
-  // thread, whatever the tool was. Only Claude Code's reader ever sets the field - Codex,
-  // Copilot and OpenCode never do - so on those tools every record was reported as the main
-  // thread on no evidence at all. An unknown is never a zero, and it is never a main thread
-  // either.
+  // Only Claude Code's reader ever sets `agent_name`, so reading its absence as the main
+  // thread reported every record of every other tool as a main thread on no evidence.
   it("claims no main thread for a tool whose route never names an agent", () => {
     const built = report({
       declaredTools: [{ tool: "codex", coverage: "covered", capability: NO_CAPABILITY }],
@@ -618,9 +571,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     ]);
   });
 
-  // A declared route is not the same as a route that names agents. Codex reads token
-  // counters from its own rollout files and names no agent anywhere in them, so its records
-  // must read exactly as a tool with no declared route at all does.
+  // A declared route is not a route that names agents: Codex reads token counters and
+  // names no agent, so its records must read as a tool with no declared route does.
   it("claims no main thread for a route that is declared and still names no agent", () => {
     const built = report({
       declaredTools: [{ tool: "codex", coverage: "covered", capability: READS_BUT_NAMES_NO_AGENT }],
@@ -630,9 +582,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     expect(built.byAgents.map((row) => row.attribution)).toEqual(["not-stated"]);
   });
 
-  // Two records that named no agent, from two tools, are two rows and not one: merging them
-  // would put work nobody could attribute in the same row as work a tool measured as its own
-  // main thread.
+  // Two records that named no agent, from two tools, are two rows and not one: merging
+  // them would mix unattributable work with a tool's own measured main thread.
   it("keeps a main thread apart from a tool that could never have named one", () => {
     const built = report({
       declaredTools: [
@@ -682,11 +633,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     expect(summed).toBe(built.totals.inputTokens);
   });
 
-  // The one axis no host limit can empty — which is not the same as complete, and the
-  // difference is measured on `CostReportPromptRow`. Every other breakdown depends on a
-  // capture that may not have happened; this one depends on a field the reader resolves for
-  // itself by walking `parentUuid`, so what it cannot name is a chain it cannot walk or a
-  // record an older reader already stored without one.
+  // The one axis no host limit can empty - which is not the same as complete: the prompt
+  // is resolved by walking `parentUuid`, not by a capture that may not have happened.
   it("breaks the period down by the prompt that caused the work, largest first", () => {
     const built = report({
       records: [
@@ -704,9 +652,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     ]);
   });
 
-  // An opaque id alone is unreadable, so the row carries the earliest moment in its group -
-  // the one a person greps for in their own transcript. Earliest, never the first seen: the
-  // sink is append-ordered by read, not by turn.
+  // An opaque id alone is unreadable, so the row carries the earliest moment in its group.
+  // Earliest, never the first seen: the sink is append-ordered by read, not by turn.
   it("dates each prompt row by the earliest moment in that prompt, not the first record read", () => {
     const built = report({
       records: [
@@ -718,9 +665,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     expect(built.byPrompts.map((row) => row.startedAt)).toEqual(["2026-08-18T09:00:00Z"]);
   });
 
-  // A record whose tool cannot say which prompt caused it is its own row, never merged into
-  // one that named a prompt - the same rule `by_agent` and `by_model` follow for an absent
-  // key. Every host but Claude Code is in that row today.
+  // A record whose tool cannot say which prompt caused it is its own row, never merged
+  // into one that named a prompt - the same rule `by_agent` and `by_model` follow.
   it("leaves records that named no prompt undated rather than dating them from another prompt", () => {
     const built = report({
       records: [
@@ -734,8 +680,7 @@ describe("buildCostReport — every breakdown reconciles", () => {
   });
 
   // A remainder, not a prompt: sorting it among the prompts by size would rank a bucket
-  // drawn from many turns against single turns. `by_flow` places its own remainder the same
-  // way, and for the same reason.
+  // drawn from many turns against single turns.
   it("keeps the row for records that named no prompt last, even when it is the largest", () => {
     const built = report({
       records: [request({ input_tokens: 900 }), request({ prompt_id: "p-1", input_tokens: 10 })],
@@ -744,10 +689,8 @@ describe("buildCostReport — every breakdown reconciles", () => {
     expect(built.byPrompts.map((row) => row.prompt)).toEqual(["p-1", undefined]);
   });
 
-  // Every counter, not only the one this session happens to look at: 99% of a real session's
-  // tokens are cache, so a guard summing `input_tokens` alone would pass while the counter
-  // carrying the money went missing. `requests` too, which is what a session-kind record
-  // leaking into a prompt group would break.
+  // Every counter, not only the one this session happens to look at: 99% of a real
+  // session's tokens are cache, and `requests` too, which a session record would break.
   it("reconciles the prompt breakdown to the same total as every other axis", () => {
     const built = report({
       records: [
@@ -831,10 +774,7 @@ describe("buildCostReport — every breakdown reconciles", () => {
   });
 
   // Every tool this report has ever seen runs at 90%-plus cache, so a weight blind to the
-  // two cache counters orders a costless breakdown by the sliver of its volume nobody reads
-  // it for - here, backwards. `heavy-cache` moves far less input/output than `light-cache`,
-  // but consumes forty times the total tokens once cache is counted: the honest "largest
-  // first" answer, and the one the report already prints beside the row.
+  // two cache counters orders a costless breakdown backwards.
   it("weighs a costless row by all four counters, cache included - not input and output alone", () => {
     const built = report({
       records: [
@@ -858,7 +798,6 @@ describe("buildCostReport — every breakdown reconciles", () => {
   });
 });
 
-// The default period is 2026-08-17..2026-08-21, five UTC days inclusive.
 describe("buildCostReport — by day and by project", () => {
   it("gives every day in the period a row, a gap included, and reconciles to the total", () => {
     const built = report({
@@ -912,8 +851,7 @@ describe("buildCostReport — by day and by project", () => {
   });
 
   // `project_id: ""` is not a name - it is what a tool writes when it has none to give.
-  // Treating it as its own project row would print a row nobody can act on, and would
-  // disagree with the plugin's own `projectKeyOf`, which already reads it as unknown.
+  // Its own row would print something nobody can act on, and disagree with `projectKeyOf`.
   it("treats an empty-string project_id the same as no project at all", () => {
     const built = report({
       records: [
@@ -931,12 +869,8 @@ describe("buildCostReport — by day and by project", () => {
 });
 
 describe("buildCostReport — an unknown keeps its row, never a zero", () => {
-  // `bySteps` already has `unattributed` and `byProjects` already has an unknown row for
-  // exactly this reason. Both the Codex and OpenCode readers permit a request record with
-  // no model, so without this row `byModels` stopped reconciling to its own total with
-  // nothing naming the gap - the fixtures below carry no model on purpose, which is the
-  // whole point: the reconciliation test above never reaches this branch because every one
-  // of its fixtures carries one.
+  // Both the Codex and OpenCode readers permit a request record with no model, so without
+  // this row `byModels` stopped reconciling to its own total with nothing naming the gap.
   it("gives a record with no model its own row in byModels, and it still reconciles", () => {
     const built = report({
       records: [
@@ -954,9 +888,8 @@ describe("buildCostReport — an unknown keeps its row, never a zero", () => {
     expect(total).toBe(built.totals.costMicroUsd);
   });
 
-  // `JSON.stringify(NaN)` is `null`, which round-trips through `parseTelemetrySinkLine` as
-  // `null !== undefined` - the exact path that made a token-counter-style guard
-  // (`typeof value === "number"`) necessary for `cost_usd` too, not just `!== undefined`.
+  // `JSON.stringify(NaN)` is `null`, which round-trips as `null !== undefined` - which is
+  // why `cost_usd` needs a `typeof` guard rather than an `!== undefined` one.
   it("reads a non-numeric cost as unknown, never as a zero", () => {
     const damaged = parseTelemetrySinkLine(
       JSON.stringify({ ...request({ turn_id: "x" }), cost_usd: Number.NaN })
@@ -970,9 +903,7 @@ describe("buildCostReport — an unknown keeps its row, never a zero", () => {
   });
 
   // `telemetrySinkRecordDayKey` answers `undefined` for a string merely shaped like a
-  // moment (see its own unit tests) - this is that answer reaching the report: the record
-  // stays in `totals` but invents no day row, rather than filing into a fragment nothing on
-  // the calendar matches.
+  // moment: the record stays in `totals` but invents no day row.
   it("gives a damaged moment no day row, while the total still holds it", () => {
     const damaged = parseTelemetrySinkLine(
       JSON.stringify({
@@ -1367,11 +1298,8 @@ describe("buildCostReport — by_flow reads the journal's own sequence, nothing 
     expect(outside?.totals.requests).toBe(1);
   });
 
-  // A session resumed after its context was compacted invokes nothing again, so no
-  // `step_start` hook fires and its journal opens no flow - while the transcript goes on
-  // stating the step on every record it produces. Measured on this machine: one such
-  // session, six `step_end` lines, no `step_start`, and 2,220 records in a 30-day period
-  // that `by_flow` reported as belonging to no flow at all.
+  // A session resumed after its context was compacted fires no `step_start`, so its journal
+  // opens no flow while the transcript goes on stating the step on every record.
   it("names the flow a record's own tool stated, where no interval covers it", () => {
     const records: readonly TelemetrySinkRecord[] = [
       request({
@@ -1445,9 +1373,8 @@ describe("buildCostReport — by_flow reads the journal's own sequence, nothing 
     expect(built.byFlows[0]?.attribution).toBe("unattributed");
   });
 
-  // An interval is the only thing that can say *which run*. A step the reader inferred from
-  // a moment says neither run nor, on its own, that a flow was ever orchestrated - so it
-  // opens no flow row, and only the tool's own statement does.
+  // An interval is the only thing that can say *which run*: a step inferred from a moment
+  // says neither run nor that a flow was ever orchestrated, so it opens no flow row.
   it("opens no flow for an orchestrating step the reader merely inferred", () => {
     const records: readonly TelemetrySinkRecord[] = [
       request({
@@ -1612,9 +1539,8 @@ describe("buildCostReport — what it says about itself", () => {
 });
 
 describe("buildCostReport — the same records, however they arrive", () => {
-  // A re-read appends, so the same session's lines sit in different orders on two
-  // machines, and nothing a consumer does controls it. Repetition alone would never catch
-  // a group that carries insertion order.
+  // A re-read appends, so the same session's lines sit in different orders on two machines.
+  // Repetition alone would never catch a group that carries insertion order.
   const RECORDS: readonly TelemetrySinkRecord[] = [
     request({
       turn_id: "a",
@@ -1740,9 +1666,8 @@ describe("buildCostReport — any dimension filters as well as it groups", () =>
     const byModel = narrowed({ filters: { model: "opus" } });
     expect(byModel.byModels).toHaveLength(1);
 
-    // by_tool is a breakdown of every *declared* tool - a --tool filter has to narrow
-    // that list too, or every excluded tool would still print a row reading "nothing in
-    // this period", indistinguishable from one genuinely measured idle.
+    // by_tool is a breakdown of every *declared* tool - a --tool filter has to narrow that
+    // list too, or an excluded tool would print a row a measured idle is not told from.
     const byTool = narrowed({ filters: { tool: "codex" } });
     expect(byTool.byTools).toHaveLength(1);
     expect(byTool.byTools[0]?.tool).toBe("codex");
@@ -1750,9 +1675,8 @@ describe("buildCostReport — any dimension filters as well as it groups", () =>
   });
 
   it("keeps a session-only figure under a step filter when a journal interval stamped one", () => {
-    // Unlike model, a step can land on a session record: `resolveStepAttribution` runs
-    // over every candidate regardless of kind, so a session record whose own moment falls
-    // inside a step interval carries `step` too.
+    // Unlike model, a step can land on a session record: `resolveStepAttribution` runs over
+    // every candidate regardless of kind.
     const sessionRecord: TelemetrySinkRecord = sessionMeasure({
       vendor_id: "s-3",
       tool: "claude",
@@ -1848,13 +1772,8 @@ describe("buildCostReport — any dimension filters as well as it groups", () =>
 });
 
 describe("buildCostReport — a line on disk holds whatever it holds, not what a type declares", () => {
-  // `parseTelemetrySinkLine` checks `sink_schema_version` and casts the rest, which is why
-  // every counter is read through a `typeof` guard rather than an `!== undefined` one.
-  // `active_time_s` was the one field that skipped it.
   /** A record carrying a field of the wrong type, built the only way one ever reaches this
-   * module: through the real parse, which checks `sink_schema_version` and casts the rest.
-   * Written as JSON rather than hand-cast, so the test exercises the route instead of
-   * asserting against a shape no file could produce. */
+   * module: through the real parse, which checks `sink_schema_version` and casts the rest. */
   function recordFromLine(overrides: Record<string, unknown>): TelemetrySinkRecord {
     return parseTelemetrySinkLine(JSON.stringify({ ...sessionMeasure(), ...overrides }));
   }

@@ -23,10 +23,9 @@ import {
 } from "./manifest-serialization.js";
 import type { InstalledPlugin } from "./plugins/installed-plugin.js";
 
-// Where a stuck-on-an-old-version manifest lives, named in the refusal below so a
-// person can act on it without hunting for the path themselves. The project-scope
-// default: a caller reading the user-scope manifest passes its own `ManifestFileContext`
-// instead, so the refusal names the file actually on disk rather than this one.
+// The project-scope default, named in the refusal below so a person can act on it without hunting
+// for the path. A caller reading the user-scope manifest passes its own `ManifestFileContext`, so
+// the refusal names the file actually on disk.
 const MANIFEST_PATH_HINT = `${AIDD_DIR}/${MANIFEST_FILENAME}`;
 const DEFAULT_CONTEXT: ManifestFileContext = {
   path: MANIFEST_PATH_HINT,
@@ -35,13 +34,9 @@ const DEFAULT_CONTEXT: ManifestFileContext = {
 };
 
 /**
- * What a version-refusal message names: the file on disk, in words fitting the sentence
- * it lands in (`"in this project"`, `"for this machine"`), and the command that
- * reinstalls once it is gone. The one thing that differs between the project manifest
- * and the user-scope one — `UserManifestRepositoryAdapter` passes its own before ever
- * reaching this guard, so the message sent to a `--scope user` user names
- * `userConfigDir()/manifest.json` and `aidd setup --scope user`, never the project's own
- * path and command.
+ * What a version-refusal message names: the file on disk, in words fitting the sentence it lands
+ * in, and the command that reinstalls once it is gone. `UserManifestRepositoryAdapter` passes its
+ * own before reaching the guard, so a `--scope user` refusal never names the project's path.
  */
 export interface ManifestFileContext {
   readonly path: string;
@@ -95,7 +90,7 @@ export class Manifest {
     return this._tools.get(toolId)?.mergeFiles ?? [];
   }
 
-  /** Returns all tracked paths (files + merge files + plugin files) across all tools that start with the given directory prefix. */
+  /** Tracked files, merge files and plugin files alike, across every tool. */
   getTrackedPathsInDirectory(dir: string): Set<string> {
     const tracked = new Set<string>();
     for (const [, entry] of this._tools) {
@@ -229,8 +224,6 @@ export class Manifest {
     return dirs;
   }
 
-  // --- Serialization ---
-
   toJSON(): ManifestData {
     return { version: MANIFEST_VERSION as 8, tools: serializeManifestTools(this._tools) };
   }
@@ -245,25 +238,13 @@ export class Manifest {
     return new Manifest({ tools });
   }
 
-  // This CLI reads exactly MANIFEST_VERSION and refuses every other one, naming a fix for
-  // each side. Too new means this CLI itself is behind, so `aidd update` is a real answer.
+  // This CLI reads exactly MANIFEST_VERSION and refuses every other one, naming a fix for each
+  // side. Too new means this CLI is behind, so `aidd update` is a real answer.
   //
-  // Too old has no such answer: v6 to v7 was not a freebie like v6 itself was (the v6 cutover
-  // only stopped accepting formats an already-published CLI, 5.2.2, could still migrate to and
-  // re-save — see the deleted migration chain this replaced), and v7 to v8 is the same kind of
-  // cutover again. v7 required data — a mandatory `scope` per plugin — that no published CLI
-  // had ever written; v8 changes what `nativeRegistrations.marketplaces` holds per entry — the
-  // host's own registered name beside aidd's own local alias, not the alias alone, once a
-  // project's alias is free to differ from what its catalog declares itself (the divergence
-  // this CLI used to refuse outright — see `architecture.md`). No published CLI has ever
-  // written that pair either, so no version number can be named here that would actually get a
-  // stuck user unstuck: `ManifestRepositoryAdapter.load()` calls `fromJSON` before any command
-  // reaches a save, so `setup`, `framework install` and every other write path refuse an old
-  // document exactly as this method does, before they ever get a chance to overwrite it. The
-  // only correction that does not first pass back through this same guard is deleting the
-  // document outright, so that is what is named. The message itself says which: a v6
-  // document names 5.2.2 as the CLI that actually wrote it, since one did; v7 and below
-  // say no published CLI can, since none ever did.
+  // Too old has none: no published CLI ever wrote v7's mandatory per-plugin `scope` or v8's
+  // host-name-beside-alias pair, and `load()` calls `fromJSON` before any command reaches a save,
+  // so every write path refuses an old document before it could overwrite it. Deleting the
+  // document is the only correction that does not pass back through this same guard.
   private static assertSupportedVersion(
     raw: Record<string, unknown>,
     context: ManifestFileContext
@@ -275,15 +256,11 @@ export class Manifest {
         `manifest version ${version} was written by a newer CLI than this one. Run \`aidd update\` to update this CLI, then try again.`
       );
     }
-    // A v6 document is also the one case this method's own guard admits a remedy
-    // richer than deletion for: 5.2.2's own manifest reader accepts exactly its native
-    // version, 6 — measured against the published tag (`git show cli-v5.2.2`) — so its
-    // `clean --force` can still be run against this project before the manifest naming
-    // what it registered is gone. A v7 document has no such CLI: 5.2.2 refuses it too
-    // ("Unsupported manifest version: 7"), so naming it there would be a false remedy.
-    // The v6 remedy is written for the project manifest specifically — a v6 document is
-    // one `ManifestRepositoryAdapter` ever produced, never `UserManifestRepositoryAdapter`
-    // (which did not exist yet), so `context.location` is always "in this project" here.
+    // A v6 document is the one case admitting a remedy richer than deletion: 5.2.2's own manifest
+    // reader accepts exactly version 6 — measured against that published version — so its
+    // `clean --force` can still run against this project before the manifest naming what it
+    // registered is gone. 5.2.2 refuses a v7 document too, so naming it there would be a false
+    // remedy. A v6 document is one the project repository ever produced, never the user-scope one.
     const remedy =
       version === 6
         ? "5.2.2, a published CLI, wrote this version. Before deleting it, run " +

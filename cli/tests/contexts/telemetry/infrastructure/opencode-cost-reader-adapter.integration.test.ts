@@ -12,8 +12,7 @@ const FIXTURE_PATH = fileURLToPath(
 );
 
 /** Installs a real, executable `opencode` stand-in on an isolated PATH — no mock of
- * `child_process`, so absent/failing/slow/well-behaved all exercise the real spawn and
- * real timeout machinery a mock would paper over. */
+ * `child_process`, so the real spawn and timeout machinery is exercised. */
 function installStandIn(scriptBody: string): { restore: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "aidd-opencode-bin-"));
   writeFileSync(join(dir, "opencode"), scriptBody, { mode: 0o755 });
@@ -85,12 +84,8 @@ describe("OpencodeCostReaderAdapter", () => {
     });
   });
 
-  // installStandIn writes a #!/bin/sh script with no file extension and chmods it
-  // executable - Windows resolves an executable by PATHEXT/extension, not a shebang line
-  // or the POSIX execute bit, so the stand-in never launches there (same gap
-  // countGitInvocations hit in the plugin's own suite, and telemetry-multi-tool.e2e.test.ts
-  // hits in cli/tests/e2e/). Every test below that calls installStandIn is skipped on
-  // win32 rather than left to fail for the wrong reason.
+  // The stand-in is a `#!/bin/sh` file with no extension: Windows resolves an executable by
+  // PATHEXT, not a shebang or the POSIX execute bit, so it never launches there.
   const skipOnWindows = process.platform === "win32";
 
   it.skipIf(skipOnWindows)(
@@ -103,7 +98,7 @@ describe("OpencodeCostReaderAdapter", () => {
 
       expect(sessionFound).toBe(true);
       // The fixture's fourth assistant message carries no `total` — never billed — so it
-      // yields no record; see opencode-export.unit.test.ts for that boundary directly.
+      // yields no record.
       expect(records).toHaveLength(3);
       expect(records[0]).toMatchObject({
         kind: "request",

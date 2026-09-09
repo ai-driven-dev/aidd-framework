@@ -217,9 +217,8 @@ test("AGENTS.md gets markdown links, resolvable from the repository root", () =>
   assert.doesNotMatch(content, /\(\.\.\//u);
 });
 
-// A link resolves against the file holding it, so a nested context file has to
-// climb back out. Hardcoding one level made every root-level link escape the
-// repository, which the link check catches as a broken local path.
+// A link resolves against the file holding it, so a nested context file climbs back out.
+// Hardcoding one level makes every root-level link escape the repository.
 test("a nested context file prefixes its links with the climb back out", () => {
   const content = run({
     context: `${OPEN}\n${CLOSE}\n`,

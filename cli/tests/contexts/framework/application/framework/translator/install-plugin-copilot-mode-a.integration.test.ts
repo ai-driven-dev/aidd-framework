@@ -17,11 +17,8 @@ import { InMemoryMarketplaceRegistry } from "../../../../../helpers/ports/in-mem
 const PROJECT_ROOT = "/test-project";
 const MARKETPLACE_NAME = "aidd-framework";
 
-/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
- * "copilot" to, at copilot's own `distributionProbes.marketplace` relative path — a real
- * build always leaves one there, so a fixture standing in for one must too, now that an
- * unreadable catalog is a hard failure rather than a silent fall back to this project's
- * own local alias (`UnreadableBuiltCatalogError`). */
+/** A real build always leaves a catalog at copilot's own `distributionProbes.marketplace`
+ * path, and an unreadable one is a hard failure, so the fixture must leave one too. */
 async function seedBuiltCatalog(fs: InMemoryFileAdapter, name = MARKETPLACE_NAME): Promise<void> {
   await fs.writeFile(
     "/built/copilot/.plugin/marketplace.json",
@@ -96,10 +93,8 @@ describe("install copilot plugin via Mode A (integration)", () => {
     // VS Code reads this file to recommend plugins to teammates, so it carries names.
     expect(settings.enabledPlugins).toBeDefined();
 
-    // It must carry no marketplace registration: that names the built tree by absolute
-    // path, which belongs to whoever ran the install, and copilot offers no
-    // machine-local project file to hold it. Copilot learns its marketplaces from its
-    // own CLI instead.
+    // No marketplace registration: that names the built tree by absolute path, which belongs
+    // to whoever ran the install; copilot learns its marketplaces from its own CLI instead.
     expect(settings.extraKnownMarketplaces).toBeUndefined();
     expect(JSON.stringify(settings)).not.toContain("/built/copilot");
   });

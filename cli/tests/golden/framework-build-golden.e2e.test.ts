@@ -1,58 +1,6 @@
 /**
- * Framework build golden — machine-independent output snapshot for all targets and modes.
- *
- * Captures the file tree hash map from `translate <source> --to <t> [--as flat]`
- * (phase 18's pure rename of `framework build --target <t> [--flat]`) against
- * tests/fixtures/framework-real and compares byte-for-byte against the stored
- * baseline in snapshots/framework-build/golden.json. A pure rename changes no output,
- * which is exactly what this file must keep proving as the invocation moves.
- *
- * The stored JSON maps key → { relative-path → SHA-256 hex }. Key format:
- *   "<target>" for marketplace mode, "<target>:flat" for flat mode.
- * All values are derived from file content only (no absolute paths, no timestamps).
- * This makes the snapshot machine-independent.
- *
- * FROZEN CELLS: all nine. Every cell's fresh build is byte-compared to the stored
- * baseline on every run, so a regression particular to one target fails here.
- *
- * It was one cell — claude — until the day a copilot-only regression shipped and this
- * file could not see it: claude's content rewrite is the identity, so the only guarded
- * cell was structurally incapable of catching a change in any other profile's. Freezing
- * the other eight immediately surfaced a stale one (see below), which is the argument for
- * doing it.
- *
- * RE-BASELINED CELLS, and why:
- *   claude — agents-manifest-fix pass: `agents` became a list of ./agents/*.md paths
- *     instead of the invalid `["./agents"]` dir form.
- *   claude:flat, cursor:flat, copilot:flat, codex:flat, opencode:flat — flat-discovery-fix
- *     pass: bare paths, no plugin segment.
- *   cursor, copilot — same agents-manifest-fix pass as claude.
- *   codex, copilot:flat, codex:flat — 2026-09-03, when the other eight cells were frozen
- *     for the first time. All three were stale, and none of the drift came from that day's
- *     work: each was verified against a binary built at this branch's base, which produces
- *     the same output. The stored file has had one write since the CLI was migrated into
- *     this repository, and the eight unfrozen cells were never compared to it again. (The
- *     re-baselining passes listed above happened before that migration, on branches whose
- *     writes were folded into the migration snapshot.)
- *       codex, 30 SKILL.md files — codex is the only target that re-serialises skill
- *         frontmatter (`stripCodexSkillFrontmatter`), and `serializeFrontmatter` quotes
- *         scalars, so its output stopped matching the source bytes the baseline recorded.
- *       copilot:flat, 2 hook files — the hooks format grew a `version` field and a
- *         flattened shape after the baseline was written.
- *       codex:flat, `.codex/config.toml` — `mergeCodexConfigToml` writes the merged file
- *         and its invariants moved after the baseline was taken. The current content holds
- *         them: `project_doc_max_bytes` 262144, `features.hooks` true, three merged
- *         `mcp_servers`, each pinned by `tests/contexts/tools/domain/profiles/codex.unit.test.ts`.
- *   opencode:flat — opencode-and-scope.md, Lot A: OpenCode's own plugin loader imports
- *     every file under `.opencode/plugin/` in-process, and a plain hook script there
- *     killed the host (uncatchable `process.exit`). `.opencode/plugin/update_memory.js`
- *     is now `.opencode/hooks/aidd-context/update_memory.js` — namespaced per plugin,
- *     the same shape `.claude/hooks/<plugin>/` and `.cursor/hooks/<plugin>/` already use.
- *     Content hash unchanged: only the path moved.
- *
- * USAGE:
- *   Capture all:   UPDATE_FRAMEWORK_GOLDEN=1 pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
- *   Verify:        pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
+ * Keyed `<target>` or `<target>:flat` → { relative-path → SHA-256 }, so it holds on any
+ * machine. Recapture with UPDATE_FRAMEWORK_GOLDEN=1; re-baselining a cell is deliberate.
  */
 
 import { createHash } from "node:crypto";
@@ -71,26 +19,16 @@ const SNAPSHOT_FILE = join(ROOT, "tests/golden/snapshots/framework-build/golden.
 type TargetSnapshot = Record<string, string>; // rel-path → sha256
 type GoldenSnapshot = Record<string, TargetSnapshot>; // key → files
 
-/** All marketplace targets */
 const MARKETPLACE_TARGETS = ["copilot", "codex", "claude", "cursor"] as const;
-/** All flat targets (including opencode which is flat-only) */
 const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode"] as const;
 
-/**
- * Every cell is frozen: each fresh build is byte-compared to its stored hash on every run.
- * Re-baselining one is a deliberate act with a reason recorded in the header above, never
- * a reflex when a run goes red.
- */
 const FROZEN_CELLS = new Set<string>([
   ...MARKETPLACE_TARGETS,
   ...FLAT_TARGETS.map((target) => `${target}:flat`),
 ]);
 
-// This repo carries no .gitattributes, so a Windows checkout's core.autocrlf converts
-// every text file's LF to CRLF on write to disk (#707) - hashing those raw bytes would
-// diff on line endings alone against the LF-committed stored baseline. Fold CRLF -> LF
-// before hashing; skip anything that doesn't round-trip through UTF-8 (this tree's
-// outputs are all .md/.json/.yml/.js today) so a future binary asset isn't corrupted.
+// A Windows checkout's core.autocrlf writes CRLF, which would diff against the LF-committed
+// baseline on line endings alone; content that is not UTF-8 is hashed raw instead.
 function normalizeLineEndings(content: Buffer): Buffer {
   const text = content.toString("utf-8");
   if (Buffer.byteLength(text, "utf-8") !== content.length) return content;
@@ -145,8 +83,6 @@ async function captureTarget(
   const key = flat ? `${target}:flat` : target;
   const outDir = join(tempDir, `dist-${key.replace(":", "-")}`);
   await mkdir(outDir, { recursive: true });
-  // `translate` is the pure rename of `framework build` (phase 18): same sourceDir,
-  // outDir and mode, so the captured file tree — and this golden — must not move.
   const args = ["translate", FRAMEWORK_FIXTURE, "--to", target, "--out", outDir];
   if (flat) args.push("--as", "flat");
   const result = await runCli(args, projectDir, fakeHome);
@@ -172,10 +108,8 @@ async function captureAllCells(
 }
 
 describe.concurrent("Framework build golden — 9-cell matrix", () => {
-  // Two full 9-cell builds, concurrently with the other tests in this file - on a real
-  // windows-latest runner this measured at 60039ms and 60096ms, just over the 60s default,
-  // not a hang (#707 windows-probe, attempt 3, run 32596840364). Raised per-test rather
-  // than the e2e project's global testTimeout so every other e2e file's budget is unchanged.
+  // Two full 9-cell builds measured just past the 60s default on a Windows runner, not a
+  // hang. Raised per test so no other e2e file's budget moves.
   it("snapshot is deterministic (two captures of each target are byte-identical)", async () => {
     const env1 = await createTestEnv("fb-golden-det-1");
     const env2 = await createTestEnv("fb-golden-det-2");
@@ -234,24 +168,17 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
 
       const stored = JSON.parse(await readFile(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
 
-      // Assert all 9 cells exist in stored
       const expectedCells = [...MARKETPLACE_TARGETS, ...FLAT_TARGETS.map((t) => `${t}:flat`)];
       for (const key of expectedCells) {
         expect(stored[key], `stored snapshot missing cell: ${key}`).toBeDefined();
         expect(Object.keys(stored[key]).length, `cell ${key} must have files`).toBeGreaterThan(0);
       }
 
-      // Every mismatching cell at once. Asserting inside the loop stops at the first, so a
-      // change landing across several profiles reads as one, and the next is found only
-      // after a fix and a re-run.
-      // Compared as sorted entries, never as serialised objects: a snapshot's key order is
-      // the order the directory was listed in, which differs by platform, while the fact
-      // under test is which files exist and what they hash to.
+      // Every mismatching cell at once, compared as sorted entries: key order follows the
+      // platform's directory listing, the fact under test is which files exist and hash to what.
       const drifted = [...FROZEN_CELLS].filter(
         (key) => canonical(captured[key] ?? {}) !== canonical(stored[key] ?? {})
       );
-      // Named per file, not per cell: a run on another platform has no way to diff the
-      // trees by hand, so the message carries the first keys whose presence or hash moved.
       const detail = drifted
         .map((key) => `${key}: ${describeDrift(stored[key] ?? {}, captured[key] ?? {})}`)
         .join("\n");
@@ -265,11 +192,6 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
   }, 120_000);
 
   it("the matrix covers every tool the CLI builds for, and nothing else", () => {
-    // "All nine cells" only means "all of them" while the two hand-written target lists
-    // still cover every tool in the registry, and while the stored file holds those cells
-    // and no others. A sixth tool absent from the lists, or a cell quietly dropped from
-    // one of them, would leave the matrix reading complete and guarding less — the same
-    // "nobody compares this" the frozen set exists to close, one level up.
     const matrixTools = new Set<string>([...MARKETPLACE_TARGETS, ...FLAT_TARGETS]);
     for (const id of AI_TOOL_IDS) {
       expect(matrixTools.has(id), `${id} is a registered AI tool with no golden cell`).toBe(true);

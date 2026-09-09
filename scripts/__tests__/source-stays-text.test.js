@@ -7,19 +7,12 @@ const { describe, it } = require("node:test");
 const ROOT = path.resolve(__dirname, "../..");
 
 /**
- * A source file must stay readable by the tools people actually use on it.
+ * A source file must stay readable by the tools people actually use on it. A raw NUL byte -
+ * a sound separator for a composite key - makes `file` report `data` and every `grep` over
+ * that file return nothing at all: no output, exit 1, indistinguishable from a genuine
+ * absence, which is how a reviewer concludes a symbol is missing from the file defining it.
  *
- * `cost-report.ts` carried two raw NUL bytes as the separator of a composite key. The
- * technique is sound - a byte that cannot occur in any component makes the key unambiguous -
- * but written as raw bytes rather than the `\u0000` escape it made `file` report `data`, and
- * every `grep` over those 1072 lines return nothing at all, silently. Not "no match with a
- * warning": no output, exit 1, indistinguishable from a genuine absence.
- *
- * That is how a reviewer concludes a symbol is missing from the one file that defines it.
- * It happened, on this repository, while reading that exact file.
- *
- * The escape compiles to the identical string, so nothing about the key changes - only
- * whether a person can search the file that builds it.
+ * The `\u0000` escape compiles to the identical string, so only searchability changes.
  */
 const TEXT_EXTENSIONS = new Set([
   ".ts",

@@ -9,10 +9,8 @@ import { RunJournalReaderAdapter } from "../../../../src/contexts/telemetry/infr
 import { environmentWithoutGitVariables } from "../../../../src/runtime/git/git-environment.js";
 import { journalTaskDeclared } from "../../../helpers/telemetry-journal-hook.js";
 
-// A ticket declared on a host whose payload names no path at all - the gap #663 left and
-// this deliverable closes. Exercised against the real hook and the real reader, nothing
-// stubbed between them: without this, a change to either side would leave every declared
-// task unreadable and no test would notice.
+// A ticket declared on a host whose payload names no path at all, exercised against the real
+// hook and the real reader with nothing stubbed between them.
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 const TASK_PATH = "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/spec.md";
@@ -49,9 +47,8 @@ describe("task_declared, from the hook that writes it to the reader that reads i
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  // Codex has no write-path field on any tool and no distinct "Read" tool either - a Bash
-  // command reading the plan is the only shape it ever sends, exactly as its step detection
-  // already relies on.
+  // Codex has no write-path field on any tool and no distinct "Read" tool: a Bash command
+  // reading the plan is the only shape it ever sends.
   function readViaBashPayload(): Record<string, unknown> {
     return {
       tool_name: "Bash",

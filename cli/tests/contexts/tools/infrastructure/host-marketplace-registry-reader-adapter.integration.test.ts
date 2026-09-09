@@ -15,10 +15,8 @@ import { hostMarketplaceRegistryReaders } from "../../../../src/contexts/tools/i
 let home: string;
 
 beforeEach(async () => {
-  // realpath'd once here so every raw target built under `home` below is already the
-  // same string the reader's own realpath call will produce — macOS aliases its own
-  // tmpdir under a symlink (`/var` -> `/private/var`), so skipping this makes every
-  // fixture path disagree with itself before the reader even runs.
+  // realpath'd once here so every fixture path already matches the reader's own realpath:
+  // macOS aliases its own tmpdir under a symlink (`/var` -> `/private/var`).
   home = await realpath(await mkdtemp(join(tmpdir(), "aidd-host-marketplace-registry-")));
 });
 
@@ -26,8 +24,8 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-/** Read off claude's own profile, never a literal — a hard-coded copy here is exactly
- * what let this path drift from `profile.ts`'s own `marketplaceRegistry` unnoticed. */
+/** Read off claude's own profile, never a literal, so this path cannot drift from
+ * `profile.ts`'s own `marketplaceRegistry`. */
 function registryPath(): string {
   const resolver = nativeActivationOf("claude")?.marketplaceRegistry;
   if (resolver === undefined) throw new Error("claude's profile declares no marketplaceRegistry");
@@ -76,8 +74,8 @@ describe("Claude Code's own known_marketplaces.json", () => {
 
     const reading = await reader().read();
 
-    // Two writes of "the same" directory, one straight and one through the link,
-    // must compare equal once both go through realpath — the /var -> /private/var lesson.
+    // Two writes of "the same" directory, one straight and one through the link, must compare
+    // equal once both go through realpath.
     expect(reading.entries?.get("probe-mkt")).toBe(realTarget);
   });
 
@@ -90,9 +88,8 @@ describe("Claude Code's own known_marketplaces.json", () => {
   });
 
   it("says a registry path it cannot read for any other reason is unreadable, never absent", async () => {
-    // A directory where the registry file should be: ENOENT never fires, some other
-    // I/O error does (EISDIR) — the shape ENOENT-only handling would wrongly report
-    // as absent, purging a cache `clean` has no proof is safe to.
+    // A directory where the registry file should be: ENOENT never fires, EISDIR does — the
+    // shape ENOENT-only handling would wrongly report as absent.
     await mkdir(registryPath(), { recursive: true });
 
     const reading = await reader().read();

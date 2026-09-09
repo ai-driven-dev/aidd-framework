@@ -148,9 +148,8 @@ describe("DiagnoseTelemetryUseCase — gating", () => {
   });
 });
 
-// Finding 1 (review.md, "one route, and every sentence about it true"): a stale export in
-// a tool's own settings file exports whether or not this project's own switch is on, so it
-// is gathered and reported on both sides of the gate, never folded into a claim.
+// A stale export in a tool's own settings file exports whether or not this project's switch is
+// on, so it is gathered and reported on both sides of the gate, never folded into a claim.
 describe("DiagnoseTelemetryUseCase — a leftover export config", () => {
   const LEFTOVER = [
     { path: "/repo/.claude/settings.local.json", keys: ["CLAUDE_CODE_ENABLE_TELEMETRY"] },
@@ -212,11 +211,8 @@ describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
   it("reads every covered tool's own files for every journalled session", async () => {
     const journal: RunJournal = {
       session: sessionStart("s-1"),
-      // The pause is what the step interval is capped at, and it is why the candidate below
-      // falls inside one at all. A journal whose only line is the opener witnesses no later
-      // moment, so the step it opened covers nothing and `records-join` reads fail - see
-      // `buildStepIntervals`'s own doc comment. Every host this fixture stands for writes a
-      // pause: `journal.cjs` maps a stop event for Claude Code, Cursor and OpenCode.
+      // The pause is what caps the step interval, and is why the candidate below falls inside
+      // one at all: a journal whose only line is the opener witnesses no later moment.
       boundaries: [
         { type: "step_start", at: "2026-08-20T09:00:30Z", skill: "aidd-dev:02-implement" },
         { type: "turn_end", at: "2026-08-20T09:30:00Z" },
@@ -237,14 +233,8 @@ describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
     expect(result.claims.find((c) => c.claim === "records-join")?.verdict).toBe("ok");
   });
 
-  // The consequence of capping an unclosed step, pinned where a person actually meets it.
-  // Copilot fires no stop event - `journal.cjs`'s own `HOOK_EVENT_NAME_TO_CANONICAL` maps
-  // one for Claude Code, Cursor and OpenCode and none for it - so a Copilot session that
-  // opened a skill and then wrote no file and declared no task leaves a journal whose only
-  // line is the opener. It witnesses no later moment, so the step covers nothing, and a
-  // record carrying no step of its own joins nothing. `check` says so rather than reporting
-  // a join it cannot see: an interval with no end in evidence used to reach forward
-  // indefinitely, which is what made this read ok.
+  // Copilot fires no stop event, so a Copilot session that opened a skill and then wrote no file
+  // leaves a journal whose only line is the opener, and the step it opened covers nothing.
   it("says records join nothing when the journal's only line is the step that opened", async () => {
     const journal: RunJournal = {
       session: sessionStart("s-1"),
@@ -333,9 +323,8 @@ describe("DiagnoseTelemetryUseCase — every claim is judged", () => {
   });
 });
 
-// The wiring proof for "not yet" stops being a failure: the same declaration
-// `gatherSetup` already read for the stated half is what the first claim judges by — never
-// the absence of a run file, which looks identical either way.
+// The first claim judges by the same recorder declaration `gatherSetup` reads, never by the
+// absence of a run file, which looks identical whether or not the recorder was declared.
 describe("DiagnoseTelemetryUseCase — the first claim reads the same declaration setup prints", () => {
   it("reports nothing to evaluate when the setup's own recorder declaration is true", async () => {
     const evidence = new StubEvidenceReader();
@@ -395,14 +384,6 @@ describe("DiagnoseTelemetryUseCase — the first claim reads the same declaratio
   });
 });
 
-/**
- * Which build produced what a person is reading.
- *
- * Neither version reached any output before this: `cli_version` and `plugin_version` were
- * written onto records and journal lines that only a person opening `~/.config/aidd` by
- * hand would ever see. `check` is the command whose job is telling someone the state of
- * their setup, so it is where they belong.
- */
 describe("the versions check reports", () => {
   function sessionAt(at: string, pluginVersion?: string): RunJournal {
     return {
@@ -461,9 +442,8 @@ describe("the versions check reports", () => {
   });
 
   it("tells a project that measured nothing yet apart from one whose hook could not name itself", async () => {
-    // The two silences mean different things: nothing journalled says nothing about the
-    // plugin, while a journalled session with no version is a plugin that arrived by
-    // neither install route. Collapsing them would let "not measured yet" read as damage.
+    // The two silences differ: nothing journalled says nothing about the plugin, while a
+    // journalled session carrying no version is a plugin that arrived by neither install route.
     const nothing = await buildUseCase({}).useCase.execute(runOptions());
     const journalledWithout = await buildUseCase({
       journals: [sessionAt("2026-09-01T10:00:00Z")],
@@ -474,9 +454,8 @@ describe("the versions check reports", () => {
   });
 });
 
-/** A repository whose load throws, which is what a hand-edited `.aidd/manifest.json`
- * actually produces: `Manifest`'s parser maps over fields it does not guard. Written as a
- * real implementation of the port rather than a cast, so it cannot drift from it. */
+/** A hand-edited `.aidd/manifest.json` makes `load` throw: `Manifest`'s parser maps over fields
+ * it does not guard. A real implementation of the port rather than a cast, so it cannot drift. */
 class ThrowingManifestRepository implements ManifestRepository {
   readonly path = "/test-project/.aidd/manifest.json";
   constructor(private readonly failure: Error) {}
@@ -531,7 +510,6 @@ describe("DiagnoseTelemetryUseCase — what the host will actually load", () => 
     expect(result.setup.hostRegistration.entries[0]?.answer).toBe("registered");
   });
 
-  // #703 itself, through the use-case: the declaration is fine and the host will drop it.
   it("says a plugin the registry lacks is not registered, and names the file", async () => {
     const { useCase } = buildUseCase({
       manifestRepo: manifestWithClaudePlugin("aidd-framework"),
@@ -555,12 +533,6 @@ describe("DiagnoseTelemetryUseCase — what the host will actually load", () => 
     );
   });
 
-  /**
-   * Verified against the built binary before it was fixed: it printed
-   * `Cannot read properties of undefined (reading 'map')` and died. Nothing loaded the
-   * manifest from `check` until this fact existed, so that crash is one the diagnostic put
-   * on its own path — and a damaged manifest is exactly when someone runs `check`.
-   */
   it("survives a manifest it cannot parse, and says so instead of dying", async () => {
     const { useCase } = buildUseCase({
       manifestRepo: new ThrowingManifestRepository(

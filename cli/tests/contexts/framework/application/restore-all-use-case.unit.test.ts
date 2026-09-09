@@ -94,12 +94,8 @@ function countingReader(fs: Deps["fs"]): {
 
 describe("RestoreAllUseCase — the --force flag", () => {
   /**
-   * `aidd restore --force` used to be inert: the command folded `force` into
-   * `interactive` and the use case only took `interactive`, so a non-TTY run always
-   * decided with `force: false`. A modified file raised InputRequiredError, the
-   * caller swallowed it into a warning telling the user to pass `--force` — which
-   * they had — and the command then reported "all files are unmodified" while
-   * `status` reported the same file modified.
+   * `--force` has to reach the use case: folded into `interactive`, a non-TTY run decided
+   * with `force: false` and reported "all files are unmodified" over a modified file.
    */
   async function setupWithModifiedTrackedFile(): Promise<{
     deps: Deps;
@@ -162,10 +158,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
 
   it("restores a corrupted plugin file with exactly one materialization call (cursor — installScope:user tool)", async () => {
     // A local-source install never reaches restoreViaBuiltTree — that path requires
-    // plugin.marketplace to be set (see apply-plugin-files-use-case.ts) — so this exercises
-    // restoreViaTranslate, same as claude, but for a differently configured tool
-    // (installScope:"user", pluginsDir:""). Confirms single-pass materialization is not
-    // claude-specific; the true built-tree write path needs a marketplace-sourced install.
+    // plugin.marketplace — so this exercises restoreViaTranslate for an installScope:"user" tool.
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "cursor");
     await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
@@ -230,10 +223,8 @@ describe("RestoreAllUseCase — plugin materialization", () => {
   });
 
   it("interactive restore with an explicit file selection also skips unselected plugin files (translate-mode)", async () => {
-    // The interactive picker never offers plugin drift (promptForFiles does not read
-    // StatusUseCase's pluginDrift), so once the user picks any specific regular file,
-    // ctx.fileFilter is active and no plugin path can match it. Same behaviour as
-    // ai.ts/ide.ts's `restore <file>`.
+    // The interactive picker never offers plugin drift, so once the user picks any specific
+    // regular file ctx.fileFilter is active and no plugin path can match it.
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "claude");
     await installTool(deps, PROJECT_ROOT, "vscode");
@@ -248,13 +239,8 @@ describe("RestoreAllUseCase — plugin materialization", () => {
     const vscodeKeybindingsPath = join(PROJECT_ROOT, ".vscode/keybindings.json");
     await deps.fs.writeFile(vscodeKeybindingsPath, "CORRUPTED KEYBINDINGS");
 
-    // User selects only the regular vscode file from the drifted-files checkbox
-    // (StatusUseCase reports relativePath, not the absolute path). Whether
-    // Whether keybindings.json is itself repaired is not asserted: RestoreAllUseCase never
-    // supplies frameworkPath to RestoreUseCase, so CONFIG_REFS-driven content cannot
-    // regenerate through this path at all. What is asserted is narrower: any explicit
-    // selection turns fileFilter on, and once on it excludes every plugin path, since a
-    // plugin file is never offered as a choice.
+    // Any explicit selection turns fileFilter on, and once on it excludes every plugin path.
+    // Whether keybindings.json is itself repaired is not asserted.
     const prompter = new ScriptedPrompter([
       ScriptedPrompter.answer.checkbox([".vscode/keybindings.json"]),
     ]);

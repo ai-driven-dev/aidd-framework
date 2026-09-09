@@ -11,10 +11,9 @@ import type { TokenProvider } from "../auth/ports/token-provider.js";
 import type { HttpGet } from "../http/http-client.js";
 import type { CliRelease, SelfUpdater } from "./self-updater.js";
 
-// This package moved into the framework repository, and release-please tags it per
-// component: `cli-v<semver>`, never a bare `v<semver>`, which is the root marketplace's.
-// Both halves were wrong at once, and `fetchChangelog` swallows its own 404 — so the
-// notice shipped without a changelog and nothing ever said why.
+// release-please tags this package per component: `cli-v<semver>`, never a bare `v<semver>`,
+// which is the root marketplace's. `fetchChangelog` swallows its own 404, so a wrong tag here
+// costs the changelog silently.
 const CLI_REPO = "ai-driven-dev/framework";
 const CLI_TAG_PREFIX = "cli-v";
 const CLI_PACKAGE = "@ai-driven-dev/cli";
@@ -35,12 +34,11 @@ function detectPackageManager(): { pm: PackageManager; binaryPath: string } {
   let binaryPath: string;
   try {
     const raw = execSync(whichCommand, { encoding: "utf8" });
-    // `where` on Windows may return multiple matches (one per line) — keep only the first
+    // `where` on Windows may return one match per line.
     binaryPath = raw.trim().split(/\r?\n/)[0].trim();
   } catch {
     throw new PackageManagerDetectionError(Object.values(PM_INSTALL_COMMANDS));
   }
-  // Normalise Windows backslashes so path checks work cross-platform
   const normalised = binaryPath.replace(/\\/g, "/");
   if (normalised.includes("/pnpm/")) return { pm: "pnpm", binaryPath };
   // yarn: ~/.yarn/bin (Unix) or AppData/Local/Yarn/bin (Windows)
@@ -53,7 +51,6 @@ function detectPackageManager(): { pm: PackageManager; binaryPath: string } {
   return { pm: "npm", binaryPath };
 }
 
-/** Read a string property from a parsed JSON body, or null when absent or not a string. */
 function readString(body: unknown, key: string): string | null {
   const value = (body as Record<string, unknown> | null | undefined)?.[key];
   return typeof value === "string" ? value : null;
@@ -87,8 +84,8 @@ export class SelfUpdaterAdapter implements SelfUpdater {
     return { version, changelog: await this.fetchChangelog(version) };
   }
 
-  // Version comes from npm — the registry `npm install -g` actually pulls from,
-  // reachable without a token whether the GitHub repo is public or private.
+  // npm, not GitHub: it is the registry `npm install -g` pulls from, and it is reachable
+  // without a token whether the GitHub repo is public or private.
   private async resolveLatestVersion(): Promise<string> {
     const url = `${this.npmRegistryBase}/-/package/${CLI_PACKAGE}/dist-tags`;
     try {

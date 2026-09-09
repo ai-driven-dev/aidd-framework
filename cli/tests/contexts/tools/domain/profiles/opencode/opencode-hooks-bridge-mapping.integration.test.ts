@@ -1,17 +1,5 @@
-/**
- * The generated bridge's own event mapping (opencode-and-scope.md, Lot B), asserted without
- * spawning a single process — the same seam `AiddTelemetry.journalCallFor`/`journalCallsFor`
- * already give `plugins/aidd-telemetry/hooks/opencode-plugin.js`, itself tested the same way
- * in `scripts/__tests__/aidd-telemetry-opencode-payloads.test.js`.
- *
- * Why this is not a unit test: the mapping only exists as text a real plugin factory
- * function must expose as a property (F6 — OpenCode's loader calls every function-valued
- * export, so the seam cannot be a second export). Proving that property really reaches a
- * real ESM module means generating the text, writing it, and importing it — file I/O, hence
- * `integration`, not `unit`. Reimplementing the same algorithm a second time in TypeScript
- * just to call it without I/O would be the exact duplication `opencode-hooks-bridge.ts`'s own
- * module comment rules out ("one fact, one home").
- */
+// The mapping exists only as generated text a real ESM module must expose as a property of its
+// factory, so proving it reaches one means writing and importing that file — integration, not unit.
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,9 +16,8 @@ async function loadFixture(name: string): Promise<unknown> {
   return JSON.parse(await readFile(join(FIXTURES_DIR, name), "utf8"));
 }
 
-// Built rather than written as a literal "${CLAUDE_PLUGIN_ROOT}" string — biome reads a
-// plain string holding "${...}" as a forgotten template literal (see
-// flat-build-strategy.hooks.integration.test.ts's own CLAUDE_ROOT_VAR).
+// Built rather than written as a literal "${CLAUDE_PLUGIN_ROOT}" string: biome reads a plain
+// string holding "${...}" as a forgotten template literal.
 const ROOT = "$" + "{CLAUDE_PLUGIN_ROOT}";
 
 const HOOKS_JSON = JSON.stringify({
@@ -110,10 +97,8 @@ describe("the generated bridge's own mapping, called directly (no spawn)", () =>
     const { postToolUseCallsFor } = await importGeneratedModule();
     const part = await loadFixture("opencode-tool-part-completed.json");
 
-    // The captured fixture's own tool is "read"; retarget it at this test's matcher ("bash")
-    // without inventing a second capture — the shape (part.tool, part.state.input,
-    // part.state.status) is what scripts/__tests__/fixtures/README.md's "OpenCode's tool
-    // part" section verifies, not the specific tool name.
+    // The captured fixture's own tool is "read"; retarget it at this test's matcher without
+    // inventing a second capture — the part's shape is what is verified, not the tool name.
     const retargeted = JSON.parse(JSON.stringify(part).replace('"tool":"read"', '"tool":"bash"'));
 
     const calls = postToolUseCallsFor(retargeted, "/home/user/project");

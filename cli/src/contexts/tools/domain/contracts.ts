@@ -49,58 +49,35 @@ export interface AiTool<C> {
    * should print `copilot` where a person reads "GitHub Copilot". */
   readonly displayName: string;
   /** Whether this tool's own file(s) can be read locally for a session's counters — see
-   * {@link TelemetryLocalRead}. This is the one route this system reads: nothing here
-   * declares an export, because nothing configures one any more. */
+   * {@link TelemetryLocalRead}. */
   readonly telemetryLocalRead: TelemetryLocalRead;
-  /** How the run journal's hook names this tool in its own `session_start` line, when the
-   * hook writes for it at all. Not the same string as `toolId` — the hook detects a host
-   * from the shape of a payload and spells Claude Code `claude-code`, while `toolId` is
-   * `claude`. Declared here so a report joining a journal to its records reads one
-   * declaration rather than carrying a table of four; a fifth host is a fifth declaration.
-   * Absent for a tool the journal hook does not run under. */
+  /** How the run journal's hook names this tool in its own `session_start` line — not the same
+   * string as `toolId`, since the hook detects a host from a payload's shape and spells Claude
+   * Code `claude-code`. Absent for a tool the journal hook does not run under. */
   readonly telemetryJournalHost?: string;
-  /** Whether a session on this tool can be traced to the task it worked on. Once true only
-   * where the journal hook could read a written path out of that tool's own hook payload;
-   * now true for every host `journal.cjs`'s `tool-used` dispatch reaches at all, because a
-   * task can be *declared* - a tool call's own arguments named a file under a task folder,
-   * read the same way `step_start` reads which skill is running, asking nothing of the
-   * host's payload shape. `false` would remain where no tool-used event ever reaches the
-   * host in the first place, which a declaration cannot work around any more than a written
-   * path could - a case every declared host has cleared as of 2026-08-31, OpenCode included:
-   * its plugin's `event` hook does receive a completed tool call's own arguments
-   * (`hooks/opencode-plugin.js`'s `declaredTaskCallFor`), a bounded measurement settled
-   * rather than assumed either way. The truth lives in `hooks/lib/task-declared.cjs` and
-   * `hooks/journal.cjs`'s dispatch, inside a zero-dependency script the framework build
-   * copies verbatim and this side cannot import, so it is declared here and pinned to
-   * `journalAttributable` by a test — the same arrangement `telemetryJournalHost` already
-   * uses for `DECLARED_HOSTS`.
-   *
-   * A tool declaring `false` is still fully reportable by period, and by step wherever a
-   * journal covers it. It simply belongs to no task, which is not the same as having
-   * touched nothing. */
+  /** Whether a session on this tool can be traced to the task it worked on: true wherever
+   * `journal.cjs`'s `tool-used` dispatch reaches the host at all, since a task can be *declared*
+   * — a tool call's own arguments named a file under a task folder — asking nothing of the
+   * host's payload shape. `false` would mean no tool-used event ever reaches that host, which a
+   * declaration cannot work around. A tool declaring `false` is still reportable by period and
+   * by step; it simply belongs to no task. The truth lives in the framework's own hook scripts,
+   * which this side cannot import, so it is declared here and pinned by a test. */
   readonly telemetryTaskAttributable: boolean;
   readonly directory: string;
   readonly toolSuffix: string;
   readonly signalDir: string | null;
   readonly capabilities: C;
   readonly configOutputPaths?: Readonly<Record<string, string>>;
-  /**
-   * The tool's framework-build contracts, one per supported build mode. Read by
-   * `buildContractFor()` so `runtime/wiring/framework.ts` can derive its build registry from the set of
-   * registered tools instead of listing every tool/mode pair by hand.
-   */
+  /** The tool's framework-build contracts, one per supported build mode, so the build registry
+   * is derived from the registered tools instead of a hand-kept list of tool/mode pairs. */
   readonly buildContracts?: {
     readonly marketplace?: () => ToolBuildContract;
     readonly flat?: () => ToolBuildContract;
   };
-  /**
-   * Where this tool's plugin manifest and marketplace catalog sit inside a distribution
-   * it produced. Read by `translate` to recognise a directory's format, so a sixth tool
-   * declares its own layout instead of being added to two lists it does not own.
-   *
-   * Order does not matter here: the collected probes are sorted deepest-path-first, so
-   * a specific location always wins over a bare `plugin.json` at the root.
-   */
+  /** Where this tool's plugin manifest and marketplace catalog sit inside a distribution it
+   * produced, so a sixth tool declares its own layout instead of joining two lists it does not
+   * own. Order is irrelevant: the collected probes are sorted deepest-path-first, so a specific
+   * location always wins over a bare `plugin.json` at the root. */
   readonly distributionProbes?: {
     readonly manifest?: readonly string[];
     readonly marketplace?: readonly string[];
@@ -115,14 +92,8 @@ export interface IdeToolConfig {
   readonly signalDir: string | null;
 }
 
-/** Whether this tool declares a rules capability at all.
- *
- * Generic over the tool's own capability set so a caller keeps whatever it had already
- * narrowed: `content-translator.ts` asks it of a tool it has narrowed to
- * `HasPlugins` and keeps that, while a caller holding an unnarrowed tool gets `HasRules`
- * alone. It lived privately in that translator until a second caller needed it; a copy
- * beside it would have been free to answer differently about the same tool.
- */
+/** Whether this tool declares a rules capability at all. Generic over the tool's own capability
+ * set so a caller keeps whatever it had already narrowed. */
 export function hasRules<TCapabilities>(
   tool: AiTool<TCapabilities>
 ): tool is AiTool<TCapabilities & HasRules> {

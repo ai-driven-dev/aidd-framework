@@ -2,9 +2,8 @@
 
 import type { TelemetrySinkRecord } from "../telemetry-sink-record.js";
 
-// Declared as the list first and the type derived from it, rather than the other way
-// round: reading the keys back off the table would have to assert their type, and an
-// assertion is exactly what stops holding the day the table and the type disagree.
+// The list first, the type derived from it: reading the keys back off the table would have to
+// assert their type, and an assertion stops holding the day the two disagree.
 export const COUNTER_FIELDS = [
   "inputTokens",
   "outputTokens",

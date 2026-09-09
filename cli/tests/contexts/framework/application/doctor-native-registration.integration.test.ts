@@ -21,14 +21,8 @@ async function manifestWithTwoNativePlugins(): Promise<Manifest> {
   return manifest;
 }
 
-/**
- * `doctor` on a manifest whose `nativeRegistrations` disagree with what the host's own
- * registry answers — the seam #703 is about, now checked at the command level rather
- * than only in the pure comparison. The sandbox this suite runs in reaches no real
- * `claude` binary (`sandbox-reaches-no-tool-binary.e2e.test.ts` holds that boundary for
- * the built CLI); this double stands in for exactly the file that binary would have
- * written.
- */
+/** The sandbox this suite runs in reaches no real `claude` binary, so the double stands in
+ * for exactly the registry file that binary would have written. */
 describe("doctor represents what claude's own registry answers", () => {
   it("is unhealthy with one error per ref the registry does not carry, naming `aidd sync`", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
@@ -75,13 +69,8 @@ describe("doctor represents what claude's own registry answers", () => {
     expect(report.issues).toHaveLength(0);
   });
 
-  /**
-   * A binary this sandbox never invokes leaves no registry file for the reader to open —
-   * exactly the case this integration test proves, and the one the e2e doctor run below
-   * proves again against the real built binary. `healthy` must stay `true`: an
-   * `unanswerable` reading is a normal state on any machine that has never run `claude`,
-   * never a fault `doctor` should gate on.
-   */
+  /** An `unanswerable` reading is the normal state on any machine that has never run
+   * `claude`, never a fault `doctor` should gate on. */
   it("stays healthy when nothing here can read the registry at all", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await deps.manifestRepo.save(await manifestWithTwoNativePlugins());

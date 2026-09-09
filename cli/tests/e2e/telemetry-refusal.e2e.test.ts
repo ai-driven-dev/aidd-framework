@@ -10,12 +10,6 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
 const JOURNAL_HOOK = resolve(REPO_ROOT, "plugins/aidd-telemetry/hooks/journal.cjs");
 
-/**
- * Phase 1 of "one route, and every sentence about it true": a person can refuse
- * measurement without touching a tracked file, the refusal wins over a project that turned
- * measurement on, and turning measurement on for a whole repository needs the same explicit
- * confirmation `endpoint --scope project` already demands.
- */
 describe("a person's own refusal, without touching a tracked file", () => {
   function hookEnv(fakeHome: string, extra?: Record<string, string>): NodeJS.ProcessEnv {
     return { ...environmentWithoutGitVariables(process.env), HOME: fakeHome, ...extra };

@@ -4,12 +4,10 @@ export function parseFrontmatter(content: string): {
   frontmatter: Record<string, unknown>;
   body: string;
 } {
-  // A line ends either way: a Windows checkout (no .gitattributes here) hands this the
-  // same document with CRLF, and the key/value patterns below are `$`-anchored, so a
-  // trailing carriage return made every one of them miss — `allowed_tools:` matched as a
-  // key with no items and the document came back all but empty. Splitting on
-  // either ending is not the same as stripping every `\r`: one inside a value is content,
-  // and stays.
+  // A line ends either way: a Windows checkout hands this the same document with CRLF, and
+  // the key/value patterns below are `$`-anchored, so a trailing carriage return makes every
+  // one of them miss. Splitting on either ending is not the same as stripping every `\r`:
+  // one inside a value is content, and stays.
   const lines = content.split(/\r?\n/);
 
   if (lines[0]?.trim() !== FRONTMATTER_DELIMITER) {
@@ -66,8 +64,8 @@ export function serializeFrontmatter(frontmatter: Record<string, unknown>, body:
 }
 
 // `[^\n]` rather than `.` throughout: `.` excludes a carriage return, so a `$`-anchored
-// value pattern silently missed any line carrying one. Splitting already removed the `\r`
-// of a CRLF ending, so what is left here is content and must survive.
+// value pattern silently misses any line carrying one — and splitting already removed the
+// `\r` of a CRLF ending, so what is left is content.
 function parseYamlLike(lines: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   let i = 0;

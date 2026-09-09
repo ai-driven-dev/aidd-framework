@@ -3,22 +3,8 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTestEnv, runCli } from "./helpers.js";
 
-/**
- * What `00-init` promises, held to what the CLI actually accepts — the same guard
- * `telemetry-cost-skill-commands.e2e.test.ts` runs for `01-cost`. Three failures this
- * guards: a command the skill names that the CLI never accepts (or the CLI stops
- * accepting), `01-check`'s absent-CLI wording drifting from the copy `01-cost` already
- * owns, and — since "the deletion path" extended `05-forget.md` to `aidd telemetry
- * forget` — the skill's account of the seventh command going stale the same way the
- * other six are already guarded against.
- *
- * `00-init`'s commands are stateful — `identity use --name` and `identity off` only make sense
- * once `identity use` has run, and `forget --yes` deletes the very journal and identity
- * every other command in this sweep might still need — so they are not run in whatever
- * order the markdown walk happens to find them in; `orderForExecution` puts every `on`
- * first, every `off` after that, and every `forget` last of all: the most destructive
- * command runs only once nothing after it still depends on what it removes.
- */
+/** `00-init`'s commands are stateful, so they are not run in the order the markdown walk
+ * finds them: the most destructive runs only once nothing after it depends on what it removes. */
 const REPO_ROOT = resolve(process.cwd(), "..");
 const SKILL_DIR = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills", "00-init");
 const COST_LOCATE = join(
@@ -50,18 +36,8 @@ function commandsNamedBySkill(): string[] {
   return [...found];
 }
 
-/**
- * The order every one of these commands can succeed in, stated rather than stumbled into.
- *
- * `telemetry on` first, `forget` last, `off` just before it. Between them the identity
- * verbs have an order of their own: `link` refuses with `IdentityRequiredToLinkError` when
- * nothing stands, so it has to come after `use`. That used to hold by accident — every
- * identity command shared one rank and `link` merely happened to appear later in the file
- * walk — and this test asserts exit 0 on all of them, so reordering the markdown would have
- * turned it red for a reason that has nothing to do with what it guards.
- *
- * A stable sort keeps ties in the file walk's own order.
- */
+/** `link` refuses with `IdentityRequiredToLinkError` when no identity stands, so it ranks
+ * after `use`; a stable sort keeps ties in the file walk's own order. */
 function orderForExecution(commands: readonly string[]): string[] {
   const rank = (command: string): number => {
     if (/\bforget\b/u.test(command)) return 4;
@@ -101,19 +77,16 @@ describe("E2E: 00-init calls the CLI", () => {
   });
 
   it("the skill's account names both the preview and the confirmed removal", () => {
-    // Pinned on the exact strings, not a substring match: a skill that dropped `--yes`
-    // from its own account would still contain "aidd telemetry forget" and pass a looser
-    // check, while a person following it would never see how to actually remove anything.
+    // Pinned on the exact strings: an account that dropped `--yes` would still contain
+    // "aidd telemetry forget" and pass a substring check, showing nobody how to remove anything.
     const commands = commandsNamedBySkill();
     expect(commands).toContain("aidd telemetry forget");
     expect(commands).toContain("aidd telemetry forget --yes");
   });
 
   it("the sweep itself would fail if the skill's account named a command the CLI refuses", async () => {
-    // The guard's own proof, in the shape `telemetry-where-things-live.test.js`'s
-    // "detects a named-but-absent script" already uses: run the mechanism against text
-    // that names something wrong, and require it to be caught — rather than trusting that
-    // it would be, which is exactly the false confidence this phase exists to remove.
+    // The guard's own proof: run the mechanism against text naming something wrong and
+    // require it to be caught, rather than trusting that it would be.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("init-skill-commands-drift");
     try {
       const driftedCommand = "aidd telemetry forget --confirm"; // not a flag `forget` accepts

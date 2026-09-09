@@ -34,10 +34,8 @@ function readSourceFile(relativePathFromSrc: string): string {
   return readFileSync(fileURLToPath(url), "utf8");
 }
 
-/** Exercises the real local-read path (`ReadLocalCostUseCase`) against the captured Claude
- * Code transcript fixture already used by `claude-code-transcript.unit.test.ts`. The
- * transcript is parsed by the real pure mapper; only the file-walking adapter is stubbed
- * out, keeping this a unit test while still proving the use-case's own stamping. */
+/** Only the file-walking adapter is stubbed: the captured transcript is parsed by the real
+ * mapper, so this stays a unit test and still proves the use case's own stamping. */
 async function readCapturedTranscript(): Promise<{
   readonly sink: InMemoryTelemetrySink;
   readonly records: readonly TelemetrySinkRecord[];
@@ -82,9 +80,8 @@ describe("every stored record names its tool", () => {
     expect(records[0]?.vendor_field).toBe("sessionId");
   });
 
-  // Derived from AI_TOOL_IDS, never hand-listed: hardcoding the tool names here would
-  // defeat the very criterion it proves — that adding a tool is a declaration the use-case
-  // never has to be told about by name.
+  // Derived from AI_TOOL_IDS, never hand-listed: a hardcoded name would defeat the criterion
+  // it proves, that adding a tool is a declaration the use case is never told about by name.
   it("contains no tool name, by string literal, in the local-read use-case", () => {
     const source = readSourceFile("contexts/telemetry/application/read-local-cost-use-case.ts");
     for (const toolId of AI_TOOL_IDS) {

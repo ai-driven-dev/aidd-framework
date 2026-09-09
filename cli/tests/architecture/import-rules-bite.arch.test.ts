@@ -1,15 +1,7 @@
 /**
- * Every import rule must still have something to forbid.
- *
- * The context boundaries are held by biome `noRestrictedImports` overrides, and a
- * pattern is only a guard while the directory it names exists. Phase 11 shipped a
- * `translate` rule listing `**` + `/domain/models/**`, `**` + `/application/use-cases/**`
- * and four more paths that the refactor had already deleted: the rule read as a
- * boundary, matched nothing, and let `translate` import `framework` for six phases.
- *
- * So this checks the patterns against the tree rather than trusting them, the same
- * way the ratchets check their baselines. It cannot prove a rule forbids the right
- * thing — only that it can still forbid anything at all.
+ * A biome `noRestrictedImports` pattern is a guard only while the directory it names exists;
+ * one naming a deleted path reads as a boundary and forbids nothing. This cannot prove a rule
+ * forbids the right thing, only that it can still forbid anything at all.
  */
 import { describe, expect, it } from "vitest";
 import { read, sourceFiles } from "./helpers.js";
@@ -19,7 +11,6 @@ interface RestrictedPattern {
   readonly pattern: string;
 }
 
-/** Every `group` entry of every `noRestrictedImports` override, with the scope that owns it. */
 function restrictedPatterns(): RestrictedPattern[] {
   const config = JSON.parse(read("biome.json")) as {
     overrides?: readonly {
@@ -58,7 +49,6 @@ function literalCore(pattern: string): string {
   return core.startsWith("/") ? core.slice(1) : core;
 }
 
-/** Whether any source path could produce an import specifier matching this literal core. */
 function matchesSomething(core: string, paths: readonly string[]): boolean {
   const needle = core.endsWith("/") ? core : `${core.replace(/\.js$/, ".ts")}`;
   return paths.some((path) => `${path}/`.includes(`/${needle}`));

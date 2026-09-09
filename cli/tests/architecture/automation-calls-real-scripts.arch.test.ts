@@ -1,21 +1,8 @@
 /**
- * Every `pnpm <script>` the automation runs against this package exists in its manifest.
- *
- * CI and the git hooks live one directory up, outside this package, so a script renamed
- * here goes on being called there and nothing local notices: `pnpm lint`, `pnpm test` and
- * the pre-push hook all pass on a machine while the pipeline is already broken.
- *
- * That is not hypothetical. Renaming `knip:production` to `knip` updated the manifest, the
- * hook and three documents; `.github/workflows/cli-ci.yml` kept calling the old name,
- * because the sweep for stale references was run from inside this package and the workflow
- * is not inside it.
- *
- * Only calls that run against this package count — a `cd cli && pnpm x` line, or a call in
- * a `run:` block whose earlier line `cd`s here first. A single-line regex only ever saw the
- * first form: the windows job's own `run: |` block does `cd cli` on one line and `pnpm
- * build` two lines later, in the same shell script, and that call was invisible until this
- * rule followed `cd` line by line instead. pnpm's own verbs are not scripts and are
- * excluded.
+ * CI and the git hooks live outside this package, so a script renamed here goes on being
+ * called there while every local check passes. Only calls that run against this package
+ * count: a `cd cli && pnpm x` line, or a call in a `run:` block that `cd`s here first —
+ * `cd` on one line still governs a `pnpm` call two lines later, in the same shell.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -63,19 +50,15 @@ function automationFiles(): string[] {
   return files;
 }
 
-/** The indentation of a line — how many leading spaces it carries, tabs aside since YAML
- * forbids them for indentation. */
+/** Leading spaces only: YAML forbids a tab for indentation. */
 function indentOf(line: string): number {
   return /^(\s*)/.exec(line)?.[1]?.length ?? 0;
 }
 
 /**
- * Every `run:` step's body, as its own array of lines.
- *
- * A `run: value` on one line is a body of one line; `run: |` (or `|-`, `>`) opens a block
- * scalar whose body is every following line indented further than the `run:` key itself,
- * which is how YAML itself delimits it — the block ends at the first line back at or above
- * that indentation, not at the next blank line.
+ * A `run: value` is a body of one line; `run: |` opens a block scalar whose body is every
+ * line indented further than the `run:` key, ending at the first line back at or above that
+ * indentation rather than at the next blank line.
  */
 function runBodies(text: string): string[][] {
   const lines = text.split("\n");
@@ -109,12 +92,9 @@ function runBodies(text: string): string[][] {
 }
 
 /**
- * Every `pnpm <script>` a `run:` body calls while its own `cd` state points at `dir` —
- * tracked line by line, the same way the shell itself would run the block: `cd cli` on one
- * line changes where every later `pnpm` call in that same body lands, `cd` to anything else
- * changes it away, and the state does not survive into the next `run:` body — each step's
- * `run:` is its own shell process, so nothing here needs to model a step boundary as
- * anything other than a fresh body.
+ * Tracked line by line the way the shell runs the block: a `cd` governs every later `pnpm`
+ * call in the same body, and the state does not survive into the next `run:`, which is its
+ * own shell process.
  */
 function pnpmCallsAgainst(dir: string, body: readonly string[]): string[] {
   let cwd: string | null = null;
@@ -134,7 +114,6 @@ function pnpmCallsAgainst(dir: string, body: readonly string[]): string[] {
   return calls;
 }
 
-/** Every `pnpm <script>` an automation file runs against this package, with where it runs. */
 function scriptCalls(files: readonly string[]): { file: string; script: string }[] {
   const calls: { file: string; script: string }[] = [];
   for (const file of files) {
@@ -148,7 +127,6 @@ function scriptCalls(files: readonly string[]): { file: string; script: string }
   return calls;
 }
 
-/** Directories outside this package that its own TypeScript program still compiles. */
 function foreignIncludes(): string[] {
   const raw = readFileSync(join(CLI_ROOT, "tsconfig.json"), "utf8").replace(/\/\/[^\n]*/g, "");
   const config = JSON.parse(raw) as { include?: string[] };
@@ -202,8 +180,6 @@ describe("the automation calls scripts this package still has", () => {
         "          npm install -g ./dist/ai-driven-dev-cli-*.tgz --force",
       ],
     ]);
-    // A single-line regex (`cd cli && pnpm x`) never matches any line of this block —
-    // `pnpm build` alone is what it missed.
     expect(pnpmCallsAgainst("cli", runBodies(block)[0] as string[])).toContain("build");
   });
 

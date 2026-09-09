@@ -37,14 +37,8 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     ]);
   });
 
-  // The live case, and the reason `turn_end` stopped closing a declaration on 2026-09-04.
-  // A `turn_end` is a pause, not a change of subject: the session declared
-  // `telemetry-screen` at 05:59, paused at 06:02, and worked on that same task for three
-  // more hours. Closed at the pause, 78% of the session read "before the next task this
-  // session declares" while only 1.8% of its tokens truly preceded any declaration.
-  //
-  // `turn_end` stays a *witness*, so an interval with nothing after it still ends there —
-  // the same moment, for the honest reason. What changes is an interval with work after it.
+  // A `turn_end` is a pause, not a change of subject. It stays a *witness*, so an interval
+  // with nothing after it still ends there; what changes is one with work after it.
   it("keeps a declaration open across a turn_end, ending at the work that followed", () => {
     const wrote = {
       type: "file_written",
@@ -108,11 +102,8 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
   });
 
   it("drops a task_declared line whose own `at` this reader cannot parse, the same as one that was never written", () => {
-    // A real line on disk, an `at` `timed()` cannot place in time - this session yields no
-    // usable interval, and `taskUnattributedReason` folds it into "no-declaration" beside a
-    // session that truly never declared, since neither can tell the two apart. The label
-    // that reason prints says "no *usable* declaration", never "none was ever declared",
-    // exactly because this case exists.
+    // `taskUnattributedReason` folds this into "no-declaration" beside a session that truly
+    // never declared, which is why that label reads "no *usable* declaration".
     const unparseable = {
       type: "task_declared",
       at: "not-a-real-timestamp",
@@ -123,11 +114,8 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
   });
 
   it("emits no interval for a declared path this reader cannot turn into an identity, but still lets it close the interval before it", () => {
-    // `task-declared.cjs`'s own gate is a scan over free-form tool-call text, looser than
-    // `taskIdentityFromWrittenPath` - a literal `..` path segment passes the hook and still
-    // names no task. Dropping the line from `closers` entirely (rather than only from the
-    // intervals it would otherwise produce) would let WANTED's own interval run past the
-    // moment the climbing line was actually declared - silently widening it.
+    // A `..` segment passes `task-declared.cjs`'s looser gate and names no task; dropped from
+    // `closers` too, it would silently widen WANTED's interval past its own declaration.
     const climbing = {
       type: "task_declared",
       at: "2026-08-17T10:10:00Z",
@@ -167,10 +155,6 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     expect(source).not.toMatch(/require\(["']node:fs/);
   });
 
-  // The bug this deliverable exists to fix: a session still running when a report is asked
-  // for has declared a task, written a file after it, and produced no turn_end yet.
-  // `lastMs` used to come only from step starts, turn ends and declarations - none of which
-  // exist here - so the interval collapsed to `[t, t)` and lost every record after it.
   it("widens an unclosed declaration's end to a written file the journal witnessed after it", () => {
     const writtenAfter = {
       type: "file_written",
@@ -182,8 +166,8 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     expect(intervals).toEqual([
       { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: Date.parse(writtenAfter.at) },
     ]);
-    // The record this bug used to lose: after the declaration, before the write, no
-    // turn_end anywhere in sight - the ordinary state of a session still running.
+    // After the declaration, before the write, no turn_end anywhere in sight - the
+    // ordinary state of a session still running.
     expect(momentFallsWithin(intervals, "2026-08-17T10:20:00Z")).toBe(true);
   });
 
@@ -208,17 +192,13 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     } as const;
     const intervals = buildTaskIntervals(journalOf([WANTED], [], [writtenAfter]));
 
-    // Long after the last thing the journal witnessed - never attributed, whatever silence
-    // followed the write.
+    // Long after the last thing the journal witnessed.
     expect(momentFallsWithin(intervals, "2026-08-20T00:00:00Z")).toBe(false);
   });
 
   it("clamps an unclosed interval's end to the report's own period end, never past it", () => {
-    // A clock-skewed or damaged `file_written` line dated far in the future still parses -
-    // `timed()` only refuses a moment it cannot parse at all - and used to widen an
-    // unclosed interval's end to it unbounded, attributing anything the period could ever
-    // report. No record this reader is ever asked to place can fall past the period's own
-    // end, so capping there costs nothing real and closes the hole entirely.
+    // A clock-skewed `file_written` far in the future still parses, and no record this reader
+    // places can fall past the period's own end, so capping there costs nothing real.
     const farFuture = {
       type: "file_written",
       at: "9999-12-31T00:00:00Z",
@@ -258,17 +238,8 @@ describe("taskUnattributedReason — which of four distinct facts applies", () =
     expect(taskUnattributedReason(intervals, "2026-08-17T09:00:00Z")).toBe("precedes-declaration");
   });
 
-  // Deleted on 2026-09-04, not moved: it asserted a reason for a moment that is now
-  // attributed, so it passed while proving nothing. It described a gap a `turn_end` left
-  // between two declarations — and a `turn_end` no longer closes one, so intervals run
-  // contiguously from each declaration to the next and no such gap can arise.
-  // `precedes-declaration` stays reachable only before a session's first declaration,
-  // which the test above covers.
-
-  // The live case, and the reason this reason exists. A resumed transcript carries turns
-  // billed days before the session that read them ever started, so the sink dates them
-  // before its journal witnessed anything. Measured on 2026-09-04: 96.2% of a real period
-  // fell here and read `precedes-declaration`, which asserts the flow declared late.
+  // A resumed transcript carries turns billed days before the session that read them ever
+  // started, so the sink dates them before its journal witnessed anything.
   it("names precedes-journal for a record older than everything its journal witnessed", () => {
     const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
     const journalFromMs = Date.parse("2026-08-17T09:30:00Z");
@@ -287,9 +258,8 @@ describe("taskUnattributedReason — which of four distinct facts applies", () =
     );
   });
 
-  // Why the coverage check runs first: a journal that declared nothing and never covered
-  // this record is described by the coverage fact, which is the one that explains why no
-  // declaration could have covered it.
+  // The coverage check runs first: it is the fact that explains why no declaration could
+  // have covered this record at all.
   it("names precedes-journal, not no-declaration, when the journal declared nothing either", () => {
     const journalFromMs = Date.parse("2026-08-17T09:30:00Z");
 

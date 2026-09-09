@@ -2,8 +2,6 @@ import type { FileHash } from "./file.js";
 import type { Hasher } from "./ports/hasher.js";
 import { stripJsonComments } from "./reading/jsonc.js";
 
-// ── MergeStrategy ────────────────────────────────────────────────────────────
-
 export type PerKeyMergeStrategy = {
   default: "framework-prime" | "user-prime";
   /** Keys where framework always wins, overriding the default strategy. */
@@ -15,8 +13,6 @@ export type MergeStrategy = "none" | "framework-prime" | "user-prime" | PerKeyMe
 export function isPerKeyMergeStrategy(s: MergeStrategy): s is PerKeyMergeStrategy {
   return typeof s === "object" && s !== null;
 }
-
-// ── MergeFileEntry ───────────────────────────────────────────────────────────
 
 export interface MergeFileEntry {
   readonly relativePath: string;
@@ -40,7 +36,6 @@ export function extractMergeEntries(
   return hashJsonEntries(container as Record<string, unknown>, hasher);
 }
 
-/** Hashes each top-level value of a JSON-serialisable object, one entry per key. */
 export function hashJsonEntries(
   entries: Record<string, unknown>,
   hasher: Hasher
@@ -69,9 +64,8 @@ export function removeEntriesFromJson(
   }
   const container = (parsed[sectionKey] as Record<string, unknown> | undefined) ?? {};
   for (const key of keysToRemove) delete container[key];
-  // A section we emptied out must vanish, not linger as `{}` — a settings file that
-  // shares its top level with unrelated keys (Claude's settings.json, permissions and
-  // all) must come back byte-identical once every key we own is gone.
+  // An emptied section must vanish, not linger as `{}`: a settings file sharing its top
+  // level with unrelated keys must come back byte-identical once every key we own is gone.
   if (Object.keys(container).length === 0) {
     delete parsed[sectionKey];
   } else {

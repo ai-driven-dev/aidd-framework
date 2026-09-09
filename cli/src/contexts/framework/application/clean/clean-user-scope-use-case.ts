@@ -30,9 +30,8 @@ import { userScopeFilesSafeToDelete } from "../shared/user-scope-plugin-files.js
 
 export interface CleanUserScopeOptions {
   /** Threaded only to `MarketplaceRegistry.delete`, whose signature takes one for the
-   * project-scope caller it usually serves — discarded by the adapter for scope
-   * `"user"` (see `MarketplaceRegistryAdapter.pathFor`), never read for anything
-   * machine-scope itself, since this operation has no one project of its own. */
+   * project-scope caller it usually serves — discarded by the adapter for scope `"user"`, since
+   * this operation has no one project of its own. */
   projectRoot: string;
   force: boolean;
   interactive?: boolean;
@@ -40,13 +39,11 @@ export interface CleanUserScopeOptions {
 
 export interface CleanUserScopePreview {
   toolIds: readonly ToolId[];
-  /** Every version directory found under `userConfigDir()/cache/built/` — what a
-   * `--force` run is about to purge whole, read structurally rather than trusted from
-   * any one tool's own manifest entry. */
+  /** Every version directory found under `userConfigDir()/cache/built/` — read structurally,
+   * never trusted from any one tool's own manifest entry. */
   builtVersions: readonly string[];
-  /** Every project on this machine that `references.json` still names, existing paths
-   * only — see `UserSourceReferences.listAllReferencingProjects`. Empty when the port
-   * was never wired in, or nothing else references the source. */
+  /** Every project on this machine that `references.json` still names, existing paths only. Empty
+   * when the port was never wired in, or nothing else references the source. */
   referencingProjects: readonly string[];
 }
 
@@ -57,45 +54,14 @@ export interface CleanUserScopeResult {
 }
 
 /**
- * `aidd clean --scope user`: undoes the machine-scope registration `setup --scope
- * user` and `sync --scope user` built, then purges the shared source itself — the
- * counterpart `clean` (project scope) has always refused to be, since one project's
- * `clean` must never break every other project sharing the same registration
- * (`CleanUseCase`'s own `undoMarketplaceRegistration` still refuses a scope-`"user"`
- * marketplace for exactly that reason).
+ * `aidd clean --scope user`: undoes the machine-scope registration and purges the shared source
+ * itself, which a project-scope `clean` refuses to do for a registration every project shares.
  *
- * A `--scope user` manifest is optional, not required: a plain project-scope `setup`
- * never writes one, yet still leaves every whitelist entry below behind (the source's
- * own build, this project's own `references.json` claim, the `marketplaces.json`
- * entry). Steps (1)-(4) below need `nativeRegistrations` only a user manifest carries,
- * so an absent one skips them outright rather than guessing at a registration that was
- * never recorded — named plainly in the result and in the logged output, "no host
- * registration was undone" — while step (5), the whitelist purge, reads nothing from
- * the manifest and always runs.
- *
- * Order is a hard constraint, same reasoning as `CleanUseCase`, whenever a manifest
- * exists: (1) uninstall every plugin ref, (2) unregister every marketplace — both
- * through the host's own CLI, at scope `"user"` always, never omitted (a real `claude`
- * binary defaults an omitted scope to `"user"` regardless, which happens to be right
- * here, but relying on that default instead of naming it is exactly the bug
- * `NativePluginActivator.enablePlugin`'s own doc comment describes for the
- * project-scope case) — before (3) a host's own declared cache is purged, which is
- * only safe once (1) and (2) actually asked that host to forget the name. Steps (1)
- * and (2) are also what removes aidd's own keys from a host's *real* user settings
- * file (`~/.claude/settings.json` and the like): that file holds a person's own
- * unrelated settings too, so this never edits it directly — the host's own CLI is the
- * only writer, the same rule `CleanUseCase` already holds for its own settings files.
- *
- * Only then (5) does a strict whitelist delete what remains: `userConfigDir()`'s own
- * `cache/built/` (every version, not just this run's own), the self-update
- * `cache/update-check.json` beside it, the now-empty `cache/` shell both leave behind,
- * and `references.json` — each re-resolved through
- * `resolveCacheCandidate`'s own `realpath` + containment check, the same one
- * `CleanUseCase` already trusts for the same reason — and `manifest.json` and the
- * `aidd-framework` entry alone from `marketplaces.json`, neither of which gets that
- * check: each is deleted through its own repository/registry, which computes its own
- * path from `userConfigDir()` directly and takes no manifest-supplied path data.
- * Never `userConfigDir()` itself, either way.
+ * A user manifest is optional: an absent one skips the host-registration steps rather than guessing,
+ * while the whitelist purge, reading nothing from the manifest, still runs. Order is a hard
+ * constraint — every plugin ref uninstalled, then every marketplace unregistered, both through the
+ * host's own CLI at scope `"user"`, before any cache is purged — and the whitelist resolves each
+ * entry through `realpath` and containment, never `userConfigDir()` itself.
  */
 export class CleanUserScopeUseCase {
   constructor(
@@ -104,19 +70,17 @@ export class CleanUserScopeUseCase {
     private readonly logger: Logger,
     private readonly marketplaceRegistry: MarketplaceRegistry,
     private readonly userConfigDir: () => string,
-    /** Native plugin CLI activators keyed by `NativeActivation.binary`, the same map
-     * every other native-activation caller is wired through. */
+    /** Native plugin CLI activators keyed by `NativeActivation.binary`. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator> = new Map(),
-    /** Readers of a host's own marketplace registry, keyed by `AiToolId` — same map
-     * `CleanUseCase` reads, `purgeAllNativeCaches`'s own post-condition. */
+    /** Readers of a host's own marketplace registry, keyed by `AiToolId` —
+     * `purgeAllNativeCaches`'s own post-condition. */
     private readonly hostMarketplaceRegistries: ReadonlyMap<
       AiToolId,
       HostMarketplaceRegistryReader
     > = new Map(),
     /** The one resolver for the OS home directory this use case ever calls. */
     private readonly homeDir: () => string = resolveHomeDir,
-    /** Absent for every caller that predates this, which reports no referencing
-     * project at all rather than guessing one. */
+    /** Absent reports no referencing project at all rather than guessing one. */
     private readonly userSourceReferences?: UserSourceReferences,
     private readonly prompter?: Prompter
   ) {}
@@ -130,10 +94,9 @@ export class CleanUserScopeUseCase {
     if (dryRunResult !== null) return dryRunResult;
 
     if (manifest !== null) {
-      // Undoing a host's own registration must happen before any purge: a host's own
-      // CLI resolves what it is unregistering against the built tree still on disk,
-      // and the cache/source purge below removes exactly that tree. Absent a
-      // manifest there is nothing recorded to undo — see the class doc.
+      // Undoing a host's own registration must happen before any purge: a host's own CLI resolves
+      // what it is unregistering against the built tree still on disk, and the purge below removes
+      // exactly that tree. Absent a manifest there is nothing recorded to undo.
       const undone = await this.undoNativeRegistrations(manifest);
       await purgeAllNativeCaches(
         this.fs,
@@ -149,8 +112,6 @@ export class CleanUserScopeUseCase {
     return { dryRun: false, manifestFound, preview };
   }
 
-  // ── Preview ──────────────────────────────────────────────────────────────────
-
   private async buildPreview(manifest: Manifest | null): Promise<CleanUserScopePreview> {
     return {
       toolIds: manifest?.getInstalledToolIds() ?? [],
@@ -159,14 +120,10 @@ export class CleanUserScopeUseCase {
     };
   }
 
-  /** What a manifest-less run states plainly, both in the result's own logged output
-   * and in the confirmation a non-`--force` run shows before doing anything: no host
-   * registration exists for steps (1)-(3) to undo, and, when this machine's own
-   * `references.json` still lists other projects, that they must each run their own
-   * `aidd clean` first — their hosts still resolve the shared source this run is about
-   * to purge. Ends with the same full-removal instruction `plugin remove`'s own guard
-   * message states, extracted once into `describeFullRemovalInstruction` so the two
-   * never drift onto a second spelling of the same two commands. */
+  /** What a manifest-less run states plainly, in the logged output and in a non-`--force` run's
+   * confirmation: no host registration exists to undo, and, when `references.json` still lists
+   * other projects, that each must run its own `aidd clean` first — their hosts still resolve the
+   * shared source this run is about to purge. */
   private describeNoUserRegistration(preview: CleanUserScopePreview): string {
     const base = "No host registration was undone: nothing was registered at user scope.";
     if (preview.referencingProjects.length === 0) return base;
@@ -226,8 +183,6 @@ export class CleanUserScopeUseCase {
     );
   }
 
-  // ── Undoing a host's own registration, at scope "user" always ───────────────
-
   private async undoNativeRegistrations(
     manifest: Manifest
   ): Promise<ReadonlyMap<ToolId, UndoneToolRegistrations>> {
@@ -270,9 +225,9 @@ export class CleanUserScopeUseCase {
     return removedHostNames;
   }
 
-  /** Named so a binary this run cannot reach still tells a person what it left
-   * standing — the marketplace and plugin-ref counts, plus this tool's own cache path
-   * when its profile declares one. */
+  /** Named so a binary this run cannot reach still tells a person what it left standing — the
+   * marketplace and plugin-ref counts, plus this tool's own cache path when its profile declares
+   * one. */
   private describeBinaryAbsent(toolId: ToolId, registrations: NativeRegistrations): string {
     const { binary } = registrations;
     const base =
@@ -287,14 +242,10 @@ export class CleanUserScopeUseCase {
     return `${base} Its cache survives at: ${paths.join(", ")}.`;
   }
 
-  // ── Cursor's own user-scope plugin tree, containment-checked ────────────────
-
-  /** The one tree this whitelist purges outside `userConfigDir()` itself: a
-   * user-scope plugin's own files (`~/.cursor/plugins/local/<plugin>`), listed by the
-   * user manifest and never deleted without `userScopeFilesSafeToDelete`'s own
-   * `realpath` + containment check — a `..` segment a corrupted entry carries, or a
-   * plugin directory that became a symlink after install, is left in place and named
-   * rather than followed. */
+  /** The one tree this whitelist purges outside `userConfigDir()` itself: a user-scope plugin's
+   * own files, listed by the user manifest and never deleted without `userScopeFilesSafeToDelete`'s
+   * `realpath` + containment check — a `..` segment a corrupted entry carries, or a plugin
+   * directory that became a symlink after install, is left in place and named. */
   private async purgeCursorUserScopeFiles(manifest: Manifest, projectRoot: string): Promise<void> {
     for (const toolId of manifest.getInstalledToolIds()) {
       if (!isAiToolId(toolId)) continue;
@@ -312,25 +263,21 @@ export class CleanUserScopeUseCase {
     }
   }
 
-  // ── The strict whitelist under userConfigDir() itself ───────────────────────
-
   private async purgeWhitelistedMachineState(projectRoot: string): Promise<void> {
     await this.purgeWhitelistedPath("cache/built", "cache/built", (candidate) =>
       this.fs.deleteDirectory(candidate)
     );
-    // The self-update check cache (`runtime/self-update/check-update-use-case.ts`), written
-    // into the same `cache/` directory on any online command. Nothing else purged it, so it
-    // outlived a machine-scope clean and kept the shell below non-empty — the one occupant
-    // that made "leaves nothing of aidd's on the machine" false in the ordinary case.
+    // The self-update check cache, written into the same `cache/` directory by any online
+    // command: left behind it keeps the shell below non-empty, the one occupant that made
+    // "leaves nothing of aidd's on the machine" false in the ordinary case.
     await this.purgeWhitelistedPath(
       "cache/update-check.json",
       "cache/update-check.json",
       (candidate) => this.fs.deleteFile(candidate)
     );
     await this.purgeEmptyCacheShell();
-    // Where the same cache used to be written before it moved under `cache/`; the reader
-    // still falls back to it, an older CLI on this machine may still write it, and it is
-    // aidd's own file — so it leaves with the rest rather than outliving the clean.
+    // Where the same cache was written before it moved under `cache/`; the reader still falls
+    // back to it and an older CLI on this machine may still write it.
     await this.purgeWhitelistedPath("update-check.json", "update-check.json", (candidate) =>
       this.fs.deleteFile(candidate)
     );
@@ -339,18 +286,16 @@ export class CleanUserScopeUseCase {
       USER_SOURCE_REFERENCES_FILENAME,
       (candidate) => this.fs.deleteFile(candidate)
     );
-    // The manifest's own repository is the single writer of `manifest.json` — deleting
-    // through it, never a second path to the same file, is what keeps that true.
+    // The manifest's own repository is the single writer of `manifest.json` — deleting through
+    // it, never a second path to the same file, is what keeps that true.
     await this.userManifestRepo.delete();
     await this.marketplaceRegistry.delete(projectRoot, FRAMEWORK_MARKETPLACE_NAME, "user");
   }
 
   /** `cache/built/` and `cache/update-check.json` are this whitelist's only occupants of
-   * `userConfigDir()/cache/`; once both are gone the shell around them is nothing but an
-   * empty directory nobody else writes to. Removed only once proven empty, under the same
-   * containment as every
-   * other candidate here — never assumed from having just purged its only child,
-   * since a future writer under `cache/` would make that assumption stale silently. */
+   * `userConfigDir()/cache/`. The shell around them is removed only once proven empty, under the
+   * same containment as every other candidate — never assumed from having just purged its only
+   * children, since a future writer under `cache/` would make that assumption stale silently. */
   private async purgeEmptyCacheShell(): Promise<void> {
     const candidate = await resolveCacheCandidate(
       this.fs,
@@ -372,11 +317,10 @@ export class CleanUserScopeUseCase {
     this.logger.info(`user scope: cache purged: ${candidate}`);
   }
 
-  /** Never `userConfigDir()` itself, and never on a manifest's word: every fixed
-   * whitelist entry is still resolved through `resolveCacheCandidate`'s own `realpath`
-   * + containment check before it is touched, the same one `CleanUseCase` trusts for
-   * its own purges — defense in depth against `userConfigDir()` or one of its
-   * children having become a symlink since it was last written. */
+  /** Never `userConfigDir()` itself, and never on a manifest's word: every fixed whitelist entry
+   * is still resolved through `resolveCacheCandidate`'s `realpath` + containment check before it
+   * is touched — defense in depth against one of those directories having become a symlink since
+   * it was last written. */
   private async purgeWhitelistedPath(
     relativeSegments: string,
     label: string,

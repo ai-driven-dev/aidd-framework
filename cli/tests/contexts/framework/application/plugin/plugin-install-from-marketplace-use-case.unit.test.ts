@@ -251,7 +251,6 @@ describe("PluginInstallFromMarketplaceUseCase", () => {
         plugins: [{ name: "sample-plugin", source: { kind: "local", path: "sample-plugin" } }],
       })
     );
-    // github marketplace source → local catalog dir; resolved git-subdir plugin → on-disk fixture
     deps.pluginFetcher.register(githubSource, GH_MKT_DIR);
     deps.pluginFetcher.register(
       {

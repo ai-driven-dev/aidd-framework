@@ -1,20 +1,9 @@
 #!/usr/bin/env node
 /**
- * check-context-imports.js - Fails when an `@import` in an AI context file sits
- * inside an HTML block, where the context loader skips it.
- *
- * Any line whose first non-space character is `<` is treated as opening an HTML
- * block that runs until the next blank line. Imports inside one are ignored
- * exactly like those in a fenced code block, so the file looks correct and loads
- * nothing, and nothing reports it.
- *
- * That rule is deliberately stricter than CommonMark, which closes a comment on
- * its own line. Context loaders are not all CommonMark, and a blank line after
- * the opening line costs nothing and holds under either reading.
- *
- * Usage:
- *   node scripts/check-context-imports.js                 every context file
- *   node scripts/check-context-imports.js CLAUDE.md ...    only those files
+ * Fails when an `@import` sits inside an HTML block, where a context loader skips it: the
+ * file looks correct, loads nothing, and nothing reports it. A block opens on any line
+ * starting with `<` and runs to the next blank line — stricter than CommonMark, because
+ * not every context loader is a CommonMark parser.
  */
 
 const fs = require("node:fs");
@@ -22,12 +11,11 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
 
-// The files a context loader reads. Anywhere in the tree, not just the root:
-// a monorepo package carries its own.
+// Anywhere in the tree, not just the root: a monorepo package carries its own.
 const CONTEXT_FILENAMES = ["CLAUDE.md", "AGENTS.md", "copilot-instructions.md"];
 
-// Directories to never walk into, matched by name at any depth. Same set as
-// scripts/check-markdown-links.js, which walks the same tree.
+// Matched by name at any depth. Same set as scripts/check-markdown-links.js, which walks
+// the same tree.
 const SKIPPED_DIRS = new Set([".git", "node_modules", "worktrees", ".specstory"]);
 
 // Snapshots of older framework versions, kept on the old shape as test input.
@@ -56,10 +44,7 @@ function collectContextFiles(dir = ROOT, found = []) {
   return found;
 }
 
-/**
- * Imports that a context loader will skip, with the line that hid them.
- * Code blocks are skipped: the broken shape is quoted in documentation.
- */
+/** Code blocks are skipped: the broken shape is quoted in documentation. */
 function findHiddenImports(content) {
   const hidden = [];
   let fence = null;

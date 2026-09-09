@@ -1,16 +1,6 @@
-/**
- * Phase 7 — OpenCode hooks install: installing a plugin with hooks/ against OpenCode
- * delivers the script, instead of skipping the component. Renamed from
- * plugin-add-opencode-hooks-skip.integration.test.ts (Phase 3), whose premise this
- * phase reverses — see aidd_docs/tasks/2026_08/2026_08_22_telemetry-every-tool/
- * measurements.md, Phase 7.
- *
- * Lot A (opencode-and-scope.md): the script no longer lands under .opencode/plugin/,
- * the directory OpenCode's own loader imports in-process — a plain hook script there
- * killed the host (process.exit, uncatchable). It is namespaced under
- * .opencode/hooks/<plugin>/ instead, the same shape .claude/hooks/<plugin>/ and
- * .cursor/hooks/<plugin>/ already use.
- */
+/** Installing a plugin carrying hooks/ against OpenCode delivers the script, namespaced under
+ * .opencode/hooks/<plugin>/ like .claude/ and .cursor/ already are. Never .opencode/plugin/,
+ * which OpenCode's own loader imports in-process, where a plain hook script kills the host. */
 
 import { join, posix } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -54,9 +44,8 @@ describe("PluginAddUseCase OpenCode hooks install (Phase 7)", () => {
   it("writes every hooks/ script but the manifest under .opencode/hooks/<plugin>/", async () => {
     const { deps } = await installSamplePlugin();
 
-    // deps.fs is the in-memory adapter, whose listUnder() returns its own "/"-normalised
-    // keys regardless of host platform - a native `join` would answer with "\" on win32
-    // and never match one of those keys.
+    // deps.fs is the in-memory adapter, whose listUnder() returns "/"-normalised keys whatever the
+    // platform joined with, so a native `join` would answer "\\" on win32 and match none of them.
     const writtenPaths = deps.fs.listUnder(PROJECT_ROOT);
     expect(writtenPaths).toContain(
       posix.join(PROJECT_ROOT, ".opencode", "hooks", "sample-plugin", "update_memory.js")
@@ -78,12 +67,8 @@ describe("PluginAddUseCase OpenCode hooks install (Phase 7)", () => {
   });
 });
 
-// Lot B (opencode-and-scope.md): `plugin install`/`setup` reach OpenCode through
-// ContentTranslator, never through FlatBuildStrategy (that one only runs for `translate`).
-// Without flatHooksBridge wired into ContentTranslator too, a plugin installed this way
-// carries a namespaced script nothing ever triggers — the exact gap `pnpm smoke` caught
-// (".opencode/plugin/ missing" after `setup --plugins recommended`, aidd-context's own
-// SessionStart hook installed with no bridge for it).
+// `plugin install` and `setup` reach OpenCode through ContentTranslator, never through
+// FlatBuildStrategy, so without flatHooksBridge there the namespaced script triggers nothing.
 describe("PluginAddUseCase OpenCode event bridge (Lot B)", () => {
   it("generates .opencode/plugin/<plugin>-hooks.js for a plugin's mapped hook", async () => {
     const { deps } = await installSamplePlugin();

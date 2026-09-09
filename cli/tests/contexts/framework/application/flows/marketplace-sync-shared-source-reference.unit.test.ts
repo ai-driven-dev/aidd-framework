@@ -74,8 +74,8 @@ describe("the shared source's own reference, recorded by sync", () => {
     expect(await userSourceReferences.listAllReferencingProjects()).toContain(PROJECT_ROOT);
   });
 
-  // Bloquant found in review: `references.json` is a help, not an authority — a
-  // corrupted copy must never block `sync`, which does not depend on it.
+  // `references.json` is a help, not an authority: a corrupted copy must never block `sync`,
+  // which does not depend on it.
   it("warns and still completes sync when references.json is corrupted", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     fs.setFile(`${PROJECT_ROOT}/marker`, "");
@@ -149,10 +149,8 @@ describe("the shared source's own reference, recorded by sync", () => {
     expect(await userSourceReferences.listAllReferencingProjects()).not.toContain(PROJECT_ROOT);
   });
 
-  // Finding 11: a clone whose committed manifest predates this machine's own copy of
-  // the registry (userConfigDir(), never inside the project) found `marketplaces` empty
-  // and returned EMPTY_RESULT — silently, forever, since nothing about a fresh clone
-  // ever populates that registry on its own.
+  // A clone whose committed manifest predates this machine's own copy of the registry finds
+  // `marketplaces` empty, and nothing about a fresh clone ever populates that registry.
   it("recreates the framework marketplace when this machine's registry holds nothing at all", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     fs.setFile(`${PROJECT_ROOT}/marker`, "");
@@ -214,14 +212,8 @@ describe("the shared source's own reference, recorded by sync", () => {
     expect(result).toEqual({ activated: [], binaryMissing: [], warnings: [], errors: [] });
   });
 
-  // `marketplace remove`, `plugin install | remove | update` and `marketplace add |
-  // refresh` all reach this same `execute` through `syncNativeActivation`, and an empty
-  // registry there is a person's own deliberate choice (their last marketplace just got
-  // removed), never a fresh clone. Recreating it for them would be exactly as wrong as
-  // `marketplace remove <name>` printing "removed" and then `marketplace list` showing
-  // the framework marketplace back — measured: this is the regression a first version
-  // of the fix caused in `plugin-install.e2e.test.ts`'s own "marketplace remove"
-  // scenario, caught only by running the real built binary through that command.
+  // Every marketplace and plugin command reaches this same `execute`, where an empty registry is
+  // a deliberate choice, never a fresh clone: recreating it would undo a `marketplace remove`.
   it("does not recreate the framework marketplace unless the caller asks for it", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     fs.setFile(`${PROJECT_ROOT}/marker`, "");

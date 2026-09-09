@@ -1,7 +1,5 @@
-// Note: idempotency (already-present marketplace) and empty-marketplace-list scenarios are
-// NOT covered here. Those behaviors live on MarketplaceSyncSettingsUseCase, which owns the
-// marketplace registration logic. ModeAMarketplaceTranslator is a thin translator adapter that
-// only registers the plugin reference in the manifest with empty files.
+// Idempotency and the empty-marketplace-list case live on MarketplaceSyncSettingsUseCase; this
+// translator only registers the plugin reference in the manifest, with empty files.
 import "../../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { describe, expect, it } from "vitest";
 import { ModeAMarketplaceTranslator } from "../../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";

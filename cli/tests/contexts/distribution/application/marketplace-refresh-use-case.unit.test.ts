@@ -261,10 +261,8 @@ describe("MarketplaceRefreshUseCase", () => {
         plugins: [{ name: "aidd-dev", source: "./plugins/aidd-dev" }],
       });
       await fs.writeFile(join(cacheDir, ".claude-plugin/marketplace.json"), freshCatalogJson);
-      // The stale check resolves this entry via resolve(cacheDir, entry.source.path), which —
-      // unlike join() — fills in the current drive letter on Windows when cacheDir is a
-      // rootless absolute path (e.g. "/test-project"). Seed through resolve() too so the
-      // written key matches what the production lookup builds on every platform.
+      // `resolve()`, unlike `join()`, fills in the current drive letter on Windows for a
+      // rootless absolute path, so seeding through it is what makes the written key match.
       await fs.writeFile(join(resolve(cacheDir, "plugins/aidd-dev"), "plugin.json"), "{}");
 
       const resolveMarketplace = new ResolveMarketplaceUseCase(

@@ -15,12 +15,8 @@ function fakeVersion(value: string): VersionReader {
   return { get: () => value };
 }
 
-// resolve(): checkMarketplaceSources hands this straight to marketplaceSourceDrift as
-// context.projectRoot, compared there against an already-resolved registered/requested
-// source (see resolvedBuiltDir's own resolve(raw) call) — a drive-less literal here would
-// make parseBuiltMarketplaceDir miss the base compare on win32 and fall through to
-// parseBuiltMarketplaceDirAtAnyRoot, misclassifying this project's own pre-migration
-// cache as a foreign one.
+// resolve(): compared in `marketplaceSourceDrift` against an already-resolved source, so a
+// drive-less literal makes win32 misclassify this project's own pre-migration cache as foreign.
 const PROJECT_ROOT = resolve("/project");
 const NAME = "probe-mkt";
 const CATALOG_RELATIVE = ".claude-plugin/marketplace.json";
@@ -33,8 +29,8 @@ function expectedBuiltDir(): string {
 }
 
 /** A `FileReader` whose `realpath` always throws, standing in for a built tree that was
- * never built, or was built and then deleted — the one case `checkMarketplaceSources`
- * must stay silent on rather than inventing a conflict against a path nothing resolves to. */
+ * never built, or built and then deleted: the one case `checkMarketplaceSources` stays silent
+ * on rather than inventing a conflict against a path nothing resolves to. */
 class UnresolvableFileReader implements FileReader {
   async readFile(): Promise<string> {
     throw new Error("not used by this test");
@@ -117,10 +113,8 @@ async function issuesFor(
     fakeVersion("1.0.0")
   );
   const issues = await useCase.execute({ manifest, projectRoot: PROJECT_ROOT, allowedIds: null });
-  // Not filtered by `NAME` (this project's own local alias): a conflict message names
-  // the catalog's own declared name, which a test deliberately diverging the two is
-  // free to set to something else entirely — see "reports a conflict keyed by the
-  // catalog's own declared name" below.
+  // Not filtered by `NAME`, this project's own local alias: a conflict message names the
+  // catalog's own declared name, which a test may diverge from the alias entirely.
   return issues.filter((issue) => issue.message.includes("catalog"));
 }
 
@@ -162,10 +156,8 @@ describe("DoctorRegistrationUseCase — marketplace source conflicts", () => {
     const HOST_NAME = "upstream";
     const hostReader = new FakeHostMarketplaceRegistryReader({
       location: REGISTRY_LOCATION,
-      // Nothing at all is registered under this project's own local alias (`NAME`,
-      // "probe-mkt") — only under the catalog's own declared name, `HOST_NAME`. A pass
-      // that looked the conflict up by `marketplace.name` (the alias) instead of the
-      // catalog's own declared name would find nothing here and stay silent.
+      // Nothing is registered under this project's local alias, only under the catalog's
+      // declared name: a pass keyed by `marketplace.name` would find nothing and stay silent.
       entries: new Map([[HOST_NAME, "/other/src"]]),
     });
 
@@ -239,10 +231,8 @@ describe("DoctorRegistrationUseCase — marketplace source conflicts", () => {
     const hostReader = new FakeHostMarketplaceRegistryReader({
       location: REGISTRY_LOCATION,
       entries: new Map([
-        // Coincidence: some unrelated catalog happens to be registered under this
-        // project's own local alias (`NAME`) — a fact `checkMarketplaceSources` must
-        // never look up, since the host never keyed *this* project's registration by
-        // that alias in the first place.
+        // Some unrelated catalog happens to be registered under this project's local alias, a fact
+        // `checkMarketplaceSources` must never look up: the host never keyed this project by it.
         [NAME, "/other/unrelated/src"],
         // The host's real key for this project's own catalog: its own declared name,
         // pointed at the exact tree this project built.
@@ -317,10 +307,8 @@ describe("DoctorRegistrationUseCase — marketplace source conflicts", () => {
 });
 
 describe("DoctorRegistrationUseCase — user-scope marketplace source drift", () => {
-  // resolve(): fed as-is into hostMarketplaceSourceConflict's driftContext.userCacheRoot,
-  // compared there against an already-resolved requested/registered source — a drive-less
-  // literal here misses parseUserBuiltMarketplaceDir's base compare on win32 and every
-  // drift decision below returns undefined before ever reaching its own logic.
+  // resolve(): compared against an already-resolved requested/registered source, so a
+  // drive-less literal misses the base compare and every drift below returns undefined.
   const USER_CACHE_ROOT = resolve("/user-cache");
   const CURRENT_VERSION = "2.0.0";
 

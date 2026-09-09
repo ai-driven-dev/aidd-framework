@@ -1,20 +1,6 @@
 /**
- * Phase 6 — Cursor remove: mcp.json is tracked in Plugin.files, so the existing
- * deletePluginFiles mechanism removes it on uninstall exactly as before.
- *
- * hooks.json is not among those keys: hooksDestination:"project" (see
- * install-plugin-cursor-hooks-mcp.integration.test.ts) merges hook entries into the
- * project's own .cursor/hooks.json, a file `plugin remove`'s baseDir-relative
- * deletePluginFiles has no way to find. Phase 7 closes that gap directly:
- * PluginRemoveUseCase.removeProjectHooks unmerges this plugin's entries out of
- * .cursor/hooks.json and deletes its .cursor/hooks/<plugin>/ scripts, leaving every
- * other plugin's contribution untouched — proven below by installing and removing for
- * real, not by reading mergeCursorProjectHooksJson.
- *
- * The mcp.json deletion is tested indirectly: we verify that its Plugin.files key
- * matches the written absolute path (so join(resolvedBase, key) == absolutePath).
- * PluginRemoveUseCase.deletePluginFiles iterates these keys, so if it's correct
- * the file will be removed.
+ * hooks.json is not tracked in Plugin.files: hooksDestination:"project" merges its entries
+ * into the project's own .cursor/hooks.json, which baseDir-relative deletion cannot find.
  */
 import "../../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
@@ -154,10 +140,8 @@ describe("plugin remove unmerges Cursor project hooks (Phase 7, Task 3)", () => 
   });
 
   it("installing the same plugin twice leaves one copy in .cursor/hooks.json", async () => {
-    // Mirrors `aidd plugin install --replace` (PluginAddUseCase.dropExistingPlugin):
-    // the manifest entry is dropped before re-adding, but the .cursor/hooks.json this
-    // plugin already merged into is untouched by that drop — the exact scenario
-    // mergeCursorProjectHooksJson's own dedup exists for.
+    // Mirrors `aidd plugin install --replace`: the manifest entry is dropped before re-adding,
+    // but the .cursor/hooks.json this plugin already merged into is untouched by that drop.
     const fs = new InMemoryFileAdapter();
     const manifest = Manifest.create();
     manifest.addTool("cursor", "test", []);

@@ -5,24 +5,16 @@ import type { PluginDistribution } from "../../../../translate/domain/plugin-dis
 import type { ReadonlySkipList } from "../../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../domain/manifest.js";
 
-/**
- * Contract implemented by both translation strategy adapters.
- *
- * This interface is a translator strategy contract (not a hexagonal port adapter).
- */
+/** A translator strategy contract, not a hexagonal port adapter. */
 export interface PluginTranslator {
-  /** Discriminant identifying which translation strategy this adapter implements. */
   readonly mode: PluginTranslationMode;
 
   /**
-   * Add a plugin for a specific tool, writing files and/or registering the plugin reference
-   * in the manifest according to this adapter's strategy.
-   *
-   * Returns a skip list — non-empty when the plugin contains components the tool cannot consume —
+   * Returns a skip list — non-empty when the plugin carries components the tool cannot consume —
    * and, for strategies that track it, how many files were actually (re)written to disk.
    *
-   * `previousMcpEntries` — pass the plugin's previous mcpEntries when replacing an existing
-   * plugin install (--replace path). Used for idempotent re-merge of OpenCode MCP servers.
+   * `previousMcpEntries` carries the plugin's previous entries when replacing an existing install,
+   * for an idempotent re-merge of OpenCode MCP servers.
    */
   addPlugin(
     dist: PluginDistribution,

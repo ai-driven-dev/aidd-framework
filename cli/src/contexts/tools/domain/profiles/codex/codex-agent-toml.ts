@@ -2,25 +2,13 @@ import { parseFrontmatter } from "../../../../../kernel/markdown.js";
 import { stringifyToml } from "./toml.js";
 
 /**
- * Converts a Claude-format agent markdown file (frontmatter + body) into a
- * Codex subagent TOML string.
+ * Converts a Claude-format agent markdown file (frontmatter + body) into a Codex subagent TOML
+ * string. Key insertion order is fixed for deterministic output, and the conversion is lossy —
+ * no model field is emitted and the TOML schema diverges from the frontmatter, so there is no
+ * inverse.
  *
- * TOML schema mapping (D-14, D-15, D-16):
- *   name               — when prefixName=false: fm.name when present, else "<pluginName>-<basename>"
- *                        when prefixName=true:  always "<pluginName>-<basename>" (flat mode)
- *   description        — fm.description when present (string)
- *   model              — omitted in MVP1 (D-5): no known Codex model id set
- *   developer_instructions — verbatim body, no rewrite (D-4)
- *
- * Key insertion order is fixed for deterministic output (D-15).
- *
- * prefixName=true is used in flat mode where all plugins share one .codex/agents/ directory;
- * the plugin prefix prevents name collisions between agents from different plugins.
- * prefixName=false is used in marketplace mode where each plugin has its own subdirectory.
- *
- * No inverse: codexAgentMarkdownToToml is lossy — the model field is intentionally
- * omitted (D-5) and the TOML schema diverges from markdown frontmatter, making a
- * lossless round-trip technically impossible.
+ * `prefixName` is for flat mode, where every plugin shares one `.codex/agents/` directory and
+ * the plugin prefix is what keeps two plugins' agents from colliding.
  */
 export function codexAgentMarkdownToToml(
   content: string,
@@ -56,7 +44,7 @@ function buildTomlObject(
   obj.name = name;
   // description is a required subagent key; default to "" when absent.
   obj.description = typeof frontmatter.description === "string" ? frontmatter.description : "";
-  // model is intentionally omitted in MVP1 (D-5): no known Codex model id set.
+  // model is intentionally omitted: no known Codex model id set.
   obj.developer_instructions = body;
   return obj;
 }

@@ -1,23 +1,7 @@
 /**
- * Tool-agnostic flat path primitives.
- *
- * All functions are pure (no I/O). Parameterized by a primary-dir prefix so that
- * claude, cursor, copilot, opencode, and codex all share the same path derivation
- * logic with different prefixes/extensions.
- */
-
-/**
- * Returns the flat-output path for an agent file.
- * The source `.md` extension is stripped and replaced with `outputExt`.
- *
- * Flat mode is PLUGIN-PREFIXED single level: no `<plugin>/` directory segment,
- * but the plugin name is prepended to the leaf filename with a hyphen so tools
- * can discover the files and the plugin origin is preserved in the name.
- *
- * @param agentsPrefix - Full prefix for agents dir (e.g. ".github/agents/", ".claude/agents/")
- * @param plugin       - Plugin name (prepended to the output filename)
- * @param agentBaseName - Source basename without path (e.g. "implementer.md")
- * @param outputExt    - Output extension (e.g. ".agent.md", ".md")
+ * Flat mode carries no `<plugin>/` directory segment: the plugin name is hyphen-prefixed
+ * onto the leaf filename instead, so a tool discovers the file at the depth it expects and
+ * the plugin origin still survives in the name.
  */
 export function genericFlatAgentPath(
   agentsPrefix: string,
@@ -30,24 +14,11 @@ export function genericFlatAgentPath(
 }
 
 /**
- * Returns the flat-output path for a skill file (preserves the skill's internal subtree).
- *
- * Flat mode is PLUGIN-PREFIXED single level: no `<plugin>/` directory segment,
- * but the plugin name is prepended to the first path segment (the skill folder)
- * with a hyphen. Tools can discover skills at the expected depth and the plugin
- * origin is preserved in the folder name.
- *
- * Assumes every immediate child of `skills/` IS a self-contained skill folder — the
- * hyphen lands on that child's own name, so a non-skill sibling (a shared helper
- * directory, a manifest file) gets renamed exactly like one, breaking any relative
- * path that reaches it by its original name. True today for the four callers still on
- * this function (claude, cursor, codex, copilot's flat contracts in tool-contracts.ts);
- * false for OpenCode's aidd-telemetry, which is why opencode's flat contract uses
- * `genericFlatSkillTreePath` instead (#defect fixed alongside this comment).
- *
- * @param skillsPrefix - Full prefix for skills dir (e.g. ".github/skills/", ".claude/skills/")
- * @param plugin       - Plugin name (prepended to the skill folder segment)
- * @param skillRelPath - Path relative to the plugin's skills/ directory
+ * Assumes every immediate child of `skills/` is a self-contained skill folder: the hyphen
+ * lands on that child's own name, so a non-skill sibling (a shared helper directory, a
+ * manifest file) is renamed exactly like one and any relative path reaching it by its
+ * original name stops resolving. A plugin where that does not hold takes
+ * `genericFlatSkillTreePath` instead.
  */
 export function genericFlatSkillPath(
   skillsPrefix: string,
@@ -58,23 +29,9 @@ export function genericFlatSkillPath(
 }
 
 /**
- * Returns the flat-output path for a skill file, nesting the plugin's ENTIRE skills/
- * subtree under one `<plugin>/` directory segment instead of hyphenating each
- * immediate child independently (contrast `genericFlatSkillPath`).
- *
- * Nothing below `skillsPrefix` is renamed: one segment is added in front of the tree and
- * every name under it survives. `genericFlatSkillPath` renames each immediate child instead,
- * and a script's `require()` is never rewritten (see plugin-content-translator.ts's
- * `TranslatedFile.verbatim` doc), so any path crossing a renamed name stops resolving there.
- *
- * This is the shape OpenCode installs today, and the one `genericFlatHooksScriptPath` uses
- * for a hook's own subtree. It does not license sharing code between skills: the four other
- * contracts do rename per child, and a plugin that relies on the tree staying intact is
- * installable by one tool out of five.
- *
- * @param skillsPrefix - Full prefix for skills dir (e.g. ".opencode/skills/")
- * @param plugin       - Plugin name (used as the nesting directory)
- * @param skillRelPath - Path relative to the plugin's skills/ directory
+ * Nests the plugin's entire `skills/` subtree under one `<plugin>/` segment, so every name
+ * below `skillsPrefix` survives — a script's `require()` is never rewritten, so a path
+ * crossing a renamed name would stop resolving.
  */
 export function genericFlatSkillTreePath(
   skillsPrefix: string,
@@ -84,23 +41,10 @@ export function genericFlatSkillTreePath(
   return `${skillsPrefix}${plugin}/${skillRelPath}`;
 }
 
-/**
- * Returns the flat-output path for the per-plugin hooks JSON file.
- *
- * @param hooksPrefix - Full prefix for hooks dir (e.g. ".github/hooks/")
- * @param plugin      - Plugin name
- */
 export function genericFlatHooksFile(hooksPrefix: string, plugin: string): string {
   return `${hooksPrefix}${plugin}.hooks.json`;
 }
 
-/**
- * Returns the flat-output path for a sibling hooks script file.
- *
- * @param hooksPrefix   - Full prefix for hooks dir
- * @param plugin        - Plugin name
- * @param scriptRelPath - Path relative to the plugin's hooks/ directory
- */
 export function genericFlatHooksScriptPath(
   hooksPrefix: string,
   plugin: string,
@@ -109,20 +53,14 @@ export function genericFlatHooksScriptPath(
   return `${hooksPrefix}${plugin}/${scriptRelPath}`;
 }
 
-/**
- * Returns the key prefix used when merging a plugin's MCP servers.
- * Includes trailing dash.
- */
 export function flatMcpKeyPrefix(plugin: string): string {
   return `${plugin}-`;
 }
 
 /**
- * A flat-mode loader's own module: the one hook script a plugin ships that the
- * loader imports as itself, rather than as something an external bridge must be
- * told to run. Kept in its own directory, separate from the per-plugin hooks
- * tree, so renaming it to the plugin's name can never collide with another
- * plugin shipping one of these.
+ * A flat-mode loader's own module: the one hook script a plugin ships that the loader
+ * imports as itself. Kept in its own directory, apart from the per-plugin hooks tree, so
+ * renaming it to the plugin's name can never collide with another plugin shipping one.
  */
 export interface FlatHooksLoaderEntry {
   readonly dir: string;
@@ -130,21 +68,11 @@ export interface FlatHooksLoaderEntry {
 }
 
 /**
- * Returns the flat-output path for a hook script under a loader that scans a
- * per-plugin hooks tree, with one exception: a script named `loaderEntry.baseName`
- * IS that loader's own runtime module (see {@link FlatHooksLoaderEntry}) — delivered
- * flat into `loaderEntry.dir` and renamed to the plugin's own name, so two plugins
- * shipping one cannot collide there. Every other script is namespaced under
- * `perPluginHooksDir`, the same per-plugin subtree `genericFlatHooksScriptPath`
- * already gives claude, cursor and codex — so a loader that also happens to scan
- * one flat plugin directory still gets a namespaced landing spot for the scripts
- * it does not import directly.
- *
- * @param perPluginHooksDir - Prefix for the namespaced hooks tree (trailing slash included)
- * @param loaderEntry       - The loader's own module name and directory, or `null` when
- *                            this loader has no such self-hosting convention
- * @param plugin            - Plugin name
- * @param hooksRelativePath - A hook component's path, e.g. "hooks/foo.js"
+ * A script named `loaderEntry.baseName` is the loader's own runtime module (see
+ * {@link FlatHooksLoaderEntry}): it lands flat in `loaderEntry.dir` under the plugin's own
+ * name, so two plugins shipping one cannot collide. Every other script is namespaced under
+ * `perPluginHooksDir`, giving a loader that also scans one flat directory a landing spot
+ * for the scripts it does not import directly. `null` means no such convention.
  */
 export function flatHooksPathWithLoaderEntry(
   perPluginHooksDir: string,

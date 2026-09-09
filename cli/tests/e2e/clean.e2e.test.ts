@@ -126,8 +126,8 @@ describe.concurrent("E2E: aidd clean", () => {
   });
 
   it("removes .claude/settings.local.json, a file install writes outside the manifest", async () => {
-    // Measured (scope-native-clean-plan.md §1.2): `clean` used to rejoin only what the
-    // manifest tracked, and this file — machine-local, so never tracked — survived.
+    // The file is machine-local and never tracked, so a clean rejoining only the manifest
+    // leaves it behind.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-settings-local");
     try {
       await seedManifest(projectDir);
@@ -146,8 +146,6 @@ describe.concurrent("E2E: aidd clean", () => {
   });
 
   it("leaves no .aidd behind when a marketplace was registered", async () => {
-    // The state the CLI wrote itself. Left behind, `.aidd` survived a run that had just
-    // printed that it cleaned all AIDD files.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-registry");
     try {
       await seedManifest(projectDir);

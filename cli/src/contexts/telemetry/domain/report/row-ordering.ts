@@ -3,13 +3,10 @@
 
 import type { CostTotals } from "../cost-report.js";
 
-/** Every token a row counted, across all four disjoint counters. The weight `bySize` falls
- * back to for a costless row - never `inputTokens + outputTokens` alone: every tool this
- * report has ever seen runs at 90%-plus cache, so a weight blind to the two cache counters
- * would order a costless breakdown by the sliver of its volume nobody reads it for, and
- * invert the order a reader actually wants. It is also the same sum the report already
- * prints beside a costless row - weighing by anything else would sort a row by a number the
- * report never shows. */
+/** Every token a row counted, across all four disjoint counters - the weight `bySize` falls
+ * back to for a costless row. Never `inputTokens + outputTokens` alone: tools run mostly on
+ * cache, so a weight blind to the cache counters would invert the order, and this is also the
+ * same sum the report prints beside a costless row. */
 function tokensOf(totals: CostTotals): number {
   return (
     (totals.inputTokens ?? 0) +
@@ -37,11 +34,9 @@ export function bySize<T>(
   );
 }
 
-// Second precision, no milliseconds - the same spelling `record.cjs`'s own `nowIso` writes
-// to the journal's `at` field. `startMs` here always comes from `Date.parse`-ing one such
-// value, so its own milliseconds are already zero; this only strips the ".000" `toISOString`
-// would otherwise append, so a row's `startedAt` string-matches the journal line it opened
-// on rather than looking like a different moment.
+// Second precision, no milliseconds - the same spelling the journal hook writes to a line's
+// `at` field, so a row's `startedAt` string-matches the line it opened on. `startMs` is parsed
+// from one such value, so this only strips the ".000" `toISOString` would append.
 export function isoSecondsFromMs(ms: number): string {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/u, "Z");
 }

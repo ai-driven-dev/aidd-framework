@@ -6,10 +6,9 @@ const GITIGNORE_FILENAME = ".gitignore";
 export class GitignoreUseCase {
   constructor(private readonly fs: FileReader & FileWriter) {}
 
-  /** `true` when at least one of `entries` was newly appended — `false` when every one
-   * was already there and nothing was written. Callers that only care about the file
-   * ending up correct can discard the return value; one does care (`aidd telemetry on`
-   * only announces the journal being ignored the run it actually adds the line). */
+  /** `true` when at least one of `entries` was newly appended, `false` when every one was already
+   * there. One caller depends on it: `aidd telemetry on` announces the journal being ignored only
+   * on the run that actually adds the line. */
   async execute(projectRoot: string, entries: string[]): Promise<boolean> {
     const gitignorePath = `${projectRoot}/${GITIGNORE_FILENAME}`;
 

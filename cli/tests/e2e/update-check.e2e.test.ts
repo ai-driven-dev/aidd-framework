@@ -18,9 +18,8 @@ interface FakeRelease {
 }
 
 /**
- * Local stand-in for both upstreams the updater queries: the npm registry
- * (source of truth for the version) and GitHub (best-effort changelog).
- * Counts every hit.
+ * Local stand-in for both upstreams the updater queries: npm (the version) and GitHub
+ * (best-effort changelog). Counts every hit.
  */
 function startFakeRelease(tag: string): Promise<FakeRelease> {
   let hits = 0;
@@ -144,10 +143,8 @@ describe("E2E: update-check piggyback", () => {
   it("online command refreshes the cache via postAction (the regression guard)", async () => {
     const t = await setupEnv("refresh");
     try {
-      // Cold cache. `marketplace list` IS an online command → postAction must fetch +
-      // persist BEFORE the process exits. `update` is deliberately NOT one of these
-      // (self-update resolves the latest version through its own request, not this
-      // piggyback) — the old fire-and-forget design left this file absent.
+      // Cold cache, and `marketplace list` IS an online command → postAction must fetch and
+      // persist BEFORE the process exits.
       const { exitCode } = await runCli(["marketplace", "list"], t.projectDir, t.env);
 
       expect(exitCode).toBe(0);
@@ -161,9 +158,8 @@ describe("E2E: update-check piggyback", () => {
   });
 
   it("still reads a cache written before it moved, rather than refetching every install at once", async () => {
-    // The file moved into `cache/`. Nothing rewrites the old one, but reading it is what
-    // keeps the move from costing every existing install a network call the first time it
-    // runs an online command.
+    // Nothing rewrites the old path, but reading it keeps the move from costing every
+    // existing install a network call on its first online command.
     const t = await setupEnv("legacy");
     try {
       await mkdir(dirname(t.legacyCachePath), { recursive: true });

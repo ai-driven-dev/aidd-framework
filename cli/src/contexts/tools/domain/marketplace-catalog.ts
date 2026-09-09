@@ -1,13 +1,10 @@
 /**
- * Marketplace catalog and manifest shaping shared by more than one tool's build
- * contract (claude, cursor, copilot, codex).
+ * Marketplace catalog and manifest shaping shared by more than one tool's build contract.
  *
- * A tool's build contract otherwise lives entirely inside that tool's own profile
- * directory. These functions are the exception: claude and cursor emit byte-identical
- * plugin manifests and catalog entries, and claude and copilot transform an agent's
- * frontmatter identically in marketplace mode. Duplicating them per tool would drift;
- * one tool importing another's directory would violate the boundary this refactor is
- * drawing. This file is the place both can reach without either.
+ * A tool's build contract otherwise lives entirely inside that tool's own profile directory;
+ * these are the exception, since claude and cursor emit byte-identical plugin manifests and
+ * catalog entries and claude and copilot transform an agent's frontmatter identically. One
+ * tool importing another's directory would break the boundary, so both reach this instead.
  */
 import { join } from "node:path";
 import { InvalidSourceMarketplaceError } from "../../../kernel/errors.js";
@@ -21,10 +18,8 @@ type SrcEntry =
   | { version?: string; description?: string; strict?: boolean; recommended?: boolean }
   | undefined;
 
-/**
- * Marketplace-mode agent transform shared by claude and copilot: both keep the
- * frontmatter untouched and only rewrite relative links to the flattened output path.
- */
+/** Marketplace-mode agent transform shared by claude and copilot: the frontmatter is kept
+ * untouched and only relative links are rewritten to the flattened output path. */
 export function transformClaudeAgent(content: string, _plugin: string, outName: string): string {
   const { frontmatter, body } = parseFrontmatter(content);
   const rewrittenBody = rewriteRelativeLinks(body, {
@@ -37,21 +32,16 @@ export interface SynthesizeClaudeStyleManifestOpts {
   /** When true, include `agents` as a list of `./agents/*.md` file paths if agents are present. */
   readonly agentsField: boolean;
   /**
-   * When true, point `hooks` at `./hooks/hooks.json` if the plugin ships one.
-   *
-   * Declared per tool because the answer is not the same for all of them: Claude Code loads
-   * that path by its own convention and, since 2.1.240, rejects a plugin whose manifest names
-   * it too — "Duplicate hooks file detected". The hooks fired anyway, so the plugin read as
-   * failed while working. Codex and the others still need the pointer.
+   * When true, point `hooks` at `./hooks/hooks.json` if the plugin ships one. Declared per tool
+   * because Claude Code loads that path by its own convention and rejects a plugin whose
+   * manifest names it too — "Duplicate hooks file detected", while the hooks fired anyway, so
+   * the plugin read as failed while working. Codex and the others still need the pointer.
    */
   readonly hooksField: boolean;
 }
 
-/**
- * Synthesize a Claude-style plugin manifest shared by claude + cursor + copilot strategies.
- * Key insertion order: name, description, version, author, homepage, repository, license,
- * keywords, agents (conditional), skills (conditional), hooks (conditional), mcpServers (conditional).
- */
+/** Synthesize a Claude-style plugin manifest, shared by the claude, cursor and copilot
+ * strategies. Key insertion order is part of the output shape. */
 export function synthesizeClaudeStyleManifest(
   source: Record<string, unknown>,
   presence: PluginPresence,
@@ -76,9 +66,6 @@ export function synthesizeClaudeStyleManifest(
   return manifest;
 }
 
-/**
- * Build a Claude-style marketplace catalog object shared by claude + cursor strategies.
- */
 export function buildClaudeStyleMarketplace(
   source: { name: string; version?: string; description?: string; owner?: unknown },
   pluginEntries: readonly Record<string, unknown>[]
@@ -144,10 +131,8 @@ export async function resolveDescription(
   );
 }
 
-/**
- * Resolve version + description, then shape the catalog entry — the marketplace-entry
- * builder claude and cursor both hand to `ToolBuildContract.buildMarketplaceEntry`.
- */
+/** Resolve version and description, then shape the catalog entry — the marketplace-entry
+ * builder claude and cursor both hand to `ToolBuildContract.buildMarketplaceEntry`. */
 export async function buildClaudeStyleEntry(
   name: string,
   outDir: string,
@@ -166,23 +151,18 @@ export async function buildClaudeStyleEntry(
   );
 }
 
-// ── Codex-native marketplace catalog (for `codex plugin marketplace add`) ──────
-// Shape verified 2026-07-05 against https://github.com/openai/plugins
-// .agents/plugins/marketplace.json and https://developers.openai.com/codex/plugins/build.
+// Codex-native marketplace catalog, for `codex plugin marketplace add`. Shape verified against
+// OpenAI's own published plugins marketplace and its plugin-build documentation.
 
 /** Default category when the source marketplace entry does not specify one. */
 const CODEX_DEFAULT_CATEGORY = "Developer Tools";
-/**
- * Default per-plugin auth policy. AIDD plugins bundle skills/agents/hooks with no
- * external OAuth, so auth is deferred to first use rather than forced at install.
- */
+/** Default per-plugin auth policy. AIDD plugins bundle skills/agents/hooks with no external
+ * OAuth, so auth is deferred to first use rather than forced at install. */
 const CODEX_DEFAULT_AUTHENTICATION = "ON_USE";
 const CODEX_INSTALLATION_AVAILABLE = "AVAILABLE";
 
-/**
- * Build a Codex marketplace catalog: `{ name, interface: { displayName }, plugins }`.
- * `displayName` falls back to the marketplace name when the source omits it.
- */
+/** Build a Codex marketplace catalog. `displayName` falls back to the marketplace name when
+ * the source omits it. */
 export function buildCodexMarketplace(
   source: { name: string; displayName?: string },
   pluginEntries: readonly Record<string, unknown>[]
@@ -191,11 +171,8 @@ export function buildCodexMarketplace(
   return { name: source.name, interface: { displayName }, plugins: pluginEntries };
 }
 
-/**
- * Build a single Codex marketplace entry. `installation`/`authentication`/`category`
- * are required per the plugin-creator spec; `authentication` and `category` accept a
- * source-entry override, else fall back to the AIDD-shaped defaults.
- */
+/** Build a single Codex marketplace entry. `installation`, `authentication` and `category` are
+ * required by the plugin-creator spec; the last two accept a source-entry override. */
 export function buildCodexMarketplaceEntry(
   name: string,
   srcEntry: Record<string, unknown> | undefined

@@ -20,20 +20,6 @@ import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-ad
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
 
-/**
- * The seam #703 is about, from the writing side.
- *
- * `aidd` declares a plugin in a project's own settings, and the host loads it only once
- * that host's own CLI has registered it — `activateNativeTools` is what performs that
- * second half. Nothing asserted it: `marketplace-sync-settings-use-case.ts` had no test
- * file at all, so the one act that makes a declared plugin actually load was covered
- * nowhere, on the branch that shipped it.
- *
- * The pairing that matters is the ref. This file proves the activation is driven with the
- * same `<plugin>@<marketplace>` string `buildHostRegistration` looks up, so the
- * two halves cannot drift into disagreeing about what to call one plugin — the failure the
- * diagnostic exists to report would otherwise become a failure it invents.
- */
 const PROJECT_ROOT = "/test-project";
 const MARKETPLACE = "aidd-framework";
 const PLUGIN = "aidd-telemetry";
@@ -65,11 +51,8 @@ function manifestWithPlugin(marketplace: string = MARKETPLACE): InMemoryManifest
   return new InMemoryManifestRepository(manifest);
 }
 
-/** What `readMarketplaceCatalogIdentity` reads back for the one marketplace `marketplace()`
- * registers, built to the one directory `fakeEnsureBuiltMarketplace()`'s default resolves
- * "claude" to — a real build always leaves a readable catalog there, so a fixture standing
- * in for one must too, now that an unreadable catalog is a hard failure rather than a
- * silent fall back to this project's own local alias (see `UnreadableBuiltCatalogError`). */
+/** An unreadable built catalog is a hard failure (`UnreadableBuiltCatalogError`), so this
+ * fixture must leave a readable one where `fakeEnsureBuiltMarketplace()` resolves "claude". */
 function seededBuiltCatalog(): InMemoryFileAdapter {
   return new InMemoryFileAdapter({
     "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
@@ -104,16 +87,14 @@ function buildSync(activator: FakeNativePluginActivator, pluginMarketplace?: str
 
 const SETTINGS_PATH = ".claude/settings.json";
 
-/** `resolve`, exactly as `syncMarketplacesFile` does — not a `/`-joined literal. On Windows
- * the production key is `C:\\test-project\\.claude\\settings.json`, and a hand-built POSIX
- * path addresses a file the use case never wrote. */
+/** `resolve`, exactly as `syncMarketplacesFile` does: on Windows the production key is
+ * `C:\\test-project\\.claude\\settings.json`, which a `/`-joined literal never addresses. */
 function settingsPathIn(projectRoot: string): string {
   return resolve(projectRoot, SETTINGS_PATH);
 }
 
-/** What the host's own CLI does that this code cannot see: `claude plugin marketplace add`
- * and `claude plugin enable` write their result into the very file `syncTool` just hashed.
- * The fake shells out to nothing, so it stands in for that write directly. */
+/** The host's own CLI writes its `marketplace add` and `plugin enable` results into the very
+ * file `syncTool` just hashed. The fake shells out to nothing, so it stands in for that write. */
 class ActivatorThatWritesSettings extends FakeNativePluginActivator {
   constructor(
     private readonly fs: InMemoryFileAdapter,
@@ -156,8 +137,6 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(activator.enabledPlugins).toContain(REF);
-    // The other half of the pairing: the ref the comparison asks a registry about. If either
-    // side ever spells it differently, this line and the one above stop agreeing.
     const asked = buildHostRegistration([
       {
         tool: "claude",
@@ -168,8 +147,6 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     expect(asked.entries[0]?.ref).toBe(activator.enabledPlugins[0]);
   });
 
-  // The #703 state itself, from this side: the settings are written, the host CLI is absent,
-  // and nothing registers. The diagnostic is the only thing that can then tell a person.
   it("registers nothing when the host CLI is not available, and does not fail the sync", async () => {
     const activator = new FakeNativePluginActivator({ available: false });
     const { useCase, registry } = buildSync(activator);
@@ -180,16 +157,8 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     expect(activator.enabledPlugins).toEqual([]);
   });
 
-  /**
-   * The half of the disagreement the contract argues hardest for, and the reason the
-   * comparison starts from the manifest rather than from a settings file.
-   *
-   * `mergeEnabledPlugins` skips a plugin whose marketplace does not resolve — silently,
-   * with a bare `continue`. So this plugin reaches no settings file and no host CLI, while
-   * AIDD's own manifest says it is installed. A diagnostic reading settings against a
-   * registry would find both sides absent and call that agreement; reading the manifest
-   * against the registry is what makes it visible.
-   */
+  // `mergeEnabledPlugins` skips a plugin whose marketplace does not resolve with a bare
+  // `continue`, so it reaches neither a settings file nor the host CLI.
   it("registers nothing for a plugin whose marketplace does not resolve, and says nothing about it", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
     const { useCase, registry } = buildSync(activator, "a-marketplace-nobody-added");
@@ -198,7 +167,6 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(activator.enabledPlugins).toEqual([]);
-    // And the manifest still carries it, which is the only place it can now be seen from.
     const entry = buildHostRegistration([
       {
         tool: "claude",
@@ -211,12 +179,6 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
   });
 });
 
-/**
- * The manifest's own record of what a tool's CLI was asked to register — what `doctor`
- * later compares against the host's real registry, and `clean` undoes through the same
- * binary. Written only for a tool this run actually activated, mirroring the rule
- * `recordWhatActivationWrote` already holds for the settings-file hash.
- */
 describe("nativeRegistrations reflects what the host's own CLI was asked to register", () => {
   it("records binary, marketplaces and pluginRefs after a successful activation", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
@@ -244,13 +206,6 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
     expect(reloaded?.getNativeRegistrations("claude")).toBeUndefined();
   });
 
-  /**
-   * What `sync` exists to repair: the manifest still carries a prior run's
-   * `nativeRegistrations`, but the host's own registry has lost it (a machine re-clone, a
-   * person clearing it by hand) — the fake starts with none of what it was asked to
-   * register on a previous run. Running `execute` again is what `sync` now does, and it
-   * must drive the CLI again rather than trust the stale manifest record.
-   */
   it("re-registers through the host CLI when the manifest's record has gone stale", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
     const { useCase, registry, manifestRepo } = buildSync(activator);
@@ -274,15 +229,8 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
     });
   });
 
-  /**
-   * The coordinator's own scenario: this project's local alias for a marketplace
-   * (`MARKETPLACE`, what its own registry and `manifestWithPlugin` both key it by) is
-   * free to differ from what the catalog it builds actually declares itself as — a
-   * supported capability, never a fault, since v8. `claude` only ever knows the
-   * marketplace by its catalog's own name, so the ref driven through `enablePlugin`
-   * and the name recorded in `nativeRegistrations` must both follow the catalog, never
-   * the alias.
-   */
+  // This project's local alias for a marketplace is free to differ from the name its catalog
+  // declares, and `claude` only ever knows the marketplace by the catalog's own name.
   it("drives the host CLI and records the catalog's own name when this project's local alias differs from it", async () => {
     const CATALOG_NAME = "aidd-framework-catalog";
     const activator = new FakeNativePluginActivator({ available: true });
@@ -320,14 +268,8 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
   });
 });
 
-/**
- * Declaring a marketplace and installing a plugin from it are two acts, and a person
- * does the first alone all the time — `activateTool` registers every known marketplace
- * regardless of whether the manifest names a plugin for it. Nothing above exercises a
- * manifest with zero plugins: `buildSync` always installs one, so a guard reintroduced
- * at the top of `activateTool` (`if (refs.length === 0) return false;`) would still pass
- * every test in this file. This is the one that catches it.
- */
+// `buildSync` always installs a plugin, so a guard `if (refs.length === 0) return false;` at the
+// top of `activateTool` would still pass every other test in this file.
 describe("registering a marketplace does not wait for a plugin to point at it", () => {
   it("registers every known marketplace even when the manifest declares no plugin", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
@@ -354,20 +296,8 @@ describe("registering a marketplace does not wait for a plugin to point at it", 
   });
 });
 
-/**
- * `syncTool` writes `.claude/settings.json`, hashes what it wrote, and the manifest is saved.
- * Only then does `activateNativeTools` run the host's own CLI — which writes into that same
- * file, because Claude Code declares one `settingsPath` for both marketplaces and enabled
- * plugins.
- *
- * So the tracked hash describes content that no longer exists the moment activation
- * succeeds. Nothing re-hashes it. `status` and `doctor` report a file the user never touched
- * as drifted, for as long as the manifest stands, and `restore` would undo the host's own
- * registration to get back to a state AIDD only ever held for the length of one function.
- *
- * The one case in this file that is about what the activation leaves behind rather than what
- * it was driven with.
- */
+// Claude Code declares one `settingsPath` for both marketplaces and enabled plugins, so the
+// host's own CLI writes into the very file `syncTool` hashed just before activation ran.
 describe("what native activation leaves behind is not reported as the user's drift", () => {
   it("tracks a hash that still matches the settings file after the host CLI has written to it", async () => {
     const registry = new InMemoryMarketplaceRegistry();
@@ -400,13 +330,8 @@ describe("what native activation leaves behind is not reported as the user's dri
     expect(entry, "the settings file is tracked at all").toBeDefined();
     expect(entry?.hash).toEqual(hasher.hash(onDisk));
   });
-  /**
-   * The other half, and the one that keeps the repair honest. A tool whose CLI is not on the
-   * PATH wrote nothing, so a settings file that differs from its tracked hash differs because
-   * a person changed it — which is exactly the drift `status` exists to report and `restore`
-   * exists to undo. Re-hashing every tool after activation would bless that as ours and
-   * silently make the change permanent.
-   */
+  // A tool whose CLI is not on the PATH wrote nothing, so a settings file differing from its
+  // tracked hash differs because a person changed it — re-hashing would bless that as ours.
   it("leaves a hash alone for a tool whose own CLI never ran", async () => {
     const registry = new InMemoryMarketplaceRegistry();
     const fs = new InMemoryFileAdapter();
@@ -429,7 +354,6 @@ describe("what native activation leaves behind is not reported as the user's dri
       ?.getToolFiles("claude")
       .find((file) => file.relativePath === SETTINGS_PATH)?.hash;
 
-    // A person edits the file, then a second sync runs and changes nothing else.
     const edited = `${await fs.readFile(settingsAbsolutePath)}\n`;
     await fs.writeFile(settingsAbsolutePath, edited);
     await useCase.execute({ projectRoot: PROJECT_ROOT });
@@ -443,14 +367,8 @@ describe("what native activation leaves behind is not reported as the user's dri
   });
 });
 
-/**
- * `reclaimOrReport` fires when the host's own `add` refuses a name already held — dead
- * or live decides whether this project may reclaim it. Both the check and the reclaim
- * itself are host-facing calls, so both must ask about, and act on, the catalog's own
- * name, never this project's local alias for it: asking about the alias would answer
- * "dead" for a registration the host actually holds live under its catalog's name, and
- * then force-remove a name the host never held.
- */
+// Asking about the local alias would answer "dead" for a registration the host holds live under
+// the catalog's own name, and then force-remove a name the host never held.
 describe("reclaiming a dead registration asks and acts on the host's own name", () => {
   it("checks and removes the catalog's own name, not this project's local alias, before re-adding", async () => {
     const CATALOG_NAME = "aidd-framework-catalog";
@@ -490,14 +408,8 @@ describe("reclaiming a dead registration asks and acts on the host's own name", 
   });
 });
 
-/**
- * The guard for the interface between the two lots: `doctor` reads the host's registry
- * (lot 1) and its fix names `aidd sync`; `sync` now drives the same activation this file
- * exercises everywhere else (lot 2). This composes both, with one activator double
- * standing in for the host CLI both sides look at, so `doctor` going healthy again is
- * read from the same state `sync` was asked to write — not from two doubles that happen
- * to agree by construction.
- */
+// One activator double stands in for the host CLI both `doctor` and `sync` look at, so health
+// is read from the state sync was asked to write, not from two doubles agreeing by construction.
 describe("what doctor tells a person to run becomes true once sync has run", () => {
   /** Answers `read()` from the activator's own recorded state, so a registry reading
    * always reflects exactly what the last `execute()` asked the host CLI to enable. */
@@ -525,15 +437,12 @@ describe("what doctor tells a person to run becomes true once sync has run", () 
       () => "/user-cache",
       { get: () => "1.0.0" }
     );
-    // `buildSync` seeds the repository with a manifest already carrying a plugin, and
-    // `MarketplaceSyncSettingsUseCase.execute` mutates that same instance in place rather
-    // than replacing it — so one load, kept across both doctor calls below, sees the sync
-    // that runs in between without needing a second, equally-unproven load.
+    // `MarketplaceSyncSettingsUseCase.execute` mutates the loaded manifest in place, so one
+    // load kept across both doctor calls sees the sync that runs in between.
     const manifest = await manifestRepo.load();
     expect(manifest, "buildSync always seeds a manifest").not.toBeNull();
     if (manifest === null) throw new Error("unreachable — asserted above");
 
-    // Before sync ever ran: the host's registry carries nothing this project expects.
     const before = await doctorRegistration.execute({
       manifest,
       projectRoot: PROJECT_ROOT,
@@ -543,7 +452,6 @@ describe("what doctor tells a person to run becomes true once sync has run", () 
       before.some((issue) => issue.severity === "error" && issue.fix.includes("aidd sync"))
     ).toBe(true);
 
-    // What `sync` now does: the same activation, re-registering through the same CLI.
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     const after = await doctorRegistration.execute({
@@ -555,13 +463,8 @@ describe("what doctor tells a person to run becomes true once sync has run", () 
   });
 });
 
-/**
- * Lot 9 review, C-B1: `recordNativeRegistrations`'s keyed merge must apply only to a
- * `marketplaceNames`-narrowed run. An unnarrowed `sync`/`setup` has to fall back to the
- * pre-lot whole-entry replace — otherwise a recorded ref whose `hostName` the registry no
- * longer carries (an upstream catalog rename, a marketplace nobody re-added) is retained
- * forever, since `setNativeRegistrations` is called from nowhere else in the tree.
- */
+// `recordNativeRegistrations`'s keyed merge applies only to a narrowed run: an unnarrowed one
+// replaces the whole entry, or a ref the registry no longer carries is retained forever.
 describe("an unnarrowed run replaces the whole recorded entry (lot 9 review C-B1)", () => {
   const LIVE_MARKETPLACE = "market-live";
   const LIVE_PLUGIN = "plugin-live";
@@ -635,14 +538,8 @@ describe("an unnarrowed run replaces the whole recorded entry (lot 9 review C-B1
   });
 });
 
-/**
- * Lot 9 review, C-B2: two of this project's own local aliases can resolve to the same
- * `hostName` (a supported capability, not a conflict — see `architecture.md`'s "aidd
- * refuses what claude would accept" bullet). `retainedMarketplaces` filters by alias,
- * `retainedRefs` filtered by hostName alone before this fix — so a narrowed run on one
- * alias silently dropped every ref at the shared hostName, including the untouched
- * alias's own.
- */
+// Two of this project's local aliases can resolve to one `hostName`; `retainedMarketplaces`
+// filters by alias, so refs must be retained by alias too, never by hostName alone.
 describe("a narrowed run preserves another alias's refs at a shared hostName (lot 9 review C-B2)", () => {
   const SHARED_HOST_NAME = "shared-catalog";
   const ALIAS_X = "alias-x";
@@ -722,15 +619,12 @@ describe("a narrowed run preserves another alias's refs at a shared hostName (lo
     await registry.save(PROJECT_ROOT, aliasMarketplace(ALIAS_X));
     await registry.save(PROJECT_ROOT, aliasMarketplace(ALIAS_Y));
 
-    // First, an unnarrowed run registers both aliases — the state a real project reaches
-    // after two `marketplace add` calls against the same catalog under two local names.
     await useCase.execute({ projectRoot: PROJECT_ROOT });
     const beforeNarrow = (await manifestRepo.load())?.getNativeRegistrations("claude");
     expect(beforeNarrow?.pluginRefs, "both refs recorded before the narrowed run").toEqual(
       expect.arrayContaining([`${PLUGIN_X}@${SHARED_HOST_NAME}`, `${PLUGIN_Y}@${SHARED_HOST_NAME}`])
     );
 
-    // Then a run narrowed to X alone — what `marketplace add alias-x <source>` re-drives.
     await useCase.execute({ projectRoot: PROJECT_ROOT, marketplaceNames: [ALIAS_X] });
 
     const recorded = (await manifestRepo.load())?.getNativeRegistrations("claude");

@@ -1,6 +1,3 @@
-/**
- * Discriminant for the two plugin translation strategies.
- * - "marketplace": Mode A — register plugin reference in tool's native config (no file materialization).
- * - "flat": Mode B — materialize plugin content as files on disk.
- */
+/** `"marketplace"`: register a plugin reference in the tool's native config, writing no plugin
+ * files. `"flat"`: materialize the plugin's content as files on disk. */
 export type PluginTranslationMode = "marketplace" | "flat";

@@ -42,9 +42,8 @@ async function listFilesUnder(dir: string): Promise<string[]> {
   return results;
 }
 
-/** Whether a directory is still there at all — `listFilesUnder` answers `[]` for an
- * empty one and for a removed one alike, so proving a shell was removed needs its own
- * question. */
+/** Whether a directory is still there at all — `listFilesUnder` answers `[]` for an empty
+ * one and a removed one alike, so proving a shell was removed needs its own question. */
 async function directoryExists(dir: string): Promise<boolean> {
   try {
     await readdir(dir);
@@ -116,18 +115,13 @@ describe("E2E: clean --scope user purges the shared source", () => {
       await mkdir(join(userConfigDir, "telemetry"), { recursive: true });
       await writeFile(telemetryFile, '{"kind":"session"}\n', "utf-8");
 
-      // This sandbox reaches no real `claude` binary (see
-      // sandbox-reaches-no-tool-binary.e2e.test.ts), so `setup --scope user` never
-      // builds the shared source's own tree here — that only happens once a host's own
-      // CLI actually needs it (`smoke:real` is what proves that against a real
-      // binary). A fixture stands in for what such a round-trip would have left
-      // behind: this is the load-bearing state `clean --scope user` must purge.
+      // This sandbox reaches no real `claude` binary, so `setup --scope user` never builds
+      // the shared source's tree here; the fixture stands in for what a host would leave.
       const builtDir = join(userConfigDir, "cache", "built", "9.9.9", "aidd-framework", "claude");
       await mkdir(builtDir, { recursive: true });
       await writeFile(join(builtDir, "marker.json"), "{}", "utf-8");
-      // The self-update check cache, which any online command writes beside `built/`.
-      // It is aidd's own file, so the whitelist takes it too — and only then is the
-      // `cache/` shell around both actually empty enough to go with them.
+      // The self-update check cache, aidd's own file beside `built/`, so the whitelist takes
+      // it too — and only then is the `cache/` shell around both empty enough to go.
       await writeFile(
         join(userConfigDir, "cache", "update-check.json"),
         '{"checkedAt":0,"latest":"9.9.9"}',
@@ -152,13 +146,8 @@ describe("E2E: clean --scope user purges the shared source", () => {
       expect(await gitStatusPorcelain(projectDir)).toBe("");
 
       const after = (await listFilesUnder(userConfigDir)).sort();
-      // The full delta, not a list of paths this test happens to think of: the whole
-      // built cache (including the fixture above), the manifest and any references
-      // file are gone. `marketplaces.json` survives with its `aidd-framework` entry
-      // gone but `other-marketplace` intact, and `auth.json`/`telemetry/` — files this
-      // whitelist has no business under — both survive untouched. No binary was ever
-      // on PATH here, so there is nothing an absent binary leaves behind to name
-      // either.
+      // The full delta, not a list of paths this test happens to think of, so a file the
+      // whitelist has no business under fails here rather than going unnoticed.
       expect(before).not.toEqual(after);
       expect(after).toEqual(
         ["auth.json", "marketplaces.json", join("telemetry", "2026-01-01.jsonl")].sort()
@@ -170,9 +159,8 @@ describe("E2E: clean --scope user purges the shared source", () => {
       expect(afterNames).not.toContain("aidd-framework");
       expect(afterNames).toContain("other-marketplace");
       expect(await readFile(telemetryFile, "utf-8")).toBe('{"kind":"session"}\n');
-      // `listFilesUnder` sees files, never an empty directory, so the shell itself has
-      // to be asked for by name: nothing of aidd's was left under `cache/`, so `cache/`
-      // is gone too rather than surviving as an empty husk.
+      // `listFilesUnder` sees files, never an empty directory, so the shell itself has to
+      // be asked for by name.
       expect(await directoryExists(join(userConfigDir, "cache"))).toBe(false);
     } finally {
       await cleanup();
@@ -188,8 +176,8 @@ describe("E2E: clean --scope user purges the shared source", () => {
         env: environmentWithoutGitVariables(process.env),
       });
 
-      // A plain, project-scope setup — no `--scope user` — never writes a user
-      // manifest, yet still registers the shared source machine-wide (architecture.md).
+      // A plain, project-scope setup — no `--scope user` — never writes a user manifest,
+      // yet still registers the shared source machine-wide.
       const setupResult = await runCli(
         [
           "setup",

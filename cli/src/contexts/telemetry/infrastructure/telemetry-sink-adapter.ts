@@ -54,26 +54,17 @@ function hasLegacyTelemetryData(): boolean {
   }
 }
 
-// `%APPDATA%` is where a Windows application puts this, not `.config` (measured on a real
-// windows-latest runner). A machine that already journalled under the old `.config` default
-// keeps landing there rather than losing access to what it already wrote; only a machine
-// starting fresh gets `%APPDATA%`.
-//
-// Exported for the test that pins it on any platform rather than only on a Windows runner:
-// where the figures land is a pure resolution, and a rule only a rarely-run job can check is
-// a rule that regresses in silence. It was the plugin's own sink that held this pin until the
-// read path moved here; it holds nothing now, so this is the only place left to hold it.
+// `%APPDATA%`, not `.config`, is where a Windows application puts this; a machine that
+// already journalled under `.config` keeps landing there rather than losing access to what it
+// wrote. Exported so a test can pin the resolution on any platform, not only a Windows runner.
 export function defaultConfigDir(): string {
   if (process.platform !== "win32") return legacyConfigDir();
   if (hasLegacyTelemetryData()) return legacyConfigDir();
   return process.env.APPDATA ? join(process.env.APPDATA, "aidd") : legacyConfigDir();
 }
 
-// The identical no-op in the journal (hooks/lib/repo.cjs): `mkdir`/`appendFile`'s
-// `mode` option is accepted on Windows without error and does nothing with it. `icacls` is
-// the mechanism that actually restricts a path there. `%APPDATA%` is already the current OS
-// user's own profile, unlike a git checkout that can sit anywhere, so restricting it to that
-// same account narrows nothing that Windows' own convention did not already imply.
+// `mkdir`/`appendFile`'s `mode` is accepted on Windows without error and does nothing there;
+// `icacls` is the mechanism that actually restricts a path.
 function restrictToCurrentUser(target: string, options: { recursive?: boolean } = {}): void {
   try {
     const owner = process.env.USERDOMAIN
@@ -91,29 +82,19 @@ function restrictToCurrentUser(target: string, options: { recursive?: boolean } 
 }
 
 /** Every write is `appendFile`. `readRecordsForVendor` is the only method that reads a day
- * file's content, and only to let a local re-read know what is already stored. */
+ * file's content, and only so a local re-read knows what is already stored. */
 export class TelemetrySinkAdapter implements TelemetrySink {
-  /**
-   * `AIDD_TELEMETRY_DIR` names this directory outright; `AIDD_USER_CONFIG_DIR` names the
-   * directory *above* it and is kept only so a setup that predates the split keeps working.
-   *
-   * They are two variables because they answer to two different needs that used to share
-   * one name: `AIDD_USER_CONFIG_DIR` also relocates `auth.json` (`auth-storage.ts:19`), a
-   * GitHub token, so it could never be the variable a team shares. The full argument, and
-   * what to tell someone still on the older one, live in `plugins/aidd-telemetry/README.md`
-   * under "Share `AIDD_TELEMETRY_DIR`, never `AIDD_USER_CONFIG_DIR`" - one home, since a
-   * copy here would be a second one to keep true.
-   */
+  /** `AIDD_TELEMETRY_DIR` names this directory outright; `AIDD_USER_CONFIG_DIR` names the
+   * directory *above* it and also relocates `auth.json`, a GitHub token, so it can never be
+   * the variable a team shares. */
   readonly rootDir: string;
-  // A user who names their own location keeps responsibility for its permissions - a shared
-  // directory is what this exists for, and locking it down to one account on Windows would
-  // break exactly that sharing.
+  // A user who names their own location keeps responsibility for its permissions: sharing a
+  // directory is what this exists for, and locking it to one account would break that.
   private readonly userNamed: boolean;
 
-  /** Which of the three answers above this directory came from. Carried because one of
-   * them has a consequence a person has to be told about: `AIDD_USER_CONFIG_DIR` also names
-   * where `auth.json` is written, so anyone who set it on the old advice has a credential in
-   * the directory they were told to share, and nothing else would ever mention it. */
+  /** Carried because one answer has a consequence a person must be told about:
+   * `AIDD_USER_CONFIG_DIR` also names where `auth.json` is written, so anyone using it has a
+   * credential in the directory they were told to share. */
   readonly locatedBy: "telemetry-dir" | "user-config-dir" | "default";
 
   constructor(userConfigDir?: string) {
@@ -131,11 +112,9 @@ export class TelemetrySinkAdapter implements TelemetrySink {
       restrictToCurrentUser(this.rootDir, { recursive: true });
       return;
     }
-    // POSIX had no branch at all, so the figures landed in a world-listable directory while
-    // the run journal beside them was 0700. `mkdir`'s own `mode` is masked by the process
-    // umask and applies only when it creates the directory, so it cannot be relied on for
-    // one that already exists. A day file's content was already private at 0600; what
-    // leaked was the listing - which days this person worked, and how many.
+    // `mkdir`'s own `mode` is masked by the process umask and applies only when it creates
+    // the directory, so it cannot make an existing one private. The listing is what needs
+    // protecting here: which days this person worked, and how many.
     try {
       chmodSync(this.rootDir, PRIVATE_DIR_MODE);
     } catch {
@@ -143,9 +122,8 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     }
   }
 
-  // `/T` on the directory does not reliably carry the grant onto a leaf file it walks into
-  // (measured on a real windows-latest runner), so a day file gets its own pass too -
-  // only the write that creates it, the one `PRIVATE_FILE_MODE` itself only applies to.
+  // `/T` on the directory does not reliably carry the grant onto a leaf file it walks into,
+  // so a day file gets its own pass on the write that creates it.
   private tightenFile(filePath: string): void {
     if (this.userNamed || process.platform !== "win32") return;
     restrictToCurrentUser(filePath, { recursive: false });
@@ -184,10 +162,9 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     }
   }
 
-  // `dir` is always a caller-supplied value (never `this.rootDir` re-derived here) — see
-  // the port's own doc. `isBareFileName` is the actual confinement: `join` alone normalises
-  // `..` away visually but still deletes wherever the normalised path lands, so a
-  // `fileName` that is not a bare component of `dir` is refused before it ever reaches `rm`.
+  // `isBareFileName` is the confinement: `join` normalises `..` away visually but still
+  // deletes wherever the result lands, so a name that is not a bare component of the
+  // caller-supplied `dir` never reaches `rm`.
   async deleteDayFile(dir: string, fileName: string): Promise<void> {
     if (!isBareFileName(fileName)) {
       throw new Error(`refusing to delete "${fileName}" — not a day file name inside ${dir}`);
@@ -203,9 +180,9 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     return records;
   }
 
-  // Every day file is opened, not only the ones the period names: a session read locally
-  // days after it ran is appended to today's file while its records carry their own, older
-  // moments. Selecting by file name would be selecting by when we heard about the work.
+  // Every day file is opened, not only the ones the period names: a session read days after
+  // it ran lands in today's file while its records carry their own, older moments, so
+  // selecting by file name would select by when we heard about the work.
   async readRecordsInPeriod(fromDay: Date, toDay: Date): Promise<TelemetrySinkPeriodRead> {
     const [fromKey, toKey] = [dayKey(fromDay), dayKey(toDay)].sort();
     const records: TelemetrySinkRecord[] = [];
@@ -237,7 +214,7 @@ export class TelemetrySinkAdapter implements TelemetrySink {
       content = await readFile(join(this.rootDir, fileName), "utf8");
     } catch {
       // A file listed a moment ago and unreadable now — rotated, deleted, or never ours.
-      // Nothing about it is known, so nothing about it is counted as skipped either.
+      // Nothing about it is known, so nothing is counted as skipped either.
       return { records: [], skippedLines: 0 };
     }
     const records: TelemetrySinkRecord[] = [];
@@ -260,8 +237,7 @@ export class TelemetrySinkAdapter implements TelemetrySink {
       content = await readFile(join(this.rootDir, fileName), "utf8");
     } catch {
       // Same tolerance as `readAllRecordsFromFile`: a file listed a moment ago and
-      // unreadable now (rotated, deleted, or never ours) must not fail a vendor-scoped
-      // read any more than it fails a full one.
+      // unreadable now must not fail a vendor-scoped read any more than a full one.
       return [];
     }
     const records: TelemetrySinkRecord[] = [];
@@ -273,9 +249,8 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     return records;
   }
 
-  // A torn final line (a concurrent write still in flight) or a stray older-schema line
-  // must not fail an unrelated session's read — skipped, not translated, since there is
-  // no typed exception a caller could usefully act on for one line among many.
+  // A torn final line or a stray older-schema line must not fail an unrelated session's
+  // read: skipped, since no typed exception is useful for one line among many.
   private parseLineOrSkip(line: string): TelemetrySinkRecord | undefined {
     try {
       return parseTelemetrySinkLine(line);

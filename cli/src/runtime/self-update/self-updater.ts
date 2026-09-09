@@ -1,6 +1,6 @@
 export interface CliRelease {
   version: string;
-  /** Release notes, or null when no changelog is available (e.g. private repo, no token). */
+  /** `null` where the release body could not be read — a private repository with no token. */
   changelog: string | null;
 }
 

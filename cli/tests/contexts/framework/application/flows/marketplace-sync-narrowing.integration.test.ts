@@ -1,17 +1,6 @@
 /**
- * Lot 9, item C: `marketplace add <name>` (and `plugin install --from <market>`) must
- * re-drive native activation for the one marketplace the command just acted on, never
- * every registered marketplace — `MarketplaceSyncSettingsOptions.marketplaceNames`
- * filters the resolved `marketplaces` inside `execute`, before the empty-registry
- * early return.
- *
- * The narrowing trap `recordNativeRegistrations` must not fall into: a narrowed run's
- * outcome only ever carries the marketplace it touched, so a plain replace of the
- * manifest's own `nativeRegistrations` would erase every other marketplace's own
- * `{alias, hostName}` and its plugin refs — the record `clean`, `doctor` and item A's
- * own `hostNameFor` all read. `recordNativeRegistrations` must instead keep every
- * existing entry outside this run's scope and replace only what this run touched,
- * merging `pluginRefs` by the `@<hostName>` suffix the touched marketplaces own.
+ * A narrowed run's outcome carries only the marketplace it touched, so replacing
+ * `nativeRegistrations` wholesale would erase every other marketplace's record.
  */
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { describe, expect, it } from "vitest";

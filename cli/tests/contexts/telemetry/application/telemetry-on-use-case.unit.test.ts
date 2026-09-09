@@ -17,10 +17,8 @@ import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 
-/** Delegates every read and write to `inner`, except a write to `path`, which throws — a
- * disk-full or permission failure on one file, never on any other. Used to prove that a
- * write failing after the switch has not yet been written must not leave the switch
- * written anyway. */
+/** Fails a write to one path alone — a disk-full or permission failure on a single file —
+ * so a write failing afterwards must not leave the switch written anyway. */
 class ThrowingWriteAdapter implements FileReader, FileWriter {
   constructor(
     private readonly inner: InMemoryFileAdapter,
@@ -84,10 +82,8 @@ function buildUseCase(seed: Record<string, string> = {}) {
 
 describe("TelemetryOnUseCase — the switch alone", () => {
   it("refuses when the records directory cannot be written, rather than losing them later", async () => {
-    // The one moment a person is asking for measurement is the moment to tell them it
-    // cannot be stored. `appendRecord` creates the directory itself, so without this the
-    // first failure comes at the first record — long after the decision, and to whoever
-    // happens to run `read` rather than to whoever turned it on.
+    // `appendRecord` creates the directory itself, so without this the first failure comes
+    // at the first record — to whoever runs `read`, not to whoever turned it on.
     const { fs, useCase, sink } = buildUseCase();
     sink.unwritable = true;
 
@@ -99,9 +95,8 @@ describe("TelemetryOnUseCase — the switch alone", () => {
 
   it("a gitignore write that fails leaves the switch unwritten, never enabled: true over a half-finished setup", async () => {
     const inner = new InMemoryFileAdapter({}, new DeterministicHasher());
-    // Matches GitignoreUseCase's own construction (`${projectRoot}/.gitignore`, a literal
-    // "/" join since git always speaks forward slashes) — not `join()`, which would key this
-    // in-memory adapter's failing path differently from the one the use case actually writes.
+    // Matches GitignoreUseCase's own literal "/" join, never `join()`, which would key this
+    // adapter's failing path differently from the one the use case actually writes.
     const fs = new ThrowingWriteAdapter(inner, `${PROJECT_ROOT}/.gitignore`);
     const logger = new CapturingLogger();
     const useCase = new TelemetryOnUseCase(
@@ -186,9 +181,8 @@ describe("TelemetryOnUseCase — the same consent `endpoint --scope project` alr
 });
 
 describe("TelemetryOnUseCase — making commits joinable to the session that made them", () => {
-  /** Records what the use case asked git to do, so the unit tier can hold the decision
-   * (install, then say so) apart from the mechanics of writing a hook, which the adapter's
-   * own integration suite proves against real repositories. */
+  /** Holds the decision — install, then say so — apart from the mechanics of writing a hook,
+   * which the adapter's own integration suite proves against real repositories. */
   function recordingGit(lineAdded: boolean) {
     const calls: { delegateFile: string; script: string }[] = [];
     const git: VersionControl = {

@@ -1,17 +1,5 @@
-/**
- * Phase 6 — Cursor flat (native user-scope) hooks + mcp parity.
- * Plugin-scope hooks were measured to never fire (three probes, see
- * aidd_docs/tasks/2026_08/2026_08_22_telemetry-every-tool/measurements.md, Phase 4),
- * so hooksDestination:"project" in cursor.ts now routes hooks/hooks.json to the
- * project's own .cursor/hooks.json instead — the destination measured to fire.
- * Asserts that:
- *   - hooks/hooks.json is merged into the project's .cursor/hooks.json (camelCase
- *     events, ${CLAUDE_PLUGIN_ROOT}/ → ./.cursor/hooks/<plugin>/)
- *   - .mcp.json is still passed through as mcp.json at the plugin root, unchanged
- *   - hooks.json is NOT tracked in Plugin.files (it isn't under the plugin's own
- *     baseDir, so `plugin remove`'s baseDir-relative deletePluginFiles must not try)
- *   - No skip warnings are emitted
- */
+// Plugin-scope Cursor hooks were measured never to fire, so `hooksDestination: "project"` routes
+// hooks/hooks.json into the project's own .cursor/hooks.json — the destination that does fire.
 import "../../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

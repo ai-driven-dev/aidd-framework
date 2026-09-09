@@ -23,9 +23,8 @@ import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetr
 import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 const PERIOD = { fromDay: "2026-08-17", toDay: "2026-08-21" } as const;
-// `execute()` now also asks whether the project switch is on - every test in this file is
-// about what the sink and the journal hold, not about that switch, so it always answers
-// "on" here and passes a fixed root and an empty env just to satisfy the shape.
+// Every test here is about what the sink and the journal hold, not the project switch: the
+// fixed root and empty env only satisfy `execute()`'s shape.
 const BASE_OPTIONS = { projectRoot: "/project", env: {} } as const;
 const STORED_ON = new Date("2026-08-21T09:00:00Z");
 const TASK = "2026_08/2026_08_21_cost-reporter";
@@ -121,11 +120,8 @@ describe("ReportCostUseCase", () => {
     expect(built.totals.costMicroUsd).toBe(toMicroUsd(1));
   });
 
-  // The written-file route only fires inside the span the journal itself witnessed, and that
-  // span reaches the report from the journal's own lines - nowhere else. A record inside it
-  // that no declaration covers is named after the one task folder the session wrote into; a
-  // record from before the journal was ever open is not, however many files that session
-  // went on to write.
+  // The second record predates the journal's own span, so no written-file inference can
+  // reach it however many files that session went on to write.
   it("names a record inside the journal's span after the only task folder that session wrote into", async () => {
     journals.set("s-inferred", {
       boundaries: [],
@@ -268,15 +264,8 @@ describe("ReportCostUseCase", () => {
     );
   });
 
-  // A task reached only by the written-file route still has a folder, and that folder can
-  // declare a backlog item. Resolving declarations from declared intervals alone would send
-  // every inferred record to the "this task declares no backlog item" row - a claim about
-  // the task, produced by a lookup that never happened.
-  // A journal moment is a second: `nowIso()` in the writing hook strips the milliseconds
-  // (`plugins/aidd-telemetry/hooks/lib/record.cjs`). A record carries them. Comparing the
-  // two as instants refuses a record that landed in the very second the journal last wrote,
-  // which is a rounding artefact of the source, not a fact about the work - measured, it
-  // cost one record of 1073 on a real session.
+  // A journal moment is second-precision — the writing hook strips the milliseconds — while
+  // a record keeps them, so a record landing in that same second still counts as inside.
   it("counts a record inside the last second its journal wrote as witnessed", async () => {
     journals.set("s-same-second", {
       boundaries: [],
@@ -346,9 +335,8 @@ describe("ReportCostUseCase", () => {
   });
 
   it("resolves the declaration through TaskBacklogReader, keyed on the folder the task identity resolves to", async () => {
-    // Pins the wiring `distinctTaskIdentities` -> `taskFolderPathFromIdentity` ->
-    // `TaskBacklogReader.read` actually performs: the double is set on the exact folder
-    // path a real adapter would be asked to read, never on the bare task identity string.
+    // The double is set on the exact folder path a real adapter would be asked to read,
+    // never on the bare task identity string.
     journals.set("s-task", {
       boundaries: [],
       session: {
@@ -358,9 +346,8 @@ describe("ReportCostUseCase", () => {
         tool: "claude-code",
         vendor_id: "s-task",
       },
-      // A witnessed moment after the record's own timestamp - without one, the declared
-      // interval's own end collapses to its start (buildTaskIntervals's own documented
-      // behaviour), and the record below would fall outside it.
+      // A witnessed moment after the record's own timestamp: without one the declared
+      // interval's end collapses to its start and the record below falls outside it.
       filesWritten: [
         {
           type: "file_written",
@@ -413,13 +400,6 @@ describe("ReportCostUseCase", () => {
   });
 });
 
-/**
- * Catching the sink up, so a report is the only command a person runs.
- *
- * `report` reads the sink, and until now nothing filled the sink but `aidd telemetry read`.
- * A person who forgot that step was told, truthfully, that the period held nothing — the one
- * answer indistinguishable from a period where nothing was spent.
- */
 describe("a report that catches the sink up first", () => {
   const SESSION = "s-catch-up";
   const AT = "2026-08-18T10:00:00.000Z";
@@ -428,7 +408,6 @@ describe("a report that catches the sink up first", () => {
   let journals: InMemoryRunJournalReader;
   let evidence: StubTelemetryEvidenceReader;
 
-  /** A journal for one session, dated inside the period unless told otherwise. */
   function journalAt(at: string): RunJournal {
     return {
       boundaries: [],
@@ -444,9 +423,8 @@ describe("a report that catches the sink up first", () => {
     };
   }
 
-  /** The real local read, over in-memory ports and one stub reader — not a double for it.
-   * What is being asserted is that `report` reaches the read at all, which a stand-in for
-   * the read could be made to show whether or not it were true. */
+  /** The real local read over in-memory ports, never a double: a stand-in could be made to
+   * show `report` reaching the read whether or not it does. */
   function localRead(records: readonly LocalCostCandidateRecord[]): ReadLocalCostUseCase {
     return new ReadLocalCostUseCase(
       sink,
@@ -504,31 +482,8 @@ describe("a report that catches the sink up first", () => {
     expect(built.totals.requests).toBe(0);
   });
 
-  // Was asserted the other way round — `expect(reads).toBe(0)`, "leaves a session already
-  // stored alone" — and that assertion is why the defect survived: it locked an
-  // optimisation that buys speed with correctness. Keyed on whether a session appears at
-  // all, one stored record froze a session that was still running. Measured on a live
-  // session: the sink held 285 records while the transcript had 541, and `report` added
-  // none of them. A plausible wrong figure, which is the one thing this layer refuses
-  // everywhere else.
-  //
-  // Re-reading is safe because the reader already dedupes per `turn_id`
-  // (`read-local-cost-use-case.ts`), so the session-level gate was a second filter at the
-  // wrong granularity. What bounds the cost is the period, not this.
-  // A judgement is derived, never trusted from disk. `step_attribution` is written into the
-  // record at read time, so a record stored before a rule was corrected keeps the answer
-  // that rule gave — measured on a live sink, which reported 91% `unattributed` while a
-  // fresh read of the same session reported 0%. `tool-stated` stays trusted: the tool naming
-  // a skill on the counters line is an observation, not a judgement.
-  // The other half of the same rule, and it had no test until a mutation went unnoticed:
-  // overwriting `tool-stated` too broke nothing. An observation outranks a derivation — the
-  // tool named that skill on the line carrying the counters, and no interval can improve on
-  // it. Asserted with the journal naming a *different* skill, so trusting the stored one is
-  // the only way to pass.
-  // A journal can disappear while its records stay: `aidd_docs/runs/` lives in the project
-  // and is git-ignored, so a clean checkout has the figures and none of the boundaries.
-  // Deriving there would answer `unattributed` for a session that once resolved a step,
-  // trading a stale reading for no reading — the one direction this whole change refuses.
+  // A journal can disappear while its records stay: `aidd_docs/runs/` is git-ignored, so a
+  // clean checkout holds the figures and none of the boundaries.
   it("keeps a stored step for a session the period's journals say nothing about", async () => {
     await sink.appendRecord(
       record({
@@ -572,15 +527,8 @@ describe("a report that catches the sink up first", () => {
     );
   });
 
-  // The exact join, and the reason the whole prompt chain exists. The record's moment falls
-  // *outside* every interval, so an interval reading answers `unattributed` — only matching
-  // the prompt both sides name can attribute it. That is what survives two tasks advancing
-  // at once: two prompts stay two prompts however their moments overlap.
-  // Three steps really do open under one prompt: measured on a live session, where
-  // `aidd-orchestrator:01-sdlc`, `aidd-pm:04-spec` and `aidd-dev:01-plan` all carried
-  // `839ab4a8-…`. The prompt names the step its work began in; taking the last opener would
-  // answer "plan" for the reasoning that produced the spec — a different claim, and a wrong
-  // one.
+  // The record's moment falls outside every interval, so only the prompt both sides name can
+  // attribute it; three steps really do open under one prompt on a measured live session.
   it("names the step a shared prompt opened first, never the last to reuse it", async () => {
     const journal = journalAt("2026-08-18T09:00:00Z");
     journals.set(SESSION, {
@@ -646,14 +594,8 @@ describe("a report that catches the sink up first", () => {
     );
   });
 
-  /**
-   * A session whose journal never opened the step, because the hook was not installed when
-   * it ran. The record still carries what its own transcript said: the skill a `Skill` call
-   * invoked inside that prompt. Same fact, same identifier, read from the other side.
-   *
-   * Measured on the real sink: 28 such prompts across 22 days, 318 records named this way
-   * and by nothing else.
-   */
+  /** The journal never opened the step because the hook was not installed when the session
+   * ran; the record still carries the skill its own transcript named for that prompt. */
   it("attributes on the skill the record's own prompt invoked, where no journal saw it", async () => {
     journals.set(SESSION, journalAt("2026-08-18T09:00:00Z"));
     await sink.appendRecord(
@@ -673,9 +615,8 @@ describe("a report that catches the sink up first", () => {
     );
   });
 
-  // The journal is the stronger of the two: it was written by a hook the host itself fired,
-  // while the transcript is read back afterwards. They can only disagree if one of them is
-  // wrong, and the reading with a witness wins.
+  // The journal was written by a hook the host itself fired while the transcript is read back
+  // afterwards, so the reading with a witness wins.
   it("keeps the journal's own answer when both sides name a skill for the same prompt", async () => {
     const journal = journalAt("2026-08-18T09:00:00Z");
     journals.set(SESSION, {
@@ -730,12 +671,8 @@ describe("a report that catches the sink up first", () => {
     );
   });
 
-  // The limit of re-reading, found by the reference-week e2e going from 7 requests to 10.
-  // A re-read is matched against what is stored on `turn_id`, and `groupByTurnId` indexes
-  // nothing without one — so re-reading a session whose records carry none appends them a
-  // second time. Rare while only unseen sessions were read; systematic once every session
-  // in the period is. Claude Code writes a `requestId` on every line (0 of 810 records
-  // without one on a live sink), but a host that does not must not be silently doubled.
+  // `groupByTurnId` indexes nothing without a `turn_id`, so re-reading a session whose
+  // records carry none would append them a second time.
   it("leaves a session alone when its stored records carry no turn id to match on", async () => {
     journals.set(SESSION, journalAt(AT));
     await sink.appendRecord(record({ vendor_id: SESSION, event_timestamp: AT }), STORED_ON);
@@ -765,8 +702,7 @@ describe("a report that catches the sink up first", () => {
 
   it("reads a stored session again, so a live session's later turns land", async () => {
     journals.set(SESSION, journalAt(AT));
-    // A `turn_id` is what makes a re-read reconcilable rather than duplicating: the test
-    // below holds the other half of that rule.
+    // A `turn_id` is what makes a re-read reconcilable rather than duplicating.
     await sink.appendRecord(
       record({ vendor_id: SESSION, event_timestamp: AT, turn_id: "req_1" }),
       STORED_ON
@@ -796,10 +732,8 @@ describe("a report that catches the sink up first", () => {
   });
 
   it("reaches a session journalled on the last day of the period, which runs to midnight", async () => {
-    // The bound is the first instant after `toDay`, not `toDay` at 00:00. Getting that
-    // wrong excluded a whole day: a report over the single day work happened on answered
-    // "nothing in this period", and `--days N` sets `toDay` to today, so the default report
-    // never caught up anything journalled today.
+    // The bound is the first instant after `toDay`, not `toDay` at 00:00: getting it wrong
+    // drops the whole last day, which `--days N` always makes today.
     journals.set(SESSION, journalAt(`${PERIOD.toDay}T23:59:59.999Z`));
 
     const built = await reportWith(
@@ -820,9 +754,8 @@ describe("a report that catches the sink up first", () => {
   });
 
   it("never reaches for a session journalled the instant the period ends", async () => {
-    // Midnight opening the day *after* `toDay` is the first moment outside, not the last
-    // one inside — the other half of the boundary, and the half a `>` instead of a `>=`
-    // would silently widen.
+    // Midnight opening the day after `toDay` is the first moment outside, not the last one
+    // inside — the half a `>` instead of a `>=` would silently widen.
     const dayAfter = new Date(Date.parse(`${PERIOD.toDay}T00:00:00Z`) + 86_400_000);
     journals.set(SESSION, journalAt(dayAfter.toISOString()));
 
@@ -835,9 +768,8 @@ describe("a report that catches the sink up first", () => {
   });
 
   it("never reaches for a session whose own moment falls outside the period asked about", async () => {
-    // Otherwise the cost of catching up would grow with the age of the repository rather
-    // than with the length of the period, and a one-week report on a two-year project would
-    // re-read every session it ever journalled.
+    // Otherwise catching up would cost with the age of the repository rather than with the
+    // length of the period asked about.
     journals.set(SESSION, journalAt("2020-01-01T00:00:00.000Z"));
 
     const built = await reportWith(localRead([CANDIDATE])).execute({
@@ -849,9 +781,8 @@ describe("a report that catches the sink up first", () => {
   });
 
   it("deletes no stored day file, since a question is not housekeeping", async () => {
-    // `read` prunes past its retention window, which is right for the command a person runs
-    // to do housekeeping. Behind a report it meant a command that had never destroyed
-    // anything started deleting measurement as a side effect of being asked a question.
+    // `read` prunes past its retention window, which is housekeeping; behind a report that
+    // would delete measurement as a side effect of being asked a question.
     journals.set(SESSION, journalAt(AT));
     for (let day = 1; day <= 120; day += 1) {
       const stamp = new Date(Date.UTC(2025, 0, day));
@@ -862,16 +793,14 @@ describe("a report that catches the sink up first", () => {
     await reportWith(localRead([CANDIDATE])).execute({ ...BASE_OPTIONS, period: PERIOD });
 
     // Asserted as "none of these is gone", not as an unchanged count: the catch-up stores
-    // what it reads, so it adds a day file of its own. What must hold is that it removed
-    // nothing.
+    // what it reads, so it adds a day file of its own.
     const after = new Set(await sink.listDayFiles());
     expect(before.filter((file) => !after.has(file))).toEqual([]);
   });
 
   it("says what a reader could not answer, rather than reporting the silence as no spend", async () => {
     // A period where every reader threw would otherwise print exactly what a period with no
-    // spend prints. The read surface showed those failures; behind a report nobody sees its
-    // output any more, so the report has to carry them itself.
+    // spend prints, and nobody sees the read surface's own output behind a report.
     journals.set(SESSION, journalAt(AT));
     const warnings: string[] = [];
     const throwing = new ReadLocalCostUseCase(
@@ -919,8 +848,7 @@ describe("a report that catches the sink up first", () => {
 
   it("opens no tool's files at all when the project switch is off", async () => {
     // Asserted on whether the reader was reached, not on the total: a refused catch-up and
-    // an absent one both report zero, so a total cannot tell them apart. What has to hold
-    // here is that a report never opens a person's session files against their refusal.
+    // an absent one both report zero, so a total cannot tell them apart.
     journals.set(SESSION, journalAt(AT));
     let reads = 0;
     const counting = new ReadLocalCostUseCase(

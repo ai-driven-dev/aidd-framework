@@ -15,9 +15,8 @@ const CLEAN_ENV = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))
 );
 
-// Removed when the file finishes, not left behind: a suite that seeds a repository per run
-// and never sweeps fills the machine's temp volume until mkdtemp itself fails with ENOSPC,
-// which is how this was found - 1878 abandoned directories, 37 GB.
+// Removed when the file finishes: a suite that seeds a repository per run and never sweeps
+// fills the machine's temp volume until mkdtemp itself fails with ENOSPC.
 const tempDirs = [];
 test.after(() => {
   for (const dir of tempDirs) fs.rmSync(dir, { recursive: true, force: true });
@@ -54,20 +53,13 @@ function makeInstalledRepo() {
   }
   // A byte-identical `.mjs` twin, for these tests alone.
   //
-  // An install carries the plugin as `.js`, and that is forced rather than chosen: OpenCode
-  // auto-discovers `{plugin,plugins}/*.{ts,js}` and nothing else, so an `.mjs` would simply
-  // never be found. It loads the file with its own runtime, which does not consult Node's
-  // `type` field — measured against a real OpenCode session, which journals its
-  // session_start.
+  // An install carries the plugin as `.js`, forced rather than chosen: OpenCode auto-discovers
+  // `{plugin,plugins}/*.{ts,js}` and nothing else, and loads the file with its own runtime,
+  // which does not consult Node's `type` field.
   //
-  // Plain Node does consult that field, and there is none to consult: neither this
-  // repository's root `package.json` nor `hooks/` declares one, so Node reaches the file as
-  // typeless, finds ESM syntax, and reparses — with a warning, and only on a Node new enough
-  // to do it at all. An earlier version of this comment said the measurement was taken "with
-  // `hooks/`'s `\"type\": \"commonjs\"` marker in place"; there is no such file, and every
-  // sibling in that directory is `.cjs`, which needs no marker. Naming the extension
-  // explicitly is what these tests do instead, and the extension is the only thing that
-  // differs from what ships.
+  // Plain Node does consult it, and there is none to consult: nothing up this tree declares
+  // one, so Node reaches the file as typeless, finds ESM syntax, and reparses. Naming the
+  // extension explicitly is what these tests do instead, and it is the only difference.
   const esmTwin = path.join(pluginDir, "opencode-plugin.mjs");
   fs.copyFileSync(path.join(pluginDir, "opencode-plugin.js"), esmTwin);
   return { repo, pluginDir, esmTwin };
@@ -90,12 +82,10 @@ function readRunLines(repo) {
 }
 
 test("opencode-plugin.js: runJournal spawns journal.cjs by an absolute filesystem path, not a file:// URL string", async () => {
-  // Regression test for a real bug found only by running a live OpenCode session
-  // (see measurements.md, Phase 7): `spawnSync("node", [new URL(...)])` stringifies
-  // the URL to "file:///..." - node's CLI does not accept that as a script path, it
-  // resolves it as a bare module specifier relative to its own cwd and dies with
-  // MODULE_NOT_FOUND. journal.cjs silently never ran; no error surfaced anywhere
-  // because journal.cjs's own "exit 0 no matter what" contract hid the spawn failure.
+  // `spawnSync("node", [new URL(...)])` stringifies the URL to "file:///...", which node's
+  // CLI resolves as a bare module specifier against its own cwd and dies with
+  // MODULE_NOT_FOUND. journal.cjs then never runs, and its "exit 0 no matter what" contract
+  // hides the spawn failure entirely.
   const { repo, esmTwin } = makeInstalledRepo();
   const mod = await import(pathToFileURL(esmTwin).href);
 

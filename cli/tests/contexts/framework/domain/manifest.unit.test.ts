@@ -319,32 +319,21 @@ describe("Manifest", () => {
       expect(restored.toJSON().version).toBe(8);
     });
 
-    // v8 changed what `nativeRegistrations.marketplaces` holds per entry: the host's own
-    // registered name beside aidd's own local alias, not the alias alone — no published
-    // CLI has ever written that pair, so — unlike the v6 cutover, which some already-
-    // published CLI could still migrate forward — there is no already-published version to
-    // name that could actually migrate a stuck v7 document. Every write path loads the
-    // manifest through this same guard before it ever reaches a save
-    // (`ManifestRepositoryAdapter.load()`), so naming a command that reads the old
-    // document first would just refuse it again. The only correction that does not loop
-    // back through this guard is deleting the document and reinstalling from scratch.
+    // No published CLI has ever written v7, and every write path loads through this same guard
+    // before it can save, so no command migrates it forward: deleting the document is the exit.
     const RECOVERY_INVOCATION = /delete \.aidd\/manifest\.json.*aidd setup/;
 
     it("rejects a version below 8 and names the file to delete, not a command to migrate it", () => {
       const v7 = { version: 7, tools: {} };
       expect(() => Manifest.fromJSON(v7)).toThrow(RECOVERY_INVOCATION);
-      // The literal string this guard used to send a stuck user toward — a CLI that
-      // itself only ever wrote v7 and would refuse the resulting document all over
-      // again. Naming it here would recreate the very loop this guard now avoids.
+      // The string this guard used to send a stuck user toward: a CLI that only ever wrote
+      // v7 and would refuse the resulting document all over again.
       expect(() => Manifest.fromJSON(v7)).not.toThrow(/update --force/);
-      // v7 was never published — no CLI has ever written it, unlike v6 below.
       expect(() => Manifest.fromJSON(v7)).toThrow(/No published CLI can write this version/);
     });
 
-    // 5.2.2 is a published CLI that migrated a v5 document to v6 and re-saved it, so a
-    // v6 document on disk today is not evidence of nothing: "no published CLI can write
-    // this version" is simply false for v6, the one version the message must not say it
-    // for.
+    // 5.2.2 is a published CLI that migrated a v5 document to v6 and re-saved it, so "no
+    // published CLI can write this version" is false for v6, the one version it must not name.
     it("names 5.2.2 for a version 6 manifest, since that published CLI actually wrote it", () => {
       const v6 = { version: 6, tools: {} };
       expect(() => Manifest.fromJSON(v6)).toThrow(RECOVERY_INVOCATION);
@@ -352,10 +341,8 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(v6)).not.toThrow(/No published CLI can write this version/);
     });
 
-    // 5.2.2's own manifest reader accepts exactly version 6, its native version — so its
-    // `clean --force` can still unregister a host's native registrations before the
-    // manifest naming them is deleted. Named before the deletion, never after: once the
-    // manifest is gone, nothing can drive that CLI's own unregistration anymore.
+    // 5.2.2's own reader accepts exactly version 6, so its `clean --force` can still unregister
+    // a host's native registrations — only before the manifest naming them is deleted.
     it("names `clean --force` on 5.2.2 before naming the deletion, for a version 6 manifest", () => {
       const v6 = { version: 6, tools: {} };
       let message = "";
@@ -371,9 +358,8 @@ describe("Manifest", () => {
       expect(deleteIndex).toBeGreaterThan(cleanIndex);
     });
 
-    // A v7 document has no such CLI: 5.2.2 itself refuses to read anything past its own
-    // native version 6, so naming its `clean` here would send a stuck user to a command
-    // that cannot even open the file.
+    // 5.2.2 refuses to read anything past its own native version 6, so naming its `clean` for a
+    // v7 document would send a stuck user to a command that cannot even open the file.
     it("never names 5.2.2's clean for a version 7 manifest, which that CLI cannot read either", () => {
       const v7 = { version: 7, tools: {} };
       expect(() => Manifest.fromJSON(v7)).not.toThrow(/5\.2\.2/);
@@ -412,9 +398,8 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude/);
     });
 
-    // `scope` is mandatory since v7, still mandatory in v8: a default here would guess exactly what the field
-    // exists to stop guessing. Naming the plugin, not just "scope", is what lets a
-    // person find the offending entry in a manifest that may carry several.
+    // `scope` is mandatory since v7: a default would guess exactly what the field exists to stop
+    // guessing. Naming the plugin is what lets a person find the entry among several.
     it("rejects a v8 plugin entry carrying no scope, naming the plugin", () => {
       const data = {
         version: 8,

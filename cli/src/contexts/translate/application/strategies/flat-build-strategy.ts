@@ -114,8 +114,6 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     );
   }
 
-  // ── Private helpers ──────────────────────────────────────────────────────────
-
   private async writeFlatAgent(
     artifact: Extract<ArtifactContract, { supported: true }>,
     pluginName: string,
@@ -193,11 +191,10 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     return this.writeRewrittenHooksJson(artifact, pluginName, raw);
   }
 
-  // OpenCode reads no hooks.json (artifact.skipHooksJson) - a plugin's declared hooks have
-  // no trigger there unless a generated bridge replaces the manifest a native host would
-  // read. Raw content only: the bridge resolves its own scripts from its own
-  // `import.meta.url`, never from an outDir-relative path this strategy would otherwise
-  // rewrite for it.
+  // OpenCode reads no hooks.json, so a plugin's declared hooks have no trigger there unless a
+  // generated bridge replaces the manifest a native host would read. Raw content only: the
+  // bridge resolves its own scripts from its own `import.meta.url`, never from an outDir-relative
+  // path this strategy would otherwise rewrite for it.
   private async writeHooksBridgeIfDeclared(
     artifact: Extract<ArtifactContract, { supported: true }>,
     pluginName: string,
@@ -317,10 +314,9 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     return `./${this.resolveSuffixToFlatPath(suffix, pluginName)}`;
   }
 
-  // "/"-joined and separator-normalized: this value is embedded into written JSON content
-  // (an MCP server command, a rewritten CLAUDE_PLUGIN_ROOT), and on Windows this.absOut is
-  // backslash-native - JSON.stringify then escapes each backslash, so a reader comparing
-  // against the plain absOut string never finds it as a substring.
+  // "/"-joined and separator-normalized: this value is embedded into written JSON content, and
+  // on Windows `this.absOut` is backslash-native — JSON.stringify then escapes each backslash,
+  // so a reader comparing against the plain absOut string never finds it as a substring.
   private resolveClaudeRootAbsolute(suffix: string, pluginName: string): string {
     const normalizedOut = this.absOut.replace(/\\/g, "/");
     return `${normalizedOut}/${this.resolveSuffixToFlatPath(suffix, pluginName)}`;

@@ -29,12 +29,8 @@ interface Run {
 }
 
 /**
- * The whole life of measurement on one project, in order, with nothing but node.
- *
- * Not a feature test: each step is only meaningful because of the one before it. Reporting
- * before enabling has to answer nothing rather than fail; disabling has to stop the
- * recording without erasing what was already measured; re-enabling has to resume rather
- * than start over. A test per step would pass while the sequence was broken.
+ * Each step is only meaningful because of the one before it, so it runs as one sequence:
+ * a test per step would pass while the sequence was broken.
  */
 describe("measurement, from nothing to off and back", () => {
   let projectDir: string;
@@ -88,14 +84,10 @@ describe("measurement, from nothing to off and back", () => {
     }
   }
 
-  /** The switch moved from `telemetry-switch.cjs` to `aidd telemetry on|off` in phase 3;
-   * invoked the same way `measure` calls the CLI, by its own built path, so the `PATH`
-   * this file strips `aidd` from still proves nothing about the switch or the reader —
-   * only that the hooks below need neither. */
+  /** Invoked by its own built path, like `measure`, so the `PATH` this file strips `aidd`
+   * from proves only that the hooks below need neither the switch nor the reader. */
   const switchTo = (state: "on" | "off") =>
     run(cliPath(), state === "on" ? ["telemetry", "on", "--yes"] : ["telemetry", "off"]);
-  /** Reading is the CLI's, and only the CLI's, since the plugin's own reporter was deleted:
-   * one implementation answers, and this cycle exercises the one that ships. */
   const measure = (args: readonly string[]) => run(cliPath(), args.slice());
 
   /** One captured hook payload, retargeted at this project and session. The hook decides
@@ -115,8 +107,6 @@ describe("measurement, from nothing to off and back", () => {
     });
   }
 
-  /** A whole session as the host reports it: it starts, a skill opens, a file lands in a
-   * task folder, the turn ends. */
   async function aSessionRuns(): Promise<void> {
     await hook("claude-code-session-start", "session-start");
     await hook("claude-code-post-tool-use-skill", "tool-used", {
@@ -143,9 +133,8 @@ describe("measurement, from nothing to off and back", () => {
     return existsSync(dir) ? await readdir(dir) : [];
   }
 
-  /** Every line the journal holds, across every session. Counting files would miss a
-   * session that carries on: a run file is named for its session, so a second turn appends
-   * to the file the first turn opened rather than starting another. */
+  /** Counting files would miss a session that carries on: a run file is named for its
+   * session, so a second turn appends to the file the first turn opened. */
   async function journalLines(): Promise<number> {
     const dir = join(projectDir, "aidd_docs", "runs");
     let total = 0;
@@ -156,64 +145,53 @@ describe("measurement, from nothing to off and back", () => {
   }
 
   it("lives the whole sequence, each step meaning what the one before it set up", async () => {
-    // 1. Nothing set up at all. Answering must be empty, not broken.
     const beforeAnything = await measure(["telemetry", "report", ...PERIOD]);
     expect(beforeAnything.exitCode, beforeAnything.stderr).toBe(0);
     expect(beforeAnything.stdout).toContain("nothing in this period");
-    // Never a literal zero for what nothing measured: no config at all reads as off, the
-    // same as an explicit "off" would, and says so rather than reporting a bare "0".
+    // No config at all reads as off, the same as an explicit "off": never a bare "0" for
+    // what nothing measured.
     expect(beforeAnything.stdout).toMatch(/this project's own switch is off/u);
     expect(beforeAnything.stdout).not.toMatch(/\bsessions\s+0\b/u);
     expect(existsSync(join(projectDir, ".aidd", "config.json"))).toBe(false);
 
-    // 2. A session runs while measuring is off. The hook must write nothing at all.
     await aSessionRuns();
     expect(await runFiles()).toEqual([]);
 
-    // 3. Allowed.
     expect((await switchTo("on")).exitCode).toBe(0);
 
-    // 4. A session runs. Now it is journalled.
     await aSessionRuns();
     expect(await runFiles()).toHaveLength(1);
 
-    // 5. Read, and report. The figures carry the step the tool named and the task the
-    //    journal recorded.
     const read = await measure(["telemetry", "read"]);
     expect(read.stdout).toContain("Claude Code: read (4 new of 4)");
     const reported = await measure(["telemetry", "report", ...PERIOD]);
     expect(reported.stdout).toContain(SESSION_TOKENS);
     expect(reported.stdout).toContain("probe-echo");
-    // On: no word about the switch at all — a person reading figures that are visibly
-    // working needs no separate sentence confirming it.
+    // While on, figures that visibly work need no sentence confirming the switch.
     expect(reported.stdout).not.toContain("measurement is off");
     const byTask = await measure(["telemetry", "report", ...PERIOD, "--task", TASK]);
     expect(byTask.stdout).toContain(`task ${TASK}`);
     expect(byTask.stdout).toContain(SESSION_TOKENS);
 
-    // 6. Turned off. What was measured stays measured; only the recording stops.
     expect((await switchTo("off")).exitCode).toBe(0);
     const afterOff = await measure(["telemetry", "report", ...PERIOD]);
     expect(afterOff.stdout).toContain(SESSION_TOKENS);
-    // Off, but the period still holds real history: says the switch is off *and* still
-    // shows every figure already measured - neither fact stands in for the other.
+    // Off and holding real history: neither fact stands in for the other.
     expect(afterOff.stdout).toMatch(/this project's own switch is off/u);
 
-    // 7. A session runs while off. Not one line is journalled — the switch is read at the
-    //    moment of every write, not once at startup.
+    // The switch is read at the moment of every write, not once at startup.
     const before = await journalLines();
     expect(before).toBeGreaterThan(0);
     await aSessionRuns();
     expect(await journalLines()).toBe(before);
 
-    // 8. Allowed again. Recording resumes into the journal that already exists rather than
-    //    starting a new one, so nothing measured before is orphaned.
+    // Recording resumes into the journal that already exists, so nothing measured before
+    // is orphaned.
     await switchTo("on");
     await aSessionRuns();
     expect(await journalLines()).toBeGreaterThan(before);
     expect(await runFiles()).toHaveLength(1);
 
-    // 9. Reading again stores nothing twice.
     const second = await measure(["telemetry", "read"]);
     expect(second.stdout).toContain("Claude Code: read (0 new of 4)");
     expect((await measure(["telemetry", "report", ...PERIOD])).stdout).toContain(SESSION_TOKENS);
@@ -250,11 +228,7 @@ describe("measurement, from nothing to off and back", () => {
     );
 
     // Turning measurement off changes what is recorded next, never what a past period
-    // answers — a consumer that cached a figure must not see any of them move.
-    // `measurement_enabled` is the one deliberate exception (finding 2/3, review.md "one
-    // route, and every sentence about it true"): it names the switch's own state right now,
-    // not a fact about the period, so it must move the instant the switch does, and would
-    // be a lie if it did not.
+    // answers. `measurement_enabled` is the one exception: it names the switch's state now.
     expect(envelope.measurement_enabled).toBe(true);
     expect(afterOff.measurement_enabled).toBe(false);
     const { measurement_enabled: _before, ...historicalFigures } = envelope;

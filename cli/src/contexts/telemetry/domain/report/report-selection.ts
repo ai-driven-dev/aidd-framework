@@ -17,9 +17,8 @@ import {
 } from "../task-identity.js";
 import type { TelemetrySinkRecord } from "../telemetry-sink-record.js";
 
-/** The vendor ids whose sessions wrote into `task` at some point - unchanged from before a
- * task could be declared at all, and deliberately still whole-session: nothing about the
- * existing per-file attribution changes for a tool that already has it. */
+/** The vendor ids whose sessions wrote into `task` at some point - deliberately
+ * whole-session, unlike the per-record precision a declared interval gives. */
 function inferredVendorIdsForTask(
   journals: readonly CostReportSessionJournal[],
   task: TaskIdentity
@@ -33,10 +32,9 @@ function inferredVendorIdsForTask(
   return vendorIds;
 }
 
-/** Every session's own declared intervals that name `task`, keyed by vendor id so a
- * record's session is a lookup rather than a walk of every journal again. A session that
- * never declared this task carries no entry - what makes an undeclared session read as
- * belonging to none, never to the last one seen. */
+/** Every session's own declared intervals that name `task`, keyed by vendor id so a record's
+ * session is a lookup rather than a walk of every journal again. A session that never declared
+ * this task carries no entry, so it reads as belonging to none, never to the last one seen. */
 function declaredIntervalsForTask(
   journals: readonly CostReportSessionJournal[],
   task: TaskIdentity
@@ -52,10 +50,9 @@ function declaredIntervalsForTask(
 }
 
 /** Both routes to `task`, kept apart rather than merged into one vendor-id set: a declared
- * interval decides per record, at the precision `buildTaskIntervals` bounds it to, while a
- * written file decides for a session's records as a whole, exactly as it always has.
- * Merging them would let a session's own zero-width or long-closed declaration - real, but
- * covering no record - drag in records a written file never touched either. */
+ * interval decides per record, a written file for a session's records as a whole. Merging them
+ * would let a zero-width or long-closed declaration - real, but covering no record - drag in
+ * records a written file never touched either. */
 export interface TaskMembership {
   readonly declaredIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>;
   readonly inferredVendorIds: ReadonlySet<string>;
@@ -71,11 +68,9 @@ export function taskMembership(
   };
 }
 
-/** How, if at all, one record belongs to the task `membership` was built for - `undefined`
- * for neither route, which is what excludes it from a `--task` report entirely. A record
- * whose own moment falls in a declared interval is `"declared"` even when its session also
- * wrote into the folder; only a record a declaration does not cover falls back to whether
- * its whole session did. */
+/** How, if at all, one record belongs to the task `membership` was built for - `undefined` for
+ * neither route, which excludes it from a `--task` report entirely. Only a record a
+ * declaration does not cover falls back to whether its whole session wrote into the folder. */
 export function taskAttributionOf(
   record: TelemetrySinkRecord,
   membership: TaskMembership
@@ -128,11 +123,9 @@ export function selectionStages(
   return stages;
 }
 
-/** Whether a filter's own value is known at all - anywhere this call can see, not only in
- * this selection. `task` reads the same membership `buildCostReport` already computed;
- * `tool` reads the declared list, a closed set no read is needed for; the rest read
- * `knownValues`, gathered once across every day file the caller looked at, not only the
- * period's own records. */
+/** Whether a filter's own value is known at all - anywhere this call can see, not only in this
+ * selection. `tool` reads the declared list, a closed set; the rest read `knownValues`,
+ * gathered across every day file the caller looked at, not only the period's own records. */
 function isKnownFilterValue(
   name: CostReportFilterName,
   value: string,
@@ -151,10 +144,9 @@ function isKnownFilterValue(
   return set?.has(value) ?? false;
 }
 
-/** True when the culprit filter's own value matched something before any generic filter
- * ran, meaning the emptiness comes from its intersection with a filter already applied
- * rather than from this value alone. `task` has no "alone" reading - it is the only route
- * to a task, not one of several composed equality checks. */
+/** True when the culprit filter's own value matched something before any generic filter ran,
+ * so the emptiness comes from an intersection rather than from this value alone. `task` has no
+ * "alone" reading - it is the only route to a task, not one composed equality check. */
 function isCombinationCulprit(
   stages: readonly SelectionStage[],
   membership: TaskMembership | null,

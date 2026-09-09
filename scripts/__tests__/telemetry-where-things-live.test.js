@@ -16,14 +16,8 @@ const ROOT = path.resolve(__dirname, "../..");
  * plugin's own shape: what each skill carries, and that nothing reaches across. */
 
 describe("a library a skill needs is carried by that skill, identically", () => {
-  // There used to be a walk here checking that no skill's own script `require()`d code
-  // outside its folder. It only ever looked at `.js` files, and this plugin's skills carry
-  // none — every script under `skills/` is `.cjs` (see the marker test below), and since
-  // phase 3/5 there are none of those either: `plugin-install-shape.test.js`'s "ships no
-  // skill scripts" already pins that a skill carries zero scripts of its own. A boundary
-  // check with nothing to walk cannot fail on any input, .js or .cjs; it is dropped rather
-  // than widened to a corpus this repository does not have, and its invariant reappears the
-  // day a skill ships a script again, in whichever test adds the corpus back.
+  // No boundary walk over skill scripts: `plugin-install-shape.test.js` already pins that a
+  // skill carries none, and a check with nothing to walk cannot fail on any input.
 
   /** No `package.json` marker anywhere: every CommonJS file this plugin ships is named
    * `.cjs`, which Node reads as CommonJS whatever the host project declares. A marker is a
@@ -53,14 +47,11 @@ describe("a library a skill needs is carried by that skill, identically", () => 
 });
 
 /**
- * Every script path this repository *names* must exist.
- *
- * `plugin-install-shape.test.js` walks the scripts that exist and runs them; it cannot see a
- * reference to one that does not. `check-markdown-links.js` walks `[text](target)` links; a
- * command inside a fenced block is invisible to it. Between those two walks sits a gap that
- * has now swallowed the same defect twice: the plugin README told people to run
- * `telemetry-report.cjs` for two phases after it was deleted, and `cli-ci.yml`'s Windows job
- * executed it and `telemetry-switch.cjs` — red before anyone looked.
+ * Every script path this repository names must exist. `plugin-install-shape.test.js` walks the
+ * scripts that exist and cannot see a reference to one that does not; `check-markdown-links.js`
+ * walks markdown links and cannot see a command inside a fenced block. Between those two, the
+ * README went on naming `telemetry-report.cjs` and a workflow went on running
+ * `telemetry-switch.cjs` after both were deleted.
  *
  * This inverts the walk: start from what is written down, and require the file.
  */
@@ -69,15 +60,12 @@ describe("a script path this repository names is a script that exists", () => {
   const PLUGIN_DIR = path.join(ROOT_DIR, "plugins/aidd-telemetry");
   const SEARCHED = ["plugins/aidd-telemetry", "docs", ".github/workflows", "README.md"];
 
-  // Only the two forms that have actually broken. A bare fragment in prose ("hooks/journal.cjs"
-  // describing a layout) is not a reference anyone runs, and asserting it would make this
-  // guard cry wolf until someone deletes it.
-  //
-  //   plugins/…/x.cjs      repo-rooted, what cli-ci.yml executes
-  //   <plugin>/…/x.cjs     the README's own form, where <plugin> is the installed plugin root
-  // `scripts` is deliberately absent: it is both a repo directory and the conventional
-  // subdirectory inside every skill, so `scripts/telemetry-check.cjs` in a skill's own
-  // markdown is relative to that skill and resolves nowhere from here.
+  // Only the two forms anyone actually runs - repo-rooted, and the README's `<plugin>/…` form.
+  // A bare fragment in prose describing a layout is not a reference, and asserting it would
+  // make this guard cry wolf. `scripts` is deliberately absent: it is both a repository
+  // directory and the conventional subdirectory inside every skill, so
+  // `scripts/telemetry-check.cjs` in a skill's own markdown is relative to that skill and
+  // resolves nowhere from here.
   const REPO_ROOTED = /(?:^|[\s"'`(])((?:plugins|cli|docs)\/[\w./-]+\.(?:cjs|mjs))/gmu;
   const PLUGIN_ROOTED = /<plugin>\/([\w./-]+\.(?:cjs|mjs))/gmu;
 

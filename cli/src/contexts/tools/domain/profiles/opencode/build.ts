@@ -1,10 +1,7 @@
 /**
- * Opencode's ToolBuildContract: flat (direct workspace materialization) only —
- * opencode has no marketplace/native plugin mode.
- *
- * `transformMcpToOpencode` lives here rather than in `profile.ts` because the flat
- * contract's config-artifact step needs it as much as the installed-content mcp
- * capability does; the profile imports it back from here.
+ * Opencode's build contract: flat only — opencode has no marketplace mode.
+ * `transformMcpToOpencode` lives here because the flat contract's config-artifact step needs it
+ * as much as the installed-content mcp capability does; the profile imports it back.
  */
 
 import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
@@ -29,8 +26,6 @@ import {
 } from "./opencode-paths.js";
 
 type FsType = FileReader & FileWriter;
-
-// ── MCP transform (shared by the opencode profile's mcp capability and the flat contract) ──
 
 type RawServer =
   | { command: string; args?: string[]; env?: Record<string, string>; disabled?: boolean }
@@ -84,8 +79,6 @@ export function transformMcpToOpencode(content: string): string {
   return JSON.stringify({ mcp }, null, 2);
 }
 
-// ── Opencode flat contract ─────────────────────────────────────────────────────
-
 function opencodeFlatAgentPath(plugin: string, rel: string): string {
   return genericFlatAgentPath(".opencode/agents/", plugin, rel.replace(/^agents\//, ""), ".md");
 }
@@ -94,11 +87,10 @@ function opencodeFlatSkillPath(plugin: string, rel: string): string {
   return genericFlatSkillTreePath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
 }
 
-/** OpenCode's loader scans one flat directory for its own plugin modules, never a
- * "hooks" family (F3) — so a plugin's hook scripts are namespaced under
- * OPENCODE_HOOKS_DIR instead, with one exception: a script literally named
- * OPENCODE_PLUGIN_ENTRY_BASENAME is that loader's own module, delivered flat into
- * OPENCODE_FLAT_HOOKS_DIR and renamed to the plugin's own name. */
+/** OpenCode's loader scans one flat directory for its own plugin modules, never a "hooks"
+ * family, so a plugin's hook scripts are namespaced under `OPENCODE_HOOKS_DIR` instead. The one
+ * exception is a script named `OPENCODE_PLUGIN_ENTRY_BASENAME`: that loader's own module,
+ * delivered flat and renamed to the plugin's own name. */
 function makeOpencodeFlatHooksPath(): (plugin: string, rel: string) => string {
   return (plugin, rel) =>
     flatHooksPathWithLoaderEntry(

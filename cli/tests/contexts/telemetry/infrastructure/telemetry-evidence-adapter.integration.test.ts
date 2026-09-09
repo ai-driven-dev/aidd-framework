@@ -12,19 +12,8 @@ import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { TelemetryEvidenceAdapter } from "../../../../src/contexts/telemetry/infrastructure/telemetry-evidence-adapter.js";
 
 /**
- * The adapter every other telemetry command asks first.
- *
- * It answers whether measurement is allowed here, whether anything is declared to do the
- * recording, and what a tool's own settings file still carries — so a wrong answer here
- * does not produce a wrong figure, it produces no figures at all, or figures nobody asked
- * to be collected. That is why it is tested against real files rather than a double: every
- * one of its answers is a read of a path this build also writes, and the two must not
- * drift.
- *
- * `HOME` is pointed at a throwaway directory for every case, because
- * `readRecorderDeclaration` checks the user-scope Claude settings file as one of its
- * locations. Left at the real value, a developer who happens to have the plugin enabled
- * globally would see these pass for the wrong reason.
+ * `HOME` is a throwaway directory for every case: `readRecorderDeclaration` checks the
+ * user-scope Claude settings file, which a developer may have the plugin enabled in.
  */
 const created: string[] = [];
 const savedHome = process.env.HOME;
@@ -207,10 +196,8 @@ describe("a payload that matched no known host", () => {
     expect(await adapter().readUnrecognisedPayload(root)).toBeNull();
   });
 
-  // The hook that writes this file anchors at the repository root (`git rev-parse
-  // --show-toplevel`), never at the directory a session happened to start from. A reader
-  // that joined straight onto `projectRoot` instead of walking up to that same root missed
-  // the file whenever a command ran from a subdirectory of the checkout.
+  // The hook writing this file anchors at the repository root, never at the directory a
+  // session started from, so a reader must walk up rather than join onto `projectRoot`.
   it("finds the file from a subdirectory of the repository, not only from its root", async () => {
     const root = project();
     mkdirSync(join(root, ".git"), { recursive: true });

@@ -33,18 +33,8 @@ import type { TelemetryLocalRead } from "../../../../src/kernel/measurement.js";
 import { AI_TOOL_IDS, type ToolId } from "../../../../src/kernel/tool.js";
 import { journalHost } from "../../../helpers/telemetry-journal-hook.js";
 
-/**
- * Conformance suite for the AiTool contract.
- *
- * Every assertion iterates the registry rather than a hardcoded list, so adding a tool file
- * automatically subjects it to all of them: omitting that tool from a parallel list elsewhere
- * fails a test instead of misbehaving at runtime.
- *
- * Since phase 10 the build targets and the probe tables derive from those same profiles, so
- * "they agree" is no longer a claim worth asserting — it cannot be false. What replaces it is
- * a probe of each derivation over synthetic tools, where a profile declaring nothing is a case
- * the live registry can never present.
- */
+/** Every assertion iterates the registry rather than a hardcoded list, so adding a tool file
+ * subjects it to all of them instead of letting it misbehave at runtime. */
 
 const registeredAiTools: [string, AiTool<unknown>][] = [
   ...getAllRegisteredTools().entries(),
@@ -109,13 +99,8 @@ describe("AiTool contract conformance", () => {
       ).toBe(true);
     });
 
-    // #703: a tool that declares `marketplaceSettings` writes a project-local
-    // extraKnownMarketplaces/enabledPlugins declaration — that alone was proven, for
-    // Claude, to load nothing under `claude -p` (nor even interactively): the runtime
-    // reads its own user-global registry, not the project file. `nativeActivation`
-    // is what drives that registry via the tool's own CLI. Its absence here is exactly
-    // the two-install-surfaces disagreement #703 measured: settings.json says a plugin
-    // is enabled, the runtime that actually loads plugins was never told.
+    // A project-local `marketplaceSettings` declaration was measured to load nothing in
+    // Claude: the runtime reads its own user-global registry, which `nativeActivation` drives.
     it("drives native CLI activation when its plugins capability declares marketplaceSettings", () => {
       const caps = tool.capabilities as {
         plugins?: { marketplaceSettings?: unknown; nativeActivation?: unknown };
@@ -145,12 +130,8 @@ describe("AiTool contract conformance", () => {
   });
 });
 
-// Cursor's local-read reason is a measured fact (see spec.md non-goals), not a guess.
-// Claude and Codex are declared as of phase 2: read via TranscriptCostReaderAdapter, see
-// claude-code-transcript.ts and codex-rollout.ts for their measurements. OpenCode is
-// declared as of phase 3: read via OpencodeCostReaderAdapter. Copilot is declared as of
-// #697: read via TranscriptCostReaderAdapter and copilot-events.ts, at session rather than
-// request granularity - see copilot-events.unit.test.ts for the measurement.
+// Cursor's local-read reason is a measured fact, not a guess; Copilot is read at session
+// rather than request granularity.
 describe("telemetryLocalRead — exact declarations, phase 2 of local-cost-read", () => {
   const EXPECTED: Record<string, { kind: TelemetryLocalRead["kind"]; reason?: string }> = {
     claude: { kind: "declared" },
@@ -187,10 +168,8 @@ describe("no parallel list references an unregistered tool", () => {
   });
 
   it("every host the journal hook writes for is claimed by exactly one tool declaration", () => {
-    // The hook spells Claude Code "claude-code" while its toolId is "claude", so a report
-    // joining a journal line to a stored record has to relate the two. It relates them by
-    // reading these declarations, which is only safe while every host has one — a fifth
-    // host added to the hook and not declared here would join to nothing, silently.
+    // These declarations relate the hook's own host name to a toolId, so a host the hook
+    // writes for and nothing declares joins to nothing, silently.
     for (const host of journalHost.DECLARED_HOSTS) {
       expect(
         journalHostToAiToolId(host),
@@ -215,16 +194,8 @@ describe("no parallel list references an unregistered tool", () => {
   });
 
   it("declares task attributability exactly where journal attribution is possible at all", () => {
-    // A task no longer needs a written-path extractor: it can be declared instead, read off
-    // any tool call's own arguments the way `declaredTaskPath` reads it - free text, scanned
-    // for a task-folder path - with no per-host gate the way `WRITTEN_PATH_EXTRACTOR_BY_HOST`
-    // gates a written path, or `stepStart` gates a step. That is why this assertion collapses
-    // to `telemetryTaskAttributable === (telemetryJournalHost !== undefined)`: once a host's
-    // events reach the journal hook *at all*, `handleTaskDeclared` runs unconditionally on
-    // every one of them, task declaration included. It does not, on its own, pin OpenCode's
-    // own dispatch mechanism (`hooks/opencode-plugin.js`, an ESM file this suite does not
-    // import) - that fact is exercised live in `scripts/__tests__/aidd-telemetry-opencode-
-    // payloads.test.js` instead, against the plugin file itself.
+    // A declared task carries no per-host gate the way a written path or a step does, so
+    // attributability collapses to whether a host reaches the journal hook at all.
     for (const [toolId, config] of registeredAiTools) {
       const host = config.telemetryJournalHost;
       const hookReachesToolUse = host !== undefined;
@@ -310,8 +281,7 @@ describe("buildTargetModesOf()", () => {
 
 describe("distributionProbesOf()", () => {
   // Order is behaviour: the reader takes the first probe that resolves, and a bare
-  // `plugin.json` at the root is satisfied by almost any directory. A specific path must
-  // therefore be tried first, whichever tool declared it.
+  // `plugin.json` at the root is satisfied by almost any directory.
   it("puts the deepest path first and a bare filename last", () => {
     const probes = distributionProbesOf(
       registryOf(
@@ -369,11 +339,8 @@ describe("frameworkBuildModeFor()", () => {
 });
 
 describe("machineLocalFilesOf()", () => {
-  // `status` scans a tool's directory and calls anything untracked an addition. It
-  // skips these files by comparing the path the profile declares against the path it
-  // built from the directory, so a profile declaring `settings.local.json` instead of
-  // `.claude/settings.local.json` would silently stop being skipped. Declaring the
-  // path project-relative is the invariant that keeps the two forms comparable.
+  // `status` skips these files by comparing the path a profile declares against the one it
+  // builds from the tool directory, so a path declared any other way stops being skipped.
   it("declares every machine-local file project-relative, inside its own tool directory", () => {
     for (const toolId of AI_TOOL_IDS) {
       const config = getToolConfig(toolId);
@@ -388,10 +355,8 @@ describe("machineLocalFilesOf()", () => {
     expect(machineLocalFilesOf("claude")).toContain(".claude/settings.local.json");
   });
 
-  // .cursor/hooks.json is deliberately absent here: its content is project-relative
-  // and shareable (verified in cursor-hooks-project-merge.ts), unlike the absolute-path
-  // content this function exists to keep out of the gitignore `aiddGitignoreEntries`
-  // builds from it. `projectHooksFileOf` carries that file instead.
+  // Its content is project-relative and shareable, unlike the absolute-path content this
+  // function keeps out of the gitignore; `projectHooksFileOf` carries that file instead.
   it("does not carry cursor's project hooks file", () => {
     expect(machineLocalFilesOf("cursor")).not.toContain(".cursor/hooks.json");
   });
@@ -419,17 +384,8 @@ describe("projectHooksFileOf()", () => {
   });
 });
 
-/**
- * Where each tool installs a rule, pinned as a table rather than described.
- *
- * The plugin script this replaced carried its own copy of these five rows and was missing
- * one: it stated "Codex CLI: rules not supported, skipped" while `.codex/rules/` is exactly
- * where a Codex rule lands. A reader on a Codex project asking what rules it had was
- * answered "none", silently and wrongly, because the copy had drifted from the installer.
- *
- * Written out here so the drift cannot come back quietly: a tool whose install path moves,
- * or a sixth tool added with rules, fails this and is read by whoever changes it.
- */
+/** Pinned as a table rather than described, so a tool whose install path moves — or a sixth
+ * tool added with rules — fails here instead of drifting away from the installer quietly. */
 describe("every tool says where its own installed rules live", () => {
   const EXPECTED: Readonly<Record<string, { directory: string; extension: string }>> = {
     claude: { directory: ".claude/rules/", extension: ".md" },

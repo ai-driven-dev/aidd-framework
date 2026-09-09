@@ -122,10 +122,8 @@ describe("PluginDistributionReaderAdapter", () => {
   });
 
   describe("a directory two tools could claim", () => {
-    // copilot accepts a bare `plugin.json` at the root, which any distribution can also
-    // happen to carry, and copilot is declared before codex. The probes are ordered
-    // deepest-path-first precisely so the specific location wins; read in declaration
-    // order, a codex distribution carrying a root `plugin.json` would read as copilot.
+    // copilot accepts a bare root `plugin.json` and is declared before codex, so the probes
+    // are ordered deepest-path-first: read in declaration order, codex would read as copilot.
     it("resolves to the tool whose location is the more specific one", async () => {
       const root = await mkdtemp(join(tmpdir(), "aidd-ambiguous-"));
       try {

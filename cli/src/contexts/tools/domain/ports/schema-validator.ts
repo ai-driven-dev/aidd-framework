@@ -1,7 +1,4 @@
-/**
- * Validates data against a JSON schema.
- * Throws JsonSchemaValidationError on validation failure.
- */
+/** Validates data against a JSON schema, throwing `JsonSchemaValidationError` on failure. */
 export interface JsonSchemaValidator {
   validate(schema: object, data: unknown): void;
 }

@@ -8,15 +8,8 @@ import { cliPath, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 
-/**
- * #703 end to end, on the built binary: a project whose plugins are declared, and a host
- * registry that carries one of them and not the other.
- *
- * The point of running it here rather than only in unit tests is the cost of the answer. The
- * whole design exists so this question is answerable **before** anyone has spent a session:
- * no AI tool on `PATH`, no network, no account, no money — only files already on disk. If
- * that ever stopped being true, it would stop here first.
- */
+/** On the built binary: plugins a project declares against a host registry carrying one of
+ * them and not the other, answerable with no tool on `PATH`, no network and no money. */
 const PLUGIN_SOURCE = { kind: "github", repo: "ai-driven-dev/framework" } as const;
 
 function pluginEntry(name: string, marketplace?: string) {
@@ -90,7 +83,7 @@ describe("check says whether the host will load what aidd installed", () => {
     });
 
     expect(stdout).toContain("plugins registered");
-    // The failure #703 is about: declared, and the host will drop it as orphaned.
+    // Declared, and the host will drop it as orphaned.
     expect(stdout).toContain("claude/aidd-dev: not-registered");
     // No marketplace recorded, so no registry keys on it — unanswerable, never "not there".
     expect(stdout).toContain("claude/hand-copied: unanswerable");

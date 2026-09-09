@@ -5,9 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cliPath, execFileAsync } from "./helpers.js";
 
 /**
- * The command the explore skill runs. Exercised against the built binary because that is
- * what the skill invokes: a use case passing in isolation says nothing about whether the
- * subcommand is reachable, and the script this replaced was reachable by construction.
+ * Run against the built binary, which is what the skill invokes: a use case passing in
+ * isolation says nothing about the subcommand being reachable.
  */
 describe("aidd framework rules — the inventory a rule scan reads", () => {
   let project: string;

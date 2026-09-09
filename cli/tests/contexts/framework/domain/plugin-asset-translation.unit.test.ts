@@ -18,16 +18,8 @@ import { FileHash } from "../../../../src/kernel/file.js";
 import { AI_TOOL_IDS } from "../../../../src/kernel/tool.js";
 
 /**
- * A plugin ships two kinds of file, and installing it must not confuse them.
- *
- * Prose — a skill, an agent, a rule — is translated: its frontmatter is converted to the
- * host tool's spelling and its paths are rewritten to the host tool's directories. An
- * artefact — a script a skill runs, a hook the host executes — is carried byte for byte,
- * because a path rewritten inside a program is a program that no longer parses.
- *
- * This is not hypothetical. Measured against the shipped measurement bundle, Codex's own
- * rewrite grew it by six bytes and Copilot's shrank it by one. Both would have shipped a
- * broken script, silently, on install.
+ * Prose — a skill, an agent, a rule — is translated: frontmatter converted, paths rewritten.
+ * An artefact is carried byte for byte: a path rewritten inside a program no longer parses.
  */
 function pluginFile(relativePath: string): string {
   return readFileSync(
@@ -66,13 +58,7 @@ describe("a plugin's executable files survive being installed", () => {
 });
 
 /** The decisive check: not "would a rewrite damage it", but "does installing the plugin
- * actually put it there, unchanged". Everything above is a guard; this is the proof.
- *
- * No skill in this plugin ships a script of its own any more (00-init, 01-cost and
- * 02-check all moved to `aidd`), so this borrows real bytes from a file the plugin does
- * still ship — `hooks/journal.cjs` — and places them at a skill-nested path. The path is
- * the fixture; the content is not, which is what tells apart "carried verbatim" from
- * "happened to compare a synthetic string to itself". */
+ * actually put it there, unchanged". The path is the fixture; the content is real bytes. */
 describe("installing the plugin carries a skill's own script, on every tool", () => {
   const SCRIPT = "skills/02-check/scripts/example.cjs";
   const SCRIPT_CONTENT = pluginFile("hooks/journal.cjs");
@@ -117,10 +103,8 @@ describe("installing the plugin carries a skill's own script, on every tool", ()
     expect(installed?.content).toContain("States what is in place");
   });
 
-  /** A script whose text that tool's own rewrite really does change. Each tool rewrites
-   * its own directory's paths, so the sample is built from `tool.directory` — a single
-   * shared sample would trip two tools of five and let the other three pass by luck, which
-   * is exactly what asserting on the shipped bundle alone already does. */
+  /** A script whose text that tool's own rewrite really does change. Each tool rewrites its
+   * own directory's paths, so a single shared sample would let three tools pass by luck. */
   function rewritableScript(directory: string): string {
     return `const p = "${directory}commands/01_plan/x";\nconst q = "@${directory}commands/02_do/y";\n`;
   }
@@ -140,9 +124,8 @@ describe("installing the plugin carries a skill's own script, on every tool", ()
 
   for (const tool of [claude, codex, copilot, cursor, opencode]) {
     it(`${tool.toolId} leaves a script's own paths alone`, () => {
-      // Paths this tool's own rewrite is built to touch, in a file that is not prose.
-      // Whether this particular tool's rewrite would change them varies; that the guard is
-      // not vacuous is asserted once, below, over every tool at once.
+      // Paths this tool's own rewrite is built to touch, in a file that is not prose. That the
+      // guard is not vacuous is asserted once, below, over every tool at once.
       const script = rewritableScript(tool.directory);
 
       const installed = translator
@@ -154,9 +137,8 @@ describe("installing the plugin carries a skill's own script, on every tool", ()
   }
 
   it("carries it verbatim on a flat install too, not just a native one", () => {
-    // OpenCode installs flat: skills keep their sub-path but every file used to be
-    // rewritten on the way. The script survived there only because that tool's own rewrite
-    // happens to leave it alone — luck, which this pins down.
+    // OpenCode installs flat: skills keep their sub-path but every file used to be rewritten
+    // on the way. The script survives there only because that rewrite leaves it alone.
     const installed = translator
       .translate(distributionOf(), opencode)
       .find((file) => file.relativePath.endsWith("02-check/scripts/example.cjs"));

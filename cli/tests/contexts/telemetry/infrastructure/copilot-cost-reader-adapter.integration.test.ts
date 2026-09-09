@@ -2,9 +2,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CopilotCostReaderAdapter } from "../../../../src/contexts/telemetry/infrastructure/copilot-cost-reader-adapter.js";
 
-// tests/fixtures/local-cost mirrors a real $HOME: .copilot/session-state/<id>/events.jsonl
-// sits exactly where a real machine would write it, so pointing homeDir at this directory
-// exercises the same path this reader builds against a real installation.
+// The fixture mirrors a real $HOME: `.copilot/session-state/<id>/events.jsonl` sits where a
+// real machine writes it, so homeDir here exercises the path built against an installation.
 const HOME_DIR = fileURLToPath(new URL("../../../fixtures/local-cost", import.meta.url)).replace(
   /\/$/,
   ""

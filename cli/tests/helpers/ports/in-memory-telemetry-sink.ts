@@ -16,10 +16,8 @@ function dayFileName(at: Date): string {
   return `${dayKey(at)}.jsonl`;
 }
 
-/** In-memory double for `TelemetrySink` — day files keyed by name, in append order.
- * `deletedFromDirs` records every `dir` argument `deleteDayFile` actually received — what a
- * mutation test checks to prove a caller passed the preview's own path, never this double's
- * `rootDir`. */
+/** `deletedFromDirs` records every `dir` argument `deleteDayFile` received, which is what
+ * proves a caller passed the preview's own path and never this double's `rootDir`. */
 export class InMemoryTelemetrySink implements TelemetrySink {
   /** Settable, so a test can stand in for a machine that located its figures either way. */
   locatedBy: TelemetrySink["locatedBy"] = "default";
@@ -58,12 +56,8 @@ export class InMemoryTelemetrySink implements TelemetrySink {
     return [...this.files.values()].flat().filter((record) => record.vendor_id === vendorId);
   }
 
-  /** Selects on each record's own moment through the same domain derivation the real
-   * adapter uses, so the two cannot disagree on a non-UTC offset or a malformed moment —
-   * the day file a record landed in is when it was stored, not when the work ran. Holds
-   * nothing
-   * unparseable, so a period read from this double always reports zero skipped; the
-   * counting itself is the real adapter's, exercised against real files there. */
+  /** Selects through the same domain derivation the real adapter uses, so the two cannot
+   * disagree on a non-UTC offset. Nothing unparseable is held, so skipped is always zero. */
   async readRecordsInPeriod(fromDay: Date, toDay: Date): Promise<TelemetrySinkPeriodRead> {
     const [fromKey, toKey] = [dayKey(fromDay), dayKey(toDay)].sort();
     const records: TelemetrySinkRecord[] = [];

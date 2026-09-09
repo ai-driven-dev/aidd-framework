@@ -14,22 +14,13 @@ import { environmentWithoutGitVariables } from "../../../../src/runtime/git/git-
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 
-/**
- * The five facts `check` states about the trailer, read from a real repository.
- *
- * Against a real git rather than a fake one because every one of them is a git question, and
- * the two that matter most — where hooks are run from, and what the last commits actually
- * carry — are answers only git has. `%(trailers:key=…)` in particular is git's own reader:
- * asserting against a regex of ours would prove the regex agrees with itself.
- */
+/** Against a real git rather than a fake one: `%(trailers:key=…)` is git's own reader, and
+ * asserting against a regex of ours would prove only that the regex agrees with itself. */
 let dir: string;
 let git: GitAdapter;
 
-/** Windows records no execute bit: `chmod` cannot take one away, every readable file reports
- * `0o666`, and git runs whatever hook it finds through `sh`. "Present but unrunnable" is
- * therefore a state that exists only where the bit does, and asserting it elsewhere measures
- * the platform rather than the reader. The states that exist everywhere — absent, and
- * runnable — are asserted on both. */
+/** Windows records no execute bit: every readable file reports `0o666`, so "present but
+ * unrunnable" is a state that exists only where the bit does. */
 const REMOVING_THE_BIT_MEANS_SOMETHING = process.platform !== "win32";
 
 /** Git exports `GIT_DIR` and friends into everything it spawns, this suite included when it
@@ -113,7 +104,6 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).callSite).toBe("present");
   });
 
-  // Said, never named: which tool owns the file changes nothing a person does.
   it("says the hook is somebody else's, and does not say whose", async () => {
     const delegatePath = await installDelegate();
     const hookPath = join(await hooksDir(), "prepare-commit-msg");
@@ -128,11 +118,8 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).hookHasOtherContent).toBe(true);
   });
 
-  /**
-   * The only claim about the chain rather than its parts, and the reason it is a count.
-   * "Some of your commits carry it" is not something a person can check; "0 of the last 3"
-   * in a repository that has been measuring all week is the entire finding.
-   */
+  /** A count, not a boolean: "some of your commits carry it" is not something a person can
+   * check, while "0 of the last 3" is the entire finding. */
   it("counts how many recent commits actually carry it", async () => {
     commit("one");
     commitCarrying("two", "s-1");
@@ -141,12 +128,8 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).recentlyCarrying).toEqual({ carrying: 2, examined: 3 });
   });
 
-  /**
-   * A merge carries no trailer by the delegate's own design — one session's id on a merge
-   * would attribute every commit it brings in to that session. Counting them puts commits in
-   * the denominator that can never be in the numerator, which is arithmetic that reads as
-   * breakage on a healthy install.
-   */
+  /** A merge carries no trailer by the delegate's own design, so counting one puts a commit
+   * in the denominator that can never be in the numerator. */
   it("does not count merges, which can never carry it", async () => {
     commitCarrying("one", "s-1");
     run(["checkout", "-q", "-b", "side"]);
@@ -166,12 +149,6 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).recentlyCarrying).toBeUndefined();
   });
 
-  /**
-   * Outside a repository, and said as such. The distinction existed in the type and in two
-   * display fixtures and was produced by nothing — so `check` printed "git could not say
-   * where it runs hooks from" beside its own "not a git repository" line, one of them false.
-   * Asserted through the real adapter, because that is where it was missing.
-   */
   it("says there is no repository, rather than that git could not answer", async () => {
     const outside = await mkdtemp(join(tmpdir(), "aidd-trailer-nogit-"));
     try {
@@ -213,12 +190,8 @@ describe("what check reads about the commit trailer", () => {
   });
 });
 
-/**
- * Whether lefthook or husky owns `prepare-commit-msg` here — decided from a root **marker
- * file**, never from the hook's own contents. A manager regenerates the hook from its own
- * config on every install, so anything read from the hook itself is already stale by the
- * time this runs; the marker is what survives that.
- */
+/** A manager regenerates `prepare-commit-msg` from its own config on every install, so
+ * anything read from the hook itself is already stale; the root marker file survives that. */
 describe("which manager owns prepare-commit-msg, read from the repository root", () => {
   it("names lefthook from lefthook.yml alone, before lefthook has ever generated a hook", async () => {
     await writeFile(join(dir, "lefthook.yml"), "prepare-commit-msg:\n  commands: {}\n");
@@ -232,9 +205,8 @@ describe("which manager owns prepare-commit-msg, read from the repository root",
   it("names lefthook even once a hook file exists, never reading that file to decide", async () => {
     await writeFile(join(dir, "lefthook.yml"), "prepare-commit-msg:\n  commands: {}\n");
     const hookPath = join(await hooksDir(), "prepare-commit-msg");
-    // What lefthook itself regenerates on every install — no aidd trailer line survives it,
-    // and nothing in these bytes names lefthook by word either, so a reader that decided
-    // from the hook's own contents would have nothing here to key off.
+    // What lefthook itself regenerates: no aidd trailer line and no mention of lefthook, so a
+    // reader deciding from the hook's own contents would have nothing here to key off.
     await writeFile(hookPath, "#!/bin/sh\nexit 0\n");
 
     expect((await read()).hookManager).toBe("lefthook");
@@ -251,14 +223,8 @@ describe("which manager owns prepare-commit-msg, read from the repository root",
   });
 });
 
-/**
- * The discriminating case: this repository's own `lefthook.yml` job, inlined as a literal
- * rather than read off disk at test time. It calls the delegate through
- * `$(git rev-parse --git-common-dir)/hooks/aidd-session-trailer.sh` — the dynamic form, never
- * the absolute-path `sessionTrailerHookLine` form `callSite` looks for — so a marker-only
- * design reports `callSite: "missing"` and would print "add this job" in the one repository
- * that already added it.
- */
+/** This repository's own lefthook job, inlined rather than read off disk: it calls the
+ * delegate through the dynamic form, never the absolute-path `sessionTrailerHookLine` one. */
 const REAL_LEFTHOOK_PREPARE_COMMIT_MSG_JOB = `prepare-commit-msg:
   commands:
     aidd-session-trailer:
@@ -295,14 +261,8 @@ describe("whether the manager's own config already calls the delegate", () => {
   });
 });
 
-/**
- * B-S2: `on` writes the delegate to `$(git rev-parse --git-common-dir)/hooks` once a manager
- * owns `prepare-commit-msg` — husky moves `core.hooksPath` under `.husky/`. Before this fix
- * `readCommitTrailerSetup` still checked the delegate's presence under `resolveHooksDir`,
- * which *follows* `core.hooksPath`: under husky `delegate` read `"absent"` however many times
- * `on` actually ran, so `describeTrailerCount`'s "every part in place yet zero commits carry
- * it" finding — the one this field exists to surface — could never fire there.
- */
+/** Husky moves `core.hooksPath` under `.husky/` while `on` writes the delegate to the common
+ * git dir, so following `core.hooksPath` reads it "absent" however often `on` ran. */
 describe("reading the delegate's own state under a manager that moves core.hooksPath", () => {
   it("finds the delegate in the common git dir, not wherever core.hooksPath points", async () => {
     await mkdir(join(dir, ".husky"), { recursive: true });

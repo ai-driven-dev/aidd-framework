@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generateOpencodeHooksBridge } from "../../../../../../src/contexts/tools/domain/profiles/opencode/opencode-hooks-bridge.js";
 
-// Built rather than written as a literal "${CLAUDE_PLUGIN_ROOT}" string, the same way
-// flat-build-strategy.hooks.integration.test.ts's own CLAUDE_ROOT_VAR does — biome reads a
-// plain string holding "${...}" as a forgotten template literal.
+// Built rather than written as a literal "${CLAUDE_PLUGIN_ROOT}" string: biome reads a plain
+// string holding "${...}" as a forgotten template literal.
 const ROOT = "$" + "{CLAUDE_PLUGIN_ROOT}";
 
 const THREE_EVENT_HOOKS_JSON = JSON.stringify({

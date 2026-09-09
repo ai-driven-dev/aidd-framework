@@ -1,22 +1,7 @@
 /**
- * `cli/biome.json`'s per-context `noRestrictedImports` overrides must forbid exactly the
- * edges `context-graph.arch.test.ts` forbids — no more, no less — derived from its own
- * `ALLOWED` and `BASELINE` data rather than a hand-copied second list that only looks like
- * it agrees. Three living declarations of the same chain (biome, this graph, and
- * `0-contexts.md`) is how a translate rule kept naming paths the refactor had already
- * deleted for six phases; this makes biome answerable to one of the other two instead of
- * to its own memory.
- *
- * A stronger bug sits underneath that agreement, and it is why this file exists rather than
- * a hand check of the JSON: biome replaces a rule's whole `options` with the LAST override
- * matching a file — it does not merge pattern arrays across two overrides that both set the
- * same rule. A generic `src/contexts/*\/domain/**\/*.ts` override and a later, broader
- * `src/contexts/tools/**\/*.ts` override both matched every file under `tools/domain/`, and
- * the broader one silently discarded the narrower one's restriction. Measured, not assumed:
- * `tools/domain/profiles/claude/profile.ts` importing `tools/infrastructure`'s
- * `native-plugin-cli-adapter.ts` passed `biome lint` outright with the old shape. So every
- * override this file checks is scoped to exactly one context's one layer, and the first
- * real test below asserts that shape mechanically rather than trusting it holds.
+ * Measured: biome replaces a rule's whole `options` with the LAST override matching a file
+ * rather than merging pattern arrays, so a broader override silently discards a narrower
+ * one's restriction. Every override checked here is scoped to one context's one layer.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -57,30 +42,25 @@ function restrictedImportGroups(override: BiomeOverride): string[] | undefined {
   return patterns.flatMap((entry) => entry.group ?? []);
 }
 
-/** `"**\/foo/**"` reads as the context or layer named `foo`; a pattern of a different shape
- * (`"**\/manifest.js"`) is not a graph edge and is left as-is for the known-extra allowlist
- * below to recognise. */
+/** `"**\/foo/**"` reads as the context or layer named `foo`; another shape is not a graph
+ * edge, and is left as-is for the allowlist below to recognise. */
 function tokenOf(pattern: string): string {
   const match = /^\*\*\/([^/]+)\/\*\*$/.exec(pattern);
   return match ? (match[1] as string) : pattern;
 }
 
 /**
- * Patterns a context/layer override carries that name something other than a context-graph
- * edge — recorded here so this test does not mistake a deliberate, narrower restriction for
- * drift. `distribution` reads a marketplace, never framework's installation record, which is
- * a stricter rule than "distribution may not import framework" (framework itself is
- * exempted at the `application` layer by `BASELINE`'s grandfathered
- * `distribution->framework` edge). Each entry here must still earn its keep:
- * `import-rules-bite.arch.test.ts` fails a pattern that matches nothing under `src/`.
+ * Patterns naming something other than a graph edge, so a deliberate narrower restriction is
+ * not read as drift: `distribution` reads a marketplace, never framework's installation
+ * record, which is stricter than the edge itself.
  */
 const NON_GRAPH_EXTRA: Readonly<Record<string, readonly string[]>> = {
   "distribution/domain": ["**/manifest.js"],
   "distribution/application": ["**/manifest.js"],
 };
 
-/** What every file at this layer must not import, regardless of context — hexagonal's
- * dependency direction, independent of which contexts may speak to which. */
+/** The layer-intrinsic direction: what any file at this layer must not import, whatever its
+ * context. */
 function genericLayerTargets(layer: Layer): ReadonlySet<string> {
   if (layer === "domain") {
     return new Set(["application", "infrastructure", "presentation", "runtime"]);
@@ -90,11 +70,8 @@ function genericLayerTargets(layer: Layer): ReadonlySet<string> {
 }
 
 /**
- * What a context's own layer must forbid: the layer-intrinsic direction above, union the
- * other contexts and presentation/runtime this context may not reach — every one of those
- * minus what `ALLOWED` admits and minus whichever ones already carry `BASELINE`'s debt at
- * this exact layer, which `baselineLayers` derives from the tree rather than a count typed
- * out a second time beside it.
+ * The layer-intrinsic direction, union every context and presentation/runtime this context may
+ * not reach, minus what `ALLOWED` admits and minus the debt `BASELINE` carries at this layer.
  */
 function expectedForbidden(
   context: string,

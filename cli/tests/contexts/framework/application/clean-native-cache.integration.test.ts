@@ -1,19 +1,6 @@
 /**
- * `clean` purging a host's own plugin cache — never on the manifest's word alone.
- *
- * Two measured leftovers, reconciled here (see aidd_docs/memory/architecture.md and
- * cli.md): `claude plugin uninstall` + `marketplace remove` leave the built tree in
- * full, marked `.orphaned_at`, never deleted; `codex plugin remove` deletes a
- * marketplace's cached content but leaves the now-empty `cache/<hostName>/` shell
- * behind — the residue `smoke:real` left in the real `$HOME` on every run before
- * `NativeActivation.pluginCacheDir` existed. Both measured 2026-09-07 against the real
- * binaries in a relocated HOME.
- *
- * A profile declaring `marketplaceRegistry` alongside `pluginCacheDir` (claude) gets
- * the full purge, gated on a fresh read of that registry no longer naming the host.
- * A profile declaring `pluginCacheDir` alone (codex) gets the narrower one: its own
- * cache directory is removed only once it is proven empty, since there is no registry
- * to reread. Copilot declares neither and is never touched (it copies nothing).
+ * The two measured leftovers this covers: `claude` leaves the built tree in full, marked
+ * `.orphaned_at`; `codex` deletes a marketplace's content but leaves the empty shell behind.
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -44,9 +31,8 @@ import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-man
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 
 const PROJECT_ROOT = "/test-project";
-// Not injectable: CleanUseCase.execute() resolves `nodeHomedir()` itself. Using the
-// same real function here — never a fixed literal — is what keeps every path below in
-// sync with what the code under test actually composes.
+// Not injectable: CleanUseCase.execute() resolves `nodeHomedir()` itself, so the same real
+// function here — never a fixed literal — is what keeps every path below in sync with it.
 const HOME = homedir();
 const CLAUDE_CACHE_ROOT = join(HOME, ".claude", "plugins", "cache");
 const CODEX_CACHE_ROOT = join(HOME, ".codex", "plugins", "cache");
@@ -64,9 +50,8 @@ class RecordingFileAdapter extends InMemoryFileAdapter {
   }
 }
 
-/** Fails `realpath` with a non-ENOENT error (EACCES) for one exact path, so a test can
- * prove `clean` treats that failure like containment — named and skipped — rather than
- * letting it abort the rest of the run. */
+/** Fails `realpath` with a non-ENOENT error (EACCES) for one exact path, so a test can prove
+ * `clean` treats that failure like containment — named and skipped — not as an abort. */
 class RealpathDeniedFileAdapter extends RecordingFileAdapter {
   constructor(private readonly deniedPath: string) {
     super();
@@ -81,11 +66,8 @@ class RealpathDeniedFileAdapter extends RecordingFileAdapter {
 }
 
 /**
- * A host's own marketplace registry, mirroring `activator.removedMarketplaces` at read
- * time instead of a fixed canned answer. This is what actually proves ordering: a
- * `purgeNativeCaches` that read the registry *before* driving `removeMarketplace`
- * would see every name in `initialNames` still present, exactly as it was before the
- * run — a static double that always answers "gone" could never catch that regression.
+ * Mirrors `activator.removedMarketplaces` at read time rather than answering a canned "gone",
+ * which is what proves ordering: a registry read before `removeMarketplace` still sees it.
  */
 class RegistryMirroringActivatorState implements HostMarketplaceRegistryReader {
   reads = 0;
@@ -216,9 +198,8 @@ describe("clean purges a host's own plugin cache", () => {
 
     expect(await fs.fileExists(cacheEntry)).toBe(true);
     expect(reader.reads).toBe(0);
-    // Not just that the cache survives — the output says where, the same absolute
-    // path the dry-run preview would have announced, since `clean` never even gets
-    // as far as `purgeNativeCaches` for this tool.
+    // Not just that the cache survives — the output says where, the same absolute path the
+    // dry-run preview would have announced.
     expect(
       logger.warnMessages.some(
         (m) => m.includes("not on the PATH") && m.includes(join(CLAUDE_CACHE_ROOT, MARKETPLACE))
@@ -316,10 +297,8 @@ describe("clean purges a host's own plugin cache", () => {
   });
 
   it("purges the cache under the same HOME its own registry reader resolves its file from", async () => {
-    // A sentinel, never this machine's real home: before the fix, `clean` composed its
-    // cache root from `os.homedir()` directly, which ignores an injected `homeDir` and
-    // would look for this cache under the *real* home instead of here, leaving it
-    // behind and failing this assertion.
+    // A sentinel, never this machine's real home: a cache root composed from `os.homedir()`
+    // directly ignores the injected `homeDir` and looks under the real home instead.
     const SENTINEL_HOME = "/sentinel-home-clean-cache-parity";
     const fs = new RecordingFileAdapter();
     const cacheEntry = join(
@@ -335,9 +314,8 @@ describe("clean purges a host's own plugin cache", () => {
     await fs.writeFile(cacheEntry, "{}");
 
     const activator = new FakeNativePluginActivator({ available: true });
-    // The real adapter, resolved from the same sentinel `homeDir` below must also
-    // compose its cache root from — a fake reader built independently of `homeDir`
-    // could never catch the two halves drifting apart.
+    // The real adapter, resolved from the same sentinel the cache root is composed from — a
+    // fake reader built independently of `homeDir` could never catch the two halves drifting.
     const reader = hostMarketplaceRegistryReaders(SENTINEL_HOME).get("claude");
     if (reader === undefined) throw new Error("claude must declare marketplaceRegistry");
 
@@ -354,9 +332,8 @@ describe("clean purges a host's own plugin cache", () => {
 
     await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
 
-    // The real reader finds no known_marketplaces.json under a sentinel home that does
-    // not exist on disk — absent, not unreadable — which purging proves it looked
-    // under the very same sentinel `purgeNativeCaches` composed its cache root from.
+    // The real reader finds no known_marketplaces.json under a sentinel home that does not
+    // exist on disk — absent, not unreadable — so purging proves both halves used it.
     expect(await fs.fileExists(cacheEntry)).toBe(false);
   });
 
@@ -364,8 +341,8 @@ describe("clean purges a host's own plugin cache", () => {
     const hostName = "../../../evil";
     const fs = new RecordingFileAdapter();
     const witness = join(CLAUDE_CACHE_ROOT, hostName);
-    // Written down exactly where an unresolved join would land — proving the guard
-    // catches the collapse `path.join` already performs, not a path this test invents.
+    // Written exactly where an unresolved join lands — so the guard is proven against the
+    // collapse `path.join` already performs, not a path this test invents.
     await fs.writeFile(join(witness, "keep-me.txt"), "still here");
 
     const activator = new FakeNativePluginActivator({ available: true });
@@ -446,11 +423,10 @@ describe("clean purges a host's own plugin cache", () => {
 
     await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
 
-    // Kept: the EACCES'd cache is never removed.
     expect(await fs.fileExists(cacheEntry)).toBe(true);
     expect(logger.warnMessages.some((m) => m.includes(candidate))).toBe(true);
-    // Never aborted mid-course: removeAiddState, well past the cache purge in
-    // execute()'s own order, still ran.
+    // removeAiddState sits well past the cache purge in execute()'s own order, so its
+    // running is what proves nothing aborted mid-course.
     expect(fs.deletedDirectories).toContain(join(PROJECT_ROOT, AIDD_DIR, "cache"));
   });
 
@@ -527,10 +503,8 @@ describe("clean purges a host's own plugin cache", () => {
   });
 
   it("leaves codex's cache in place, even empty, when marketplace removal was not confirmed", async () => {
-    // Nothing is written under the cache directory at all — empty, exactly the shape
-    // `purgeCacheIfEmpty` reads as safe on its own — but `removeMarketplace` itself
-    // throws, so this project never actually confirmed the host forgot the name.
-    // Emptiness alone must not be read as proof it is safe to purge.
+    // Nothing under the cache directory — the shape `purgeCacheIfEmpty` reads as safe — while
+    // `removeMarketplace` throws, so the host was never confirmed to have forgotten the name.
     const fs = new RecordingFileAdapter();
 
     const activator = new FakeNativePluginActivator({ available: true, throwOnRemove: true });

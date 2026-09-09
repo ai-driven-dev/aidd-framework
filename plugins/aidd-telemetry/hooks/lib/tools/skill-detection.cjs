@@ -1,6 +1,5 @@
-// How a step's skill name is found, in general - reused by more than one tool's own
-// declaration, so it lives here rather than in any single one of them. Neither shape below
-// names a host; each tool file passes in the field names its own payload actually uses.
+// How a step's skill name is found, in general: neither shape below names a host, and each
+// tool file passes in the field names its own payload uses.
 
 const { normalizeSeparators, stringsWithin } = require("../host.cjs");
 
@@ -43,11 +42,10 @@ function skillNameFromAnyArgument(readers) {
   };
 }
 
-// The path family: the host names no skill, and the only evidence is that it read a
-// SKILL.md. Every string in the tool's arguments is scanned rather than one named field,
-// because Cursor puts the path in `file_path` while Codex buries it in a shell command -
-// and because Codex's hook calls that tool `Bash` while its own transcripts call it
-// `exec_command`, so keying on a tool name would have matched nothing, silently.
+// The path family: the host names no skill, and the only evidence is that it read a SKILL.md.
+// Every string in the arguments is scanned rather than one named field, because Cursor puts
+// the path in `file_path` while Codex buries it in a shell command - and Codex spells that
+// tool differently in its hook and its transcript, so a tool name would match nothing.
 function skillNameFromSkillFileRead(payload) {
   for (const value of stringsWithin(payload.tool_input)) {
     const match = SKILL_FILE_PATTERN.exec(normalizeSeparators(value));

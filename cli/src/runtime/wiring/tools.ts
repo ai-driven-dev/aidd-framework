@@ -13,10 +13,8 @@ import { hostMarketplaceRegistryReaders } from "../../contexts/tools/infrastruct
 import { NativePluginCliAdapter } from "../../contexts/tools/infrastructure/native-plugin-cli-adapter.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../kernel/tool.js";
 
-/**
- * One native plugin CLI adapter per tool whose profile declares an activation shape —
- * read off the registry rather than listed by hand, so a sixth tool costs no edit here.
- */
+/** One adapter per tool whose profile declares an activation shape, read off the registry
+ * rather than listed by hand, so a new tool costs no edit here. */
 export function wireTools(): {
   nativePluginActivators: Map<string, NativePluginActivator>;
   hostMarketplaceRegistries: ReadonlyMap<AiToolId, HostMarketplaceRegistryReader>;

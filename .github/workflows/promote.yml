@@ -1,21 +1,13 @@
 name: Promote next to main
 
-# One intuitive button to ship `next` to `main` the RIGHT way: a merge commit.
+# Ships `next` to `main` as a merge commit, run from the Actions tab: it snapshots `next`,
+# opens a PR and enables auto-merge, and CI gates it.
 #
-# The merge commit does two jobs. It carries every conventional commit onto
-# `main` untouched, so commitlint passes and release-please attributes each
-# commit to a package by the path it touched, which a squash would hide. And
-# its two parents give `main` and `next` a real merge base, which is the only
-# thing that keeps the back-merge after each release conflict-free.
-#
-# Neither alternative does the second job. A squash collapses the batch into one
-# subject and hides the scopes. A rebase recopies the commits under new hashes,
-# so git never learns the branches were reconciled: the recorded merge base goes
-# stale, and every later back-merge conflicts on the release metadata that
-# release-please rewrites each time. That is the failure this workflow prevents.
-#
-# Run it from the Actions tab (Run workflow). It snapshots `next`, opens a PR to
-# main, and enables merge auto-merge. CI gates it, then it merges itself.
+# The merge commit does two jobs. It carries every conventional commit onto `main` untouched,
+# so release-please attributes each one to a package by the path it touched — a squash hides
+# that. And its two parents give the branches a real merge base, which a rebase never
+# records: without one the base goes stale, and every later back-merge conflicts on the
+# release metadata release-please rewrites each cycle.
 
 on:
   workflow_dispatch:
@@ -54,21 +46,16 @@ jobs:
           git config user.email "aidd-bot[bot]@users.noreply.github.com"
           git fetch origin main next --prune
 
-          # Compare trees, not ancestry. After a back-merge, next's tip is a
-          # merge commit main does not carry, so next is never an ancestor of
-          # main even when the two hold identical content. Going by ancestry
-          # would open an empty promote PR, and merging it is a push to main,
-          # which runs release-please for nothing.
+          # Trees, not ancestry: after a back-merge, next's tip is a merge commit main does
+          # not carry, so identical content still reads as unmerged and opens an empty PR.
           if [ "$(git rev-parse origin/next^{tree})" = "$(git rev-parse origin/main^{tree})" ]; then
             echo "next and main already hold the same tree; nothing to promote."
             exit 0
           fi
 
-          # Promote a snapshot of next, never next itself. A PR headed by the
-          # live branch silently widens as work merges into next during review,
-          # so what ships stops matching what was approved. The snapshot points
-          # at next's exact tip, so merging it still makes that commit an
-          # ancestor of main and still refreshes the merge base.
+          # A snapshot of next, never next itself: a PR headed by the live branch widens as
+          # work merges in during review. The snapshot is next's exact tip, so the merge base
+          # still refreshes.
           BRANCH="promote/next-to-main-${RUN_ID}"
           git push origin "origin/next:refs/heads/${BRANCH}"
 
@@ -78,15 +65,13 @@ jobs:
             | grep -oE '[0-9]+$')
           echo "Promote PR: #$PR"
 
-          # `ci:` on purpose. The type is absent from release-please's
-          # changelog-sections, so this plumbing commit never surfaces in a
-          # released changelog, while commitlint still accepts it.
+          # `ci:` on purpose: the type is absent from release-please's changelog-sections,
+          # so this plumbing commit never surfaces in a changelog, and commitlint accepts it.
           gh pr merge "$PR" --repo "$REPO" --merge --auto --delete-branch \
             --subject "ci: promote next to main (#${PR})"
 
-          # Without a recorded subject GitHub generates "Merge pull request #N
-          # from ...", which is not conventional. Commitlint lints main's tip on
-          # push, so fail here rather than on main.
+          # Without a recorded subject GitHub generates one that is not conventional, and
+          # commitlint lints main's tip on push.
           gh pr view "$PR" --repo "$REPO" --json autoMergeRequest \
             --jq '.autoMergeRequest.commitHeadline // empty' | grep -q . || {
             echo "Auto-merge did not record the commit subject; refusing to leave main's tip to chance."

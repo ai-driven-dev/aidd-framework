@@ -21,10 +21,6 @@ function assertKnownToolId(toolId: string): asserts toolId is ToolId {
   }
 }
 
-// ---------------------------------------------------------------------------
-// install
-// ---------------------------------------------------------------------------
-
 async function runFrameworkInstall(
   deps: Deps,
   output: CLIOutput,
@@ -89,10 +85,6 @@ async function installIdeTool(
   output.success(`Installed ${result.toolId} (${result.fileCount} files)`);
 }
 
-// ---------------------------------------------------------------------------
-// remove
-// ---------------------------------------------------------------------------
-
 async function runFrameworkRemove(
   deps: Deps,
   output: CLIOutput,
@@ -113,10 +105,6 @@ async function runFrameworkRemove(
   const result = await deps.uninstallIdeUseCase.execute({ toolId, projectRoot });
   output.success(`Removed ${result.toolId} (${result.fileCount} files removed)`);
 }
-
-// ---------------------------------------------------------------------------
-// update
-// ---------------------------------------------------------------------------
 
 interface UpdatedTool {
   toolId: ToolId;
@@ -188,10 +176,6 @@ async function runFrameworkUpdate(
     [...ai.errors, ...ide.errors]
   );
 }
-
-// ---------------------------------------------------------------------------
-// registration
-// ---------------------------------------------------------------------------
 
 export function registerFrameworkCommand(program: Command): void {
   const framework = program

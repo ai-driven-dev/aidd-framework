@@ -69,10 +69,8 @@ function onePersonMapping(): PersonIdentity {
 }
 
 describe("buildCostReportArtefact", () => {
-  // The row a declared identity now names retroactively. Rendered as that person, never as
-  // "nobody opted in": `personLabel` used to fall through to the no-identifier label for
-  // every resolution it did not name, so a value added to `PersonResolution` reached a
-  // reader as its opposite without the compiler saying a word.
+  // A resolution `personLabel` does not name must not fall through to the no-identifier
+  // label: a value added to `PersonResolution` would reach a reader as its opposite.
   it("names a row this machine's identity claims after that person, not as nobody", () => {
     const envelope = envelopeOf({
       records: [request({ turn_id: "a", event_timestamp: "2026-08-17T10:00:00Z" })],
@@ -120,8 +118,7 @@ describe("buildCostReportArtefact", () => {
     );
   });
 
-  // Finding 3 (review.md, "one route, and every sentence about it true"): `--axis` had no
-  // way to say measurement was off either - a pasted table carried no word of it at all.
+  // A pasted table leaves the terminal behind, so it has to carry the switch being off itself.
   it("names the project's switch being off in its own header, on every axis", () => {
     const off = envelopeOf({ measurementEnabled: false });
     for (const axis of ARTEFACT_AXES) {
@@ -163,9 +160,8 @@ describe("buildCostReportArtefact", () => {
     expect(unresolvedLines).toHaveLength(2);
   });
 
-  // No identity declared on this machine: only then is "nobody opted in" the truth for a
-  // record that carried no identifier. With one declared, that same record is this
-  // machine's own person - the case the test above pins.
+  // Only with no identity declared on this machine is "nobody opted in" true of a record
+  // carrying no identifier; with one declared, that record is this machine's own person.
   it("labels the no-identifier row distinctly from an unresolved one", () => {
     const envelope = envelopeOf({
       records: [request({ turn_id: "a" }), request({ turn_id: "b", person_id: "a-stranger" })],
@@ -248,10 +244,8 @@ describe("buildCostReportArtefact", () => {
   });
 });
 
-// One skill reached once from the tool's own statement and once from a journal interval is
-// two rows sharing one step name (`by_step` is keyed on step + attribution together) - the
-// table this axis pastes elsewhere is the one place that column can be dropped silently,
-// since the terminal rendering carries it inline beside each row already.
+// `by_step` is keyed on step plus attribution, so one skill can hold two rows sharing a name.
+// A pasted table is the one place that column can be dropped silently.
 describe("buildCostReportArtefact — by step, two rows sharing one name", () => {
   const STEP = "aidd-dev:02-implement";
 
@@ -325,9 +319,8 @@ describe("buildCostReportArtefact — the agent axis names which silence a row i
     taskAttributable: false,
   } as const;
 
-  // Two rows carry no agent name and mean opposite things. A table that printed "the main
-  // thread" for both would state, of a tool that never names an agent, a fact nothing
-  // observed — the reading this axis gave every Codex, Copilot and OpenCode record.
+  // Two rows carry no agent name and mean opposite things: printing "the main thread" for a
+  // tool that never names an agent states, of that tool, a fact nothing observed.
   it("prints the main thread and a tool that names no agent as different rows", () => {
     const envelope = envelopeOf({
       declaredTools: [
@@ -408,9 +401,8 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
     expect(buildCostReportArtefact(withOneFlow(), "flow")).toContain("opens a flow of its own");
   });
 
-  // The guard against writing the names out beside the set instead of reading them from it:
-  // a project adding a fourth orchestrator is promised it need change nothing here, and a
-  // hardcoded list of three would go on printing three while this turns red.
+  // The names are read from the declared set, never written out beside it: a hardcoded list
+  // would go on printing its own three once a fourth orchestrator is declared.
   it("names every unqualified orchestrating skill the declared set holds, whatever it holds", () => {
     const artefact = buildCostReportArtefact(withOneFlow(), "flow");
     const bare = bareOrchestratingSkillNames();
@@ -429,9 +421,8 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
     expect(artefact).not.toContain("opens a flow of its own");
   });
 
-  // A limit is a statement about a mechanism that ran. A period whose only flow came from a
-  // record's own tool never walked a step sequence, so the two limits of that walk describe
-  // nothing that happened here and must not be printed.
+  // A limit is a statement about a mechanism that ran, and a period whose only flow its own
+  // tool named never walked a step sequence.
   it("states no journal limit for a period whose only flow its own tool named", () => {
     const statedOnly = envelopeOf({
       records: [

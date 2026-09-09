@@ -10,20 +10,13 @@ import { resolvePluginsCapability } from "../../../tools/domain/registry.js";
 
 /**
  * Undoes what `ProjectHooksMaterializer` wrote for one plugin: a tool declaring
- * `hooksDestination: "project"` (Cursor) merges a plugin's hooks into the project's own
- * hooks file rather than tracking them in `Plugin.files` (see
- * `mode-b-flat-materialization-translator.ts`), so removal needs its own unmerge
- * instead of a baseDir-relative file delete. Both destinations are recomputed from
- * `pluginName` alone, exactly as install computed them — no extra state to keep in
- * sync. A no-op for a tool that declares no project-merged hooks destination, and for
- * one with nothing yet written there.
+ * `hooksDestination: "project"` (Cursor) merges a plugin's hooks into the project's own hooks file
+ * rather than tracking them in `Plugin.files`, so removal needs an unmerge instead of a
+ * baseDir-relative file delete. Both destinations are recomputed from `pluginName` alone, exactly
+ * as install computed them, so there is no extra state to keep in sync.
  *
- * Shared between `PluginRemoveUseCase` (one plugin) and `CleanUseCase` (every plugin):
- * both undo the same install-time write, and a second private copy would be the exact
- * duplication `0-shared-modules.md` exists to name.
- *
- * Returns whether anything was actually there to undo — `CleanUseCase` counts it,
- * `PluginRemoveUseCase` does not need to.
+ * Returns whether anything was actually there to undo. A no-op for a tool declaring no
+ * project-merged hooks destination.
  */
 export async function removeProjectHooks(
   fs: FileReader & FileWriter,

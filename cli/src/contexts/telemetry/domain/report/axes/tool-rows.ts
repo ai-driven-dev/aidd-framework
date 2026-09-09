@@ -9,11 +9,10 @@ import type {
   TotalsAccumulator,
 } from "../../cost-report.js";
 
-/** `by_tool` is a breakdown of every *declared* tool, not only the ones a record touched -
- * that is what lets an unreadable one show its own reason instead of a false zero. A
- * `--tool` filter has to narrow that same list, or every tool it excluded would still
- * print a row reading "nothing in this period" - indistinguishable from one genuinely
- * measured idle, exactly the lie a filter's whole point is to remove. */
+/** `by_tool` is a breakdown of every *declared* tool, not only the ones a record touched, so
+ * an unreadable one shows its reason instead of a false zero. A `--tool` filter narrows that
+ * same list, or every tool it excluded would still print "nothing in this period" -
+ * indistinguishable from one genuinely measured idle. */
 export function declaredToolsInScope(
   declaredTools: readonly CostReportToolDeclaration[],
   filters: CostReportFilters | undefined
@@ -24,9 +23,9 @@ export function declaredToolsInScope(
     : declaredTools.filter((tool) => tool.tool === wanted);
 }
 
-/** Every declared tool gets a row, in the declared order, whether or not it contributed -
- * a tool absent from the output is a tool a reader assumes did nothing, and for an
- * unreadable one that assumption is exactly the false zero this layer exists to prevent. */
+/** Every declared tool gets a row, in the declared order, whether or not it contributed: a
+ * tool absent from the output is one a reader assumes did nothing, which for an unreadable
+ * tool is the false zero this layer exists to prevent. */
 export function buildToolRows(
   declaredTools: readonly CostReportToolDeclaration[],
   measured: ReadonlyMap<AiToolId, TotalsAccumulator>,

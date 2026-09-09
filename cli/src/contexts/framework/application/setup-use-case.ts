@@ -43,8 +43,7 @@ export class SetupUseCase {
     private readonly currentVersionProvider: VersionReader,
     private readonly setupToolsPromptUseCase?: SetupToolsPromptUseCase,
     private readonly projectContextDetector?: ProjectContextDetectorUseCase,
-    /** Handles `flow.scope === "user"` entirely — absent for every caller that
-     * predates `--scope user`, in which case `execute` refuses a request it has
+    /** Handles `flow.scope === "user"` entirely. Absent, `execute` refuses a request it has
      * nothing to serve. */
     private readonly setupMachineScopeUseCase?: SetupMachineScopeUseCase
   ) {}

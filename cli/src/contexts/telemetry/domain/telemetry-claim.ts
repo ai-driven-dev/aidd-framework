@@ -1,23 +1,10 @@
 import type { AiToolId } from "../../../kernel/tool.js";
 import type { StepAttributionSource } from "./step-attribution.js";
 
-/**
- * Four independently verifiable claims about the measurement chain, each answered from
- * what was actually read, never inferred from the others. Ported from the plugin's own
- * `diagnose.cjs`, which the CLI pivot deleted along with the rest of the skills' scripts;
- * the route it covered is named here rather than left behind a pointer to a file no reader
- * can open. That route is the local one: `hook fired` -> `session journalled` ->
- * `tool files readable` -> `records join`.
- *
- * Two more claims — `export-configured` and `identifier-joinable` — graded a second,
- * export route. That route (the OTLP receiver, the export config reader, and the mapper
- * that turned an exported payload into a stored record) was deleted in "one route, and
- * every sentence about it true" (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/):
- * on the machine that built this system, those two claims graded a route that had never
- * once produced a record, and failed a healthy install by recommending the one action that
- * sends a person's address off the machine. Every diagnostic claim is now about the one
- * route that exists.
- */
+/** Four independently verifiable claims about the measurement chain, each answered from what was
+ * actually read, never inferred from the others. Ported from the plugin's own `diagnose.cjs`,
+ * whose route is named here rather than left behind a pointer to a file no reader can open:
+ * `hook fired` -> `session journalled` -> `tool files readable` -> `records join`. */
 export type TelemetryClaimId =
   | "hook-fired"
   | "session-journalled"
@@ -26,15 +13,9 @@ export type TelemetryClaimId =
 
 export type TelemetryClaimVerdict = "ok" | "fail" | "unknown";
 
-/**
- * The reasons `noRunFileClaim` can land the first claim on — one absence, told apart by
- * what is actually known about it, never guessed from the absence alone. Its own union so
- * a sixth cause can only ever be added by extending this type: `TelemetryClaimReason`
- * composes it in, so a new member here forces every exhaustive `Record` keyed on it
- * (the diagnostic skill's own drift guard, `telemetry-claim.unit.test.ts`) to name an
- * account for it or fail to compile — the same failure mode this cluster exists to
- * prevent is not allowed to reopen quietly through a sixth branch nobody documented.
- */
+/** The reasons `noRunFileClaim` can land the first claim on — one absence, told apart by what is
+ * known about it, never guessed. Its own union: `TelemetryClaimReason` composes it in, so a
+ * sixth member forces every exhaustive `Record` keyed on it to name one or fail to compile. */
 export type NoRunFileReason =
   | "recorder-declared-nowhere"
   | "recorder-declared-not-yet-fired"
@@ -42,12 +23,9 @@ export type NoRunFileReason =
   | "anchorless-run-file"
   | "journal-in-another-schema";
 
-/**
- * The closed set of reasons a claim can land on a verdict. One claim's `fail` can have
- * several distinct causes — "no run file" and "untrusted hook" both fail `hook-fired`, and
- * collapsing them into one reading is exactly what a diagnostic exists to prevent — so the
- * reason, not the verdict alone, is what a caller must switch on to tell them apart.
- */
+/** The closed set of reasons a claim can land on a verdict. One claim's `fail` has several
+ * distinct causes — "no run file" and "untrusted hook" both fail `hook-fired` — so a caller
+ * switches on the reason, never on the verdict alone. */
 export type TelemetryClaimReason =
   | "session-anchored"
   | "untrusted-codex-hook"
@@ -73,19 +51,16 @@ export interface TelemetryClaim {
   readonly detail: string;
 }
 
-/** One journalled session, the shape `claimHookFired`/`claimSessionJournalled` need from
- * it — a fuller run journal (file writes, task declarations) carries nothing these claims
- * read, so it stays out of this evidence shape entirely. */
+/** One journalled session, the shape `claimHookFired`/`claimSessionJournalled` need from it —
+ * a fuller run journal carries nothing these claims read, so it stays out of this shape. */
 export interface TelemetryClaimJournal {
   readonly vendorId?: string;
   readonly sessionStartAt?: string;
   readonly turnClosed: boolean;
 }
 
-/** One covered tool's attempt to read one journalled session's own files. `records` carries
- * only the step attribution each one resolved to — `claimRecordsJoin`'s only use for a
- * record at all — never the counters themselves, which this diagnostic has no business
- * repeating from the report. */
+/** One covered tool's attempt to read one journalled session's files. `records` carries only the
+ * step attribution each resolved to, never counters this diagnostic would be repeating. */
 export interface TelemetryClaimToolRead {
   readonly tool: AiToolId;
   readonly sessionFound: boolean;
@@ -96,10 +71,9 @@ export interface TelemetryClaimToolRead {
   readonly error?: string;
 }
 
-/** Whether Codex has trusted this plugin's hook — `undefined` when there is no trust gate
- * to consult at all (every host but Codex, or a Codex session whose anchor was never
- * resolved). `readable: false` covers everything short of the config file actually opening
- * as text; neither direction licenses a guess at trust. */
+/** Whether Codex has trusted this plugin's hook — `undefined` when there is no trust gate to
+ * consult (every host but Codex, or a Codex session whose anchor was never resolved).
+ * `readable: false` covers everything short of the config file opening as text. */
 export interface TelemetryCodexHookTrust {
   readonly readable: boolean;
   readonly trusted?: boolean;
@@ -114,29 +88,18 @@ export interface TelemetryEvidence {
   readonly currentSessionId?: string;
   readonly unrecognisedPayloadAt?: string;
   readonly hookTrust?: TelemetryCodexHookTrust;
-  /** Whether the recorder is declared anywhere this build knows to check (the AIDD
-   * manifest, or a tool's own settings) — read the same way `TelemetrySetup`'s own
-   * `recorderDeclaration` fact is, so the claim below can never disagree with what the
-   * stated half already printed. Decides which of two absences an empty journal is: one
-   * still worth naming a failure, one that has simply not happened yet. Never itself proof
-   * the hook will fire — see `noRunFileClaim`'s own doc for the measured case where a
-   * declaration is silently dropped. */
+  /** Whether the recorder is declared anywhere this build checks — read the same way
+   * `TelemetrySetup`'s own `recorderDeclaration` is, so the two cannot disagree. Never proof
+   * the hook will fire: a declaration can be silently dropped. */
   readonly recorderDeclared: boolean;
-  /** Whether every location `readRecorderDeclaration` checked was actually readable —
-   * `false` only when `recorderDeclared` is `false` *and* at least one checked location
-   * exists but could not be read or parsed (a trailing comma, a `//` comment, unreadable
-   * permissions). A damaged declaring file is not the same absence as a recorder declared
-   * nowhere, the same "could not be read" distinction the switch file and identity already
-   * carry — collapsing it into "not declared" would grade a healthy, merely-unreadable
-   * install `FAIL` for a cause it does not have. Meaningless, and always `true`, when
-   * `recorderDeclared` is `true`: a declaration found at one readable location is real
-   * regardless of what else could not be read. */
+  /** Whether every location `readRecorderDeclaration` checked was readable — `false` only when
+   * `recorderDeclared` is `false` *and* a checked location exists but could not be read. A
+   * damaged declaring file is not the same absence as one declaring nothing: collapsing them
+   * grades a healthy install `FAIL` for a cause it does not have. */
   readonly recorderDeclarationReadable: boolean;
-  /** The schema stated by every run file the journal reader refused, from
-   * `RunJournalReader.listForeignSchemas`. Carried separately from `journals` because a
-   * refused file is absent from that list while being present on disk: without this, the
-   * one fact actually known about it — that it states a schema this build does not read —
-   * is invisible, and the claim below falls through to a branch that is false about it. */
+  /** The schema stated by every run file the journal reader refused. Carried separately from
+   * `journals` because a refused file is absent there while present on disk, and without it the
+   * claim below falls through to a branch that is false about it. */
   readonly foreignSchemaVersions: readonly number[];
 }
 
@@ -181,10 +144,8 @@ function unreadableTrustSuffix(hookTrust: TelemetryCodexHookTrust | undefined): 
 
 // The one absence, two causes this claim exists to tell apart: a recorder never declared
 // anywhere this build reads has nothing that could have written a run file, which is a
-// failure worth naming; a recorder that IS declared may simply not have run yet — that is
-// nothing to evaluate, never a failure, and its detail says so without promising the
-// declaration will actually fire (`telemetry-setup.ts` records the one measured case
-// where a headless run silently drops a declared entry as orphaned).
+// failure worth naming; a recorder that IS declared may simply not have run yet — nothing to
+// evaluate, and its detail says so without promising the declaration will actually fire.
 function recorderDeclaredNotYetFiredClaim(runsDirLabel: string): TelemetryClaim {
   return {
     claim: "hook-fired",
@@ -213,9 +174,7 @@ function recorderNotDeclaredClaim(
 
 // A location that cannot be read says so and costs only itself: this is not proof the
 // recorder is missing, only that whether it is declared could not be determined. Grading
-// `FAIL` off an unreadable file would reinstate, one layer down, the exact bug this
-// diagnostic exists to prevent — a healthy install told it is broken because something
-// about it could not be read.
+// `FAIL` off an unreadable file tells a healthy install it is broken.
 function recorderDeclarationUnreadableClaim(runsDirLabel: string): TelemetryClaim {
   return {
     claim: "hook-fired",
@@ -229,14 +188,9 @@ function recorderDeclarationUnreadableClaim(runsDirLabel: string): TelemetryClai
 }
 
 // A run file existing at all is direct evidence the recorder did something, whatever the
-// declaration says: reading its absence as "no run file … yet" (nothing to evaluate) or
-// as "the recorder is declared nowhere" (which claims no run file exists) are both wrong
-// about the one fact that is actually known here — a file is present, and it has no
-// session anchor to judge against. Unconditional on the recorder's own declaration: a
-// hooks block that registers PostToolUse/Stop but never SessionStart produces exactly
-// this file while reading "declared nowhere" (`hooksDeclarePlugin` only asks after
-// SessionStart), so gating this on `recorderDeclared` would still print "no run file"
-// about a file that demonstrably exists.
+// declaration says. Unconditional on `recorderDeclared`: a hooks block registering PostToolUse
+// but never SessionStart produces exactly this file while reading "declared nowhere", so gating
+// on it would print "no run file" about a file that demonstrably exists.
 function anchorlessRunFileClaim(runsDirLabel: string, fileCount: number): TelemetryClaim {
   return {
     claim: "hook-fired",
@@ -249,11 +203,10 @@ function anchorlessRunFileClaim(runsDirLabel: string, fileCount: number): Teleme
   };
 }
 
-// The schema a journal states is the writer's own statement about its shape, so a build
-// that does not read that schema knows exactly one thing about the file: not what its lines
-// mean. Ahead of `anchorlessRunFileClaim` for that reason — "none carry a readable
-// session_start" is a claim about the file's contents, which is the claim this build has
-// just said it cannot make.
+// The schema a journal states is the writer's own statement about its shape, so a build that
+// does not read that schema knows exactly one thing about the file: not what its lines mean.
+// Ahead of `anchorlessRunFileClaim`, whose "none carry a readable session_start" is a claim
+// about contents this build has just said it cannot make.
 function foreignSchemaClaim(runsDirLabel: string, stated: readonly number[]): TelemetryClaim {
   const versions = [...new Set(stated)].sort((left, right) => left - right).join(", ");
   return {
@@ -326,8 +279,6 @@ function sessionAnchoredClaim(
   };
 }
 
-// Split out of `claimHookFired` to keep both under the line-count limit: everything this
-// branch needs when no journal carries a session anchor at all.
 function noSessionJournalClaim(evidence: TelemetryEvidence): TelemetryClaim {
   const { journals, runsDirLabel, unrecognisedPayloadAt, hookTrust } = evidence;
   if (unrecognisedPayloadAt !== undefined) return unrecognisedPayloadClaim(unrecognisedPayloadAt);

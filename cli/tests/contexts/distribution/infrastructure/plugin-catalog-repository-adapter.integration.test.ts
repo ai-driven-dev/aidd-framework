@@ -127,11 +127,8 @@ describe("PluginCatalogRepositoryAdapter.load (Copilot-native path)", () => {
   });
 });
 
-// Regression: a user (framework 4.4.1, claude) hit a cryptic
-// `Invalid plugin manifest: "plugins" must be an array` crash when a cached
-// marketplace.json held a non-array object (stale / interrupted fetch).
-// The catalog reader must surface an actionable, recovery-bearing error
-// instead, and the hint must differ for cache vs user-provided sources.
+// A cached marketplace.json holding a non-array `plugins` must surface an actionable,
+// recovery-bearing error, and the hint differs for a cache source and a user-provided one.
 describe("PluginCatalogRepositoryAdapter.load — malformed catalog recovery", () => {
   async function writeCatalog(frameworkDir: string, content: string): Promise<void> {
     await mkdir(join(frameworkDir, ".claude-plugin"), { recursive: true });

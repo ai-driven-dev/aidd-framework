@@ -11,10 +11,8 @@ import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetr
 const PROJECT_ROOT = "/repo";
 const RUNS_ENTRY = "aidd_docs/runs/";
 
-// Most tests here care about the journal/sink/identity, not about git — this stands for
-// "inside a repository, nothing tracked yet", the common case, so `history` reads
-// `"possible"` rather than `"none"` by default. Tests about history itself override
-// `isRepository`/`listTrackedFiles`/`hasHistoryFor` explicitly.
+// "Inside a repository, nothing tracked yet", the common case, so `history` reads `"possible"`
+// by default. Tests about history itself override the git answers explicitly.
 const insideRepoNoTracking: VersionControl = { ...noGit, isRepository: async () => true };
 
 const RECORD: TelemetrySinkRecord = {
@@ -98,9 +96,8 @@ describe("ForgetTelemetryUseCase.preview() — every location, resolved once, an
   });
 
   it("reads a staged-but-never-committed journal honestly — tracked, not certainly held", async () => {
-    // `git add`ed but never committed: the index (`listTrackedFiles`) says tracked, but
-    // history (`hasHistoryFor`) has nothing for it yet — the exact gap `git ls-files`
-    // alone cannot see (finding: "history certainly holds it" was over-asserted this way).
+    // `git add`ed but never committed: the index says tracked while history holds nothing for it,
+    // the gap `git ls-files` alone cannot see.
     const git = {
       ...insideRepoNoTracking,
       listTrackedFiles: async () => ["aidd_docs/runs/staged.jsonl"],
@@ -270,9 +267,8 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
     const realPreview = await useCase.preview({ projectRoot: PROJECT_ROOT });
     expect(realPreview.sink.dayFileNames).toEqual(["2026-08-19.jsonl", "2026-08-20.jsonl"]);
 
-    // A person was shown only one of the two day files - the mutated value below is what
-    // "shown" means for this test, standing in for a preview built before a second day
-    // file appeared. Handing this to `remove()` must delete only what it names.
+    // A person was shown only one of the two day files, standing in for a preview built before the
+    // second appeared. Handing this to `remove()` must delete only what it names.
     const shownOnlyOneFile = {
       ...realPreview,
       sink: { ...realPreview.sink, dayFileNames: ["2026-08-19.jsonl"] },
@@ -280,9 +276,8 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
 
     await useCase.remove(shownOnlyOneFile);
 
-    // The file never named in what was shown survives - a fresh `listDayFiles()` inside
-    // `remove()` would have deleted it anyway, which is exactly the failure this design
-    // exists to make impossible.
+    // The file never named in what was shown survives: a fresh `listDayFiles()` inside `remove()`
+    // would have deleted it anyway, which is the failure this design exists to make impossible.
     expect(await sink.listDayFiles()).toEqual(["2026-08-20.jsonl"]);
     expect(sink.deletedFiles).toEqual(["2026-08-19.jsonl"]);
   });
@@ -293,10 +288,8 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
     const realPreview = await useCase.preview({ projectRoot: PROJECT_ROOT });
     expect(realPreview.journal.path).toBe(runJournalReader.runsDir);
 
-    // A relocated `AIDD_RUNS_DIR` between preview and remove would change what
-    // `runJournalReader.runsDir` answers on the next call, but never what was already
-    // shown — standing in for exactly that by handing `remove()` a preview naming a
-    // different directory than the reader's own.
+    // A relocated `AIDD_RUNS_DIR` between preview and remove changes what
+    // `runJournalReader.runsDir` answers next, but never what was already shown.
     const shownElsewhere = {
       ...realPreview,
       journal: { ...realPreview.journal, path: "/elsewhere/relocated-runs" },

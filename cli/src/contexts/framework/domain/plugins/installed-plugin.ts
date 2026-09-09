@@ -15,12 +15,9 @@ import { type InstallScope, isInstallScope } from "../install-scope.js";
 
 export const PLUGIN_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-/** What a plugin's `files` keys are relative to: the project root, or the tool's
- * user-scope plugins directory. Recorded once, at install, and read by everything
- * that resolves a plugin's files afterward — never re-derived from a tool's current
- * profile, which can disagree with what was true when the entry was written. Same value
- * domain as `InstallScope` (the CLI's `--scope` flag), aliased here so this field's own
- * name stays about what it records rather than about the flag that requested it. */
+/** What a plugin's `files` keys are relative to: the project root, or the tool's user-scope plugins
+ * directory. Recorded once, at install, and never re-derived from a tool's current profile, which
+ * can disagree with what was true when the entry was written. */
 export type PluginScope = InstallScope;
 
 export function parsePluginSpec(arg: string): { name: string; version?: string } {
@@ -29,15 +26,9 @@ export function parsePluginSpec(arg: string): { name: string; version?: string }
   return { name: arg.slice(0, at), version: arg.slice(at + 1) };
 }
 
-// ── The three maps ───────────────────────────────────────────────────────────
-// `InstalledPlugin` used to carry three `ReadonlyMap<string, string>` fields told apart
-// only by a comment — the compiler saw the same type in all three, so a value meant for
-// one could be assigned to another without complaint. Branding each map's type closes
-// that: the brand is a phantom property that exists only for the type checker, so a
-// plain `ReadonlyMap<string, string>` built anywhere else in the codebase is still
-// accepted at these public factories (cast once at the boundary below), while the three
-// fields themselves — and any function written to take more than one of them — can no
-// longer be confused for each other.
+// Branding closes a hole the compiler could not see: three `ReadonlyMap<string, string>` fields
+// told apart only by name meant a value meant for one could be assigned to another. The brand is a
+// phantom property, so a plain map built anywhere else is still accepted at the factories below.
 declare const mapBrand: unique symbol;
 type BrandedMap<Name extends string> = ReadonlyMap<string, string> & {
   readonly [mapBrand]: Name;

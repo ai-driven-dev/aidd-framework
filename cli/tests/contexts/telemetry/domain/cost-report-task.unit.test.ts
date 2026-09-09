@@ -54,9 +54,7 @@ function sumOf(rows: readonly { readonly totals: CostTotals }[]): CostTotals {
 }
 
 // One session that declares two tasks in sequence, closing the first the moment the
-// second opens - the shape `buildTaskIntervals` produces from two `task_declared` lines
-// with no `turn_end` between them. A record before the first declaration falls in
-// neither.
+// second opens. A record before the first declaration falls in neither.
 const FIRST_TASK = "2026_08/first-task";
 const SECOND_TASK = "2026_08/second-task";
 const JOURNALS: readonly CostReportSessionJournal[] = [
@@ -170,12 +168,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
   });
 
-  // Two absences a person acts on differently, and the report used to give them one name.
-  // A session whose journal was read and declared nothing is a fact about the work. A
-  // session with no journal at all is a fact about the read - the directory was missing,
-  // the machine that wrote it was another one, the project is not this one. Calling the
-  // second "no usable task declaration in this session" asserts something about work this
-  // layer never looked at, which is an unknown reported as a zero.
+  // A session whose journal was read and declared nothing is a fact about the work; a
+  // session with no journal at all is a fact about the read. One name for both is a zero.
   it("says no journal was read, rather than that the session declared nothing", () => {
     const records: readonly TelemetrySinkRecord[] = [
       request({ vendor_id: "s-unjournalled", event_timestamp: "2026-08-17T10:00:00Z" }),
@@ -221,12 +215,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(built.byBacklog[0]?.reason).toBe("no-journal");
   });
 
-  // 27 of a real session's 1073 records sat between `session_start` and its first
-  // declaration - 38 minutes of work before the flow named its ticket. That session wrote
-  // into exactly one task folder for its whole life, so those records have an answer the
-  // breakdown was not reading. Marked `inferred`, never merged into the declared row: the
-  // same task holds 1045 records the journal declared and 27 it did not, and one row
-  // carrying the weaker attribution would state something false about the 1045.
+  // A session bills records before its flow names a ticket. Where it wrote into exactly one
+  // task folder those have an answer, marked `inferred`, never merged into the declared row.
   it("names a record no declaration covers after the only task folder the session wrote into", () => {
     const journals: readonly CostReportSessionJournal[] = [
       {
@@ -261,9 +251,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
   });
 
-  // Two candidates and no reason to choose between them. The objection that kept written
-  // paths out of this breakdown entirely - one session placed under two task rows at once -
-  // is answered by refusing, never by picking the first.
+  // Two candidates and no reason to choose between them: one session placed under two task
+  // rows at once is answered by refusing, never by picking the first.
   it("infers nothing for a session that wrote into two task folders", () => {
     const journals: readonly CostReportSessionJournal[] = [
       {
@@ -292,11 +281,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(built.byTasks[0]?.reason).toBe("no-declaration");
   });
 
-  // The bound that stops this route from inventing history. A session whose journal was lost
-  // and recreated witnesses only the time since: its earlier records are in the sink, and
-  // attributing them to a folder that session touched today would be false by days. Measured
-  // on a live machine, where one session's journal began at 09:54 while its own records ran
-  // back a week.
+  // A session whose journal was lost and recreated witnesses only the time since: its earlier
+  // records are in the sink, and attributing them to a folder it touched today is false.
   it("infers nothing for a record outside the span its journal actually witnessed", () => {
     const journals: readonly CostReportSessionJournal[] = [
       {
@@ -322,11 +308,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(built.byTasks[0]?.reason).toBe("precedes-journal");
   });
 
-  // The live shape, and what the reason is for. A resumed transcript hands over turns billed
-  // days before the session that read them opened its journal; the same session then declares
-  // a task and works inside it. Both records are unattributed and they are unattributed for
-  // two different reasons - one predates the journal entirely, one is a genuinely late
-  // declaration - and one row for both would say the flow declared late in every case.
+  // A resumed transcript hands over turns billed days before its journal opened, and the same
+  // session then declares a task: both records are unattributed, for two different reasons.
   it("separates a record older than its journal from one that merely preceded a declaration", () => {
     const journals: readonly CostReportSessionJournal[] = [
       {
@@ -364,9 +347,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
   });
 
   it("never lets the whole-session written-path inference the --task filter uses leak into this breakdown", () => {
-    // A session that wrote into a task folder, but never declared - the --task filter's
-    // own "inferred" route would attribute the whole session to it; this breakdown does
-    // not consult written paths at all, so the record lands in the no-task row.
+    // A session that wrote into a task folder but never declared - this breakdown does not
+    // consult written paths at all, so the record lands in the no-task row.
     const journals: readonly CostReportSessionJournal[] = [
       {
         vendorId: "s-written-only",
@@ -391,11 +373,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
   });
 
   it("never contradicts a --task header: the inferred route's own record still names no declared interval", () => {
-    // A session that wrote into first-task's folder but never declared an interval - the
-    // --task filter's own "inferred" route keeps this record in scope (report.task is
-    // set), but by_task does not read that route, so the record still lands in the row
-    // with no `task`. That row must never be read as "this session touched no task" -
-    // see cost-report-contract.md's own note on this interaction.
+    // The --task filter's own "inferred" route keeps this record in scope, but by_task does
+    // not read that route: its no-`task` row is never "this session touched no task".
     const journals: readonly CostReportSessionJournal[] = [
       {
         vendorId: "s-inferred-only",
@@ -424,11 +403,8 @@ describe("buildCostReport — by_task groups by the declared interval a record f
   });
 
   it("resolves a declared interval whose path merely contains '..' as text, never misreading live coverage as journal-silent", () => {
-    // The hook's own gate for a declared path (task-declared.cjs) allows "..' inside a
-    // folder name - "2026_02_10_a..b" is a name, not a climb - and used to be rejected by
-    // a blanket substring check here, which then fell through to `journal-silent` for a
-    // record squarely inside the declared, still-open interval. That is a false claim
-    // about the journal's own timing, not about the path.
+    // A declared path may hold ".." as text - "2026_02_10_a..b" is a name, not a climb - and a
+    // blanket substring check falls through to `journal-silent` for a live, open interval.
     const journals: readonly CostReportSessionJournal[] = [
       {
         vendorId: "s-dotted-name",

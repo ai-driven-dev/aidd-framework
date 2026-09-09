@@ -123,9 +123,8 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
   });
 
   it("closes a flow opened by its bare name with the end the orchestrator declares in full", () => {
-    // Cursor and Codex write `01-sdlc` into step_start - the plugin never reaches the
-    // journal - while the end the skill echoes always carries it. Compared exactly, the
-    // declaration those hosts capture closed nothing at all.
+    // Cursor and Codex write `01-sdlc` into step_start, the plugin never reaching the
+    // journal, while the end the skill echoes always carries it.
     const bareOpener = {
       type: "step_start",
       at: "2026-08-17T10:00:00Z",
@@ -148,9 +147,8 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
   });
 
   it("never closes a flow on a step_end naming some other skill", () => {
-    // A step run inside the orchestration ends; the orchestration does not. Distinguishing:
-    // something is witnessed after that end, so closing there and not closing there are two
-    // different numbers.
+    // A step run inside the orchestration ends; the orchestration does not. Something is
+    // witnessed after that end, so the two readings are different numbers.
     const intervals = buildFlowIntervals(journalOf([SDLC_OPENS, PLAN_ENDS], [], [WRITTEN_LATE]));
 
     expect(intervals[0]?.endMs).toBe(Date.parse(WRITTEN_LATE.at));
@@ -158,10 +156,8 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
   });
 
   it("does not close a flow at a turn_end - a pause is not the end of an orchestration", () => {
-    // The separating case: with `turn_end` last, the moment it would close at and the
-    // journal's own last witnessed moment are the same number, so a fixture ending on the
-    // pause proves nothing either way. Something witnessed *after* the pause is what tells
-    // the two rules apart — this end is 11:30, and was 11:00 while a `turn_end` closed one.
+    // With `turn_end` last, closing there and capping at the journal's end are the same
+    // number: only something witnessed after the pause tells the two rules apart.
     const intervals = buildFlowIntervals(
       journalOf([SDLC_OPENS, EARLIER_TURN_END], [], [WRITTEN_LATE])
     );
@@ -171,9 +167,6 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
   });
 
   it("keeps work done after the pause inside the flow that was still running", () => {
-    // The consequence a person actually reads: the orchestration measured here paused at
-    // 06:02 and worked on for three more hours, and every one of those records used to fall
-    // outside its own flow.
     const intervals = buildFlowIntervals(
       journalOf([SDLC_OPENS, EARLIER_TURN_END], [], [WRITTEN_LATE])
     );
@@ -212,7 +205,6 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
       SDLC_OPENS.skill,
       SDLC_OPENS.skill,
     ]);
-    // The first closes on the second's own start, not on the pause between them.
     expect(intervals[0]?.endMs).toBe(Date.parse(secondSdlcRun.at));
     expect(intervals[1]?.endMs).toBe(Date.parse(secondSdlcRun.at)); // unclosed - capped at its own start
   });
@@ -326,9 +318,6 @@ describe("buildFlowIntervals — a journal with no readable moment in it", () =>
 });
 
 describe("buildFlowIntervals — the limit the flow axis prints beside its figures", () => {
-  // Pinned as behaviour, not left to a doc comment: `cost-report-artefact.ts`'s own
-  // `flowLimits` tells a reader this happens, and a change here that stopped it happening
-  // would leave that sentence describing something the code no longer does.
   it("opens a flow on a bare 01-sdlc, whichever project's own skills/ directory named it", () => {
     const projectsOwnSkill = {
       type: "step_start",

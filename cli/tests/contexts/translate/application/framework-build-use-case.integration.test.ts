@@ -17,19 +17,16 @@ import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
 const SOURCE_DIR = FIXTURE_DIR;
-// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
-// drive-relative and prepends the current drive, so production's own resolve(outDir)
-// would otherwise write under a different key than this constant's raw string names.
+// resolve(), not the bare literal: on Windows a leading "/" is drive-relative, so
+// production's own resolve(outDir) would key the tree differently from this constant.
 const OUT_DIR = resolve("/tmp/aidd-build-test-out");
 
-// Minimal plugin manifest JSON schema: only "name" required.
 const MINIMAL_MANIFEST_SCHEMA = {
   type: "object",
   required: ["name"],
   properties: { name: { type: "string" } },
 };
 
-// Minimal marketplace JSON schema: only "name", "metadata", "owner", "plugins" required.
 const MINIMAL_MARKETPLACE_SCHEMA = {
   type: "object",
   required: ["name", "metadata", "owner", "plugins"],
@@ -140,7 +137,6 @@ describe("FrameworkBuildUseCase", () => {
     });
 
     it("synthesized plugin.json omits skills when no SKILL.md files exist", async () => {
-      // Remove all SKILL.md files from the fixture
       for (const path of fs.listUnder(`${SOURCE_DIR}/plugins/aidd-test/skills`)) {
         if (path.endsWith("SKILL.md")) fs.deleteFile(path);
       }
@@ -368,7 +364,6 @@ describe("FrameworkBuildUseCase", () => {
 
   describe("marketplace field sourcing", () => {
     it("uses version from source marketplace entry when present", async () => {
-      // Inject a version on the marketplace entry
       fs.setFile(
         `${SOURCE_DIR}/.claude-plugin/marketplace.json`,
         JSON.stringify({

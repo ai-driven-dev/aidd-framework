@@ -80,8 +80,7 @@ describe("UserManifestRepositoryAdapter", () => {
     it("never removes the user config dir itself — auth.json, marketplaces.json and references.json live there too", async () => {
       const manifest = Manifest.create();
       await adapter.save(manifest);
-      // A neighbour this adapter must never touch, standing in for auth.json /
-      // marketplaces.json / references.json / telemetry/, all of which also live
+      // A neighbour this adapter must never touch, standing in for everything else living
       // directly under userConfigDir.
       const neighbour = join(userConfigDir, "marketplaces.json");
       await writeFile(neighbour, "{}");

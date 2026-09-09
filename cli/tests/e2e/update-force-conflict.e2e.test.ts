@@ -41,10 +41,8 @@ async function modifyTrackedFile(projectDir: string): Promise<void> {
   return modifyFirstTrackedFile(projectDir, "claude");
 }
 
-// `aidd update` (bare) is now self-update — it never touches tracked project files, so
-// it has no conflict guard to test here. The project-wide "re-install everything" sweep
-// this file used to exercise under that name now lives at `framework update` (no
-// --tool), which is what "aidd ai update"/"aidd ide update" folded into below.
+// Bare `aidd update` is self-update and touches no tracked file, so the project-wide sweep
+// under test is `framework update` without `--tool`.
 describe.concurrent("E2E: update conflict guard", () => {
   describe("aidd framework update --tool claude", () => {
     it("exits 1 when a tracked AI tool file is modified in non-TTY mode (no --force)", async () => {

@@ -1,9 +1,8 @@
 import { FileHash } from "../../../../kernel/file.js";
 import type { MergeFileEntry } from "../../../../kernel/merge.js";
 
-// ── MergeFileEntry serialization ────────────────────────────────────────────
-// A merge file is co-owned: framework and user each hold entries inside the same file
-// (e.g. `mcpServers` in `.claude/settings.json`), tracked per-key rather than per-file.
+// A merge file is co-owned: framework and user each hold entries inside the same file (e.g.
+// `mcpServers` in `.claude/settings.json`), tracked per-key rather than per-file.
 
 export interface MergeFileEntryData {
   relativePath: string;

@@ -3,30 +3,17 @@ import type {
   TranscriptLineAccumulator,
 } from "../ports/session-cost-reader.js";
 
-// Measured 2026-08-20 against two real files: a main transcript line from
-// ~/.claude/projects/*/*.jsonl (Claude Code 2.1.229) and a subagent's own line from
-// ~/.claude/projects/*/<sessionId>/subagents/agent-*.jsonl (2.1.232). If Claude Code moves
-// any of these field names,
-// tests/contexts/telemetry/domain/formats/claude-code-transcript.unit.test.ts turns red
-// against the captured fixture before a zero could be stored in the moved field's place.
-//
-// A subagent's own messages are never inline in the main transcript — every `isSidechain:
-// true` line measured lives only in its own `<sessionId>/subagents/agent-*.jsonl` file,
-// which is why `CLAUDE_CODE_TRANSCRIPT_LOCATION`
-// (contexts/tools/domain/profiles/claude/claude-transcript-location.ts) matches both layouts.
+// Field names measured against real transcripts: the unit test turns red against its fixture if
+// Claude Code moves one, before a zero could be stored in the moved field's place. A subagent's
+// messages are never inline in the main transcript but in their own `subagents/agent-*.jsonl`,
+// which is why `CLAUDE_CODE_TRANSCRIPT_LOCATION` matches both layouts.
 const VENDOR_FIELD = "sessionId";
 const TURN_FIELD = "requestId";
 
-// Claude Code writes its own fabricated assistant messages into the transcript with this
-// literal in `message.model` - a session-limit notice, an "API Error: your computer went
-// to sleep" notice. They are messages the tool composed, not calls anyone was
-// billed for, so they yield no record at all.
-//
-// The filter is the marker, never all-counters-zero: measured 2026-08-23 across every
-// transcript in ~/.claude/projects, all 251 `<synthetic>` messages carried four zero
-// counters and `<synthetic>` was the only such placeholder any of them used for a model.
-// A genuinely billed call that happened to read zero on all four - improbable, not
-// impossible - is still an observation, and still yields its record.
+// Claude Code writes its own fabricated assistant messages with this literal in
+// `message.model` — a session-limit or error notice the tool composed, billed to nobody, so
+// they yield no record. The marker is the filter, never all-counters-zero: a genuinely billed
+// call reading zero on every counter is still an observation, and still yields its record.
 const SYNTHETIC_MODEL = "<synthetic>";
 
 interface ClaudeUsage {
@@ -72,8 +59,8 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** All four or none: a partial `usage` — a truncated final line, or a shape this file has
- * not been taught — yields no record rather than one with a missing counter read as zero. */
+/** All four or none: a partial `usage` yields no record rather than one whose missing counter
+ * reads as zero. */
 function readCounters(usage: ClaudeUsage | undefined): ClaudeCounters | null {
   const input = asNumber(usage?.input_tokens);
   const cacheCreation = asNumber(usage?.cache_creation_input_tokens);
@@ -101,27 +88,17 @@ function buildIdentity(
     vendor_id: vendorId,
     vendor_field: VENDOR_FIELD,
     ...(turnId !== undefined ? { turn_id: turnId, turn_field: TURN_FIELD } : {}),
-    // The same value as `turn_id` on this route — Claude Code's local transcript names one
-    // billed call the same way it names one turn, `requestId`. Stated separately rather
-    // than derived from `turn_id` downstream: `turn_id` is not guaranteed unique per billed
-    // request on every tool and route, and a consumer collapsing two records into one must
-    // never key that on a field with that caveat. See telemetry-sink-record.ts.
+    // Stated separately rather than derived from `turn_id` downstream: `turn_id` is not unique
+    // per billed request on every route, and a consumer collapsing two records into one must
+    // never key on a field carrying that caveat.
     ...(turnId !== undefined ? { billed_request_id: turnId } : {}),
   };
 }
 
-// The export path sets `agent_name` for a subagent's own request (see
-// otlp-logs-claude-code-subagent.json); matching that here is what keeps a consumer from
-// being able to tell a local-read subagent record from an exported one by anything but
-// `provenance`.
-// `attributionSkill` is exact and unflagged, per message, on the same line as `usage` —
-// measured 2026-08-20 against 40 real transcripts (2267 attributed messages, 25 distinct
-// skills). It arrived around Claude Code 2.1.220 and is omitted, never nulled, when no
-// skill is running; a version that predates the field omits it identically. Nothing on the
-// line separates those two cases, so its absence here yields no `step` at all, leaving
-// attribution to fall back to a run-journal interval (or unattributed) rather than
-// asserting "no skill ran". `attributionPlugin` is read alongside it, and only alongside
-// it — a plugin name with no skill name is not a fact this line can state.
+// `agent_name` matches what the export path sets, so a local-read subagent record differs from
+// an exported one by `provenance` alone. `attributionSkill` is omitted, never nulled, both when
+// no skill runs and on a version predating it, so its absence yields no `step` at all rather
+// than asserting "no skill ran"; `attributionPlugin` is read only alongside it.
 function buildOptionalFields(
   line: ClaudeTranscriptLine
 ): Pick<
@@ -177,25 +154,10 @@ function uuidOf(line: string): string | undefined {
   return parsed === null ? undefined : asString(parsed.uuid);
 }
 
-/** The prompt a line belongs to, found by walking `parentUuid` upward.
- *
- * A billed call and the prompt that caused it never share a line: measured on a real
- * 810-record session, zero lines carry both `requestId` and `promptId`, only `type: "user"`
- * lines carry the second, and all 209 lines bearing counters reach one this way — three hops
- * in the median.
- *
- * `seen` bounds the walk instead of a hop count: a transcript is appended to by a live
- * process and can be truncated mid-write, so a parent that points at a line which never
- * arrived, or a cycle a damaged file leaves behind, must end the walk rather than search
- * forever. A hop cap would also terminate, but it would silently stop answering for a
- * legitimately deep chain, which is the kind of number nobody could ever justify. */
-/** The skill a `Skill` tool call on this line invokes, or `undefined` for every other line.
- *
- * Only a `Skill` call names a step. Every other tool call is work done inside whatever step
- * was already running, and reading one as a start would name a skill for a prompt that
- * invoked none. `input.skill` is the field Claude Code puts the name in - the same one
- * `skill-detection.cjs` reads out of the hook payload, so the transcript and the run
- * journal name a step identically. */
+/** Only a `Skill` call names a step: every other tool call is work done inside the step already
+ * running, and reading one as a start would name a skill for a prompt that invoked none.
+ * `input.skill` is the same field `skill-detection.cjs` reads out of the hook payload, so
+ * transcript and run journal name a step identically. */
 function skillInvokedOn(line: ClaudeTranscriptLine): string | undefined {
   const content = line.message?.content;
   if (!Array.isArray(content)) return undefined;
@@ -209,6 +171,10 @@ function skillInvokedOn(line: ClaudeTranscriptLine): string | undefined {
   return undefined;
 }
 
+/** The prompt a line belongs to, walking `parentUuid` upward — a billed call and the prompt
+ * that caused it never share a line. `seen` bounds the walk rather than a hop count: a live
+ * transcript truncated mid-write can point at a parent that never arrived, or leave a cycle,
+ * while a hop cap would silently stop answering for a legitimately deep chain. */
 function resolvePromptId(
   startUuid: string | undefined,
   parents: ReadonlyMap<string, string>,
@@ -225,23 +191,10 @@ function resolvePromptId(
   return undefined;
 }
 
-/** One parsed JSONL line, keyed by `message.id` — the identifier that ties together the
- * separate log lines one API call can produce. Mapping every such line to its own record
- * would count that single call's tokens more than once.
- *
- * The lines do NOT all carry the same `usage`, which an earlier version of this comment
- * claimed. Measured across 1,604 real transcripts on one machine: of 83,626 `message.id`
- * groups, 25,702 carry differing figures, and in 25,702 of 25,702 the last line's
- * `output_tokens` is greater than or equal to the first's. Claude Code writes a line when a
- * message starts and again when it completes, and only the last carries
- * `output_tokens_details` and `iterations`. Keeping the first kept the placeholder: 37.4% of
- * every output token on that machine was being discarded, and up to 94% of a
- * subagent-heavy session's.
- *
- * The last line wins, and the figures are never summed. In 25,143 of those 25,702 groups
- * `input_tokens` and `cache_read_input_tokens` are identical across the lines — they are one
- * call restated, not two calls — so adding them would multiply the cache counters, which are
- * by far the largest. */
+/** Keyed by `message.id`: Claude Code writes a line when a message starts and another when it
+ * completes, so one record per line would count the same call twice. The last wins, carrying the
+ * complete `output_tokens` where the first holds a placeholder; the figures are never summed,
+ * the lines being one call restated with identical input and cache-read counters. */
 function parseAssistantLine(
   line: string
 ): { readonly dedupeKey: string; readonly record: LocalCostCandidateRecord } | null {
@@ -266,22 +219,19 @@ function parseAssistantLine(
 }
 
 class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
-  // Insertion-ordered, and the value is replaced rather than skipped: a later line for a key
-  // already seen is the same call, restated with figures that have grown. The record's
-  // position stays where the call first appeared, so the order a reader sees is the order
-  // the calls happened.
+  // Insertion-ordered, value replaced rather than skipped: the record keeps the position the
+  // call first appeared at, so a reader sees the order the calls happened.
   private readonly byKey = new Map<string, LocalCostCandidateRecord>();
-  // Which line each record came from, so its prompt can be resolved once every line has
-  // been seen — a parent almost always appears earlier, but nothing in the format promises
-  // it, and a walk run mid-stream would answer from a half-built map.
+  // Which line each record came from, so prompts are resolved once every line has been seen:
+  // nothing in the format promises a parent appears earlier, and a walk run mid-stream would
+  // answer from a half-built map.
   private readonly uuidByKey = new Map<string, string>();
-  // Every line's own links, gathered from *all* lines rather than only billed ones: the
-  // chain from a call to its prompt runs through lines that carry no counters at all.
+  // Gathered from *all* lines, not only billed ones: the chain from a call to its prompt runs
+  // through lines carrying no counters at all.
   private readonly parents = new Map<string, string>();
   private readonly prompts = new Map<string, string>();
-  /** Every `Skill` call the transcript holds, in the order it holds them, paired with the
-   * line that made it. Resolved to prompts in `build()` and not here, for the reason the
-   * class already resolves prompts there: a walk run mid-stream reads a half-built chain. */
+  /** In the order the transcript holds them, resolved to prompts in `build()` for the same
+   * reason prompts are: a walk run mid-stream reads a half-built chain. */
   private readonly skillCalls: { readonly uuid: string; readonly skill: string }[] = [];
 
   push(line: string): void {
@@ -293,8 +243,8 @@ class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
     if (uuid !== undefined) this.uuidByKey.set(parsed.dedupeKey, uuid);
   }
 
-  /** Parsed a second time, deliberately: `parseAssistantLine` answers `null` for every line
-   * that is not a billed assistant turn, and those are exactly the lines this walk needs. */
+  /** Parsed a second time: `parseAssistantLine` answers `null` for every line that is not a
+   * billed assistant turn, and those are exactly the lines this walk needs. */
   private rememberLinks(line: string): void {
     const parsed = parseLine(line);
     if (parsed === null) return;
@@ -308,12 +258,9 @@ class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
     if (skill !== undefined) this.skillCalls.push({ uuid, skill });
   }
 
-  /** The skill each prompt invoked, first call wins.
-   *
-   * The first and not the last: a prompt that invokes two skills invoked the second from
-   * inside the first, and the prompt is named for the work it began - the same rule
-   * `promptToSkill` follows over the run journal's own `step_start` lines, so the two
-   * sources cannot disagree about a prompt they both saw. */
+  /** First call wins, not the last: a prompt invoking two skills invoked the second from
+   * inside the first, and the prompt is named for the work it began — the same rule
+   * `promptToSkill` follows over the journal's own lines, so the two cannot disagree. */
   private skillByPrompt(): ReadonlyMap<string, string> {
     const byPrompt = new Map<string, string>();
     for (const { uuid, skill } of this.skillCalls) {
@@ -342,10 +289,8 @@ export function createClaudeCodeTranscriptAccumulator(): TranscriptLineAccumulat
   return new ClaudeCodeTranscriptAccumulator();
 }
 
-/** The `(content: string) => records[]` shape task 1.4 asks for, and what a fixture-driven
- * test targets directly. The adapter instead streams `createClaudeCodeTranscriptAccumulator`
- * one line at a time, so a large transcript is never held whole in memory — this is a
- * convenience wrapper around the same per-line logic, not a second implementation of it. */
+/** A wrapper around the same per-line logic, for a fixture-driven test to target directly:
+ * the adapter streams the accumulator instead, so a large transcript is never held whole. */
 export function mapClaudeCodeTranscriptToSinkRecords(
   content: string
 ): readonly LocalCostCandidateRecord[] {

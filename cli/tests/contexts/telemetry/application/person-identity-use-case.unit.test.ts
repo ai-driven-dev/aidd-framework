@@ -265,13 +265,8 @@ describe("PersonIdentityUseCase.unlink", () => {
 
 describe("PersonIdentityUseCase.use, minted apart from adopted", () => {
   /**
-   * The one distinction the merge had to carry across.
-   *
-   * `on` and `use` were two commands, so nothing could confuse them. Behind one door the
-   * difference lives entirely in a word, and the word decides what a person is told: an
-   * identifier this machine created gets the disclosure about what it will attach to, while
-   * one carried here from another machine has to say what it replaced instead. Reporting
-   * either as the other is a sentence about the wrong event.
+   * An identifier this machine minted gets the disclosure about what it will attach to; one
+   * carried here from another machine has to say what it replaced instead.
    */
   it("calls a fresh identifier minted, and one carried here adopted", async () => {
     const minted = await useCase(new InMemoryPersonIdentityStore(null)).use({});
@@ -281,7 +276,6 @@ describe("PersonIdentityUseCase.use, minted apart from adopted", () => {
 
     expect(minted.outcome).toBe("minted");
     expect(adopted.outcome).toBe("adopted");
-    // And on disk, where a later reader looks: the same distinction, independently.
     expect(minted.identity.origin).toBe("minted");
     expect(adopted.identity.origin).toBe("adopted");
   });
@@ -302,11 +296,8 @@ describe("PersonIdentityUseCase.use, minted apart from adopted", () => {
 
 describe("PersonIdentityUseCase.use, attaching a display name", () => {
   it("mints an identifier for a name given when none stands, rather than refusing", async () => {
-    // The separate `name` verb refused here, and had to: it could only decorate something
-    // that already existed. Under one door the refusal has no reason left — `use` is the
-    // verb that opts in, and `--name` is a property of what it settles on. A person typing
-    // `identity use --name Ada` with nothing standing is saying who they are, not asking to
-    // rename a thing that is not there.
+    // `--name` is a property of what `use` settles on: a person typing `identity use --name Ada`
+    // with nothing standing is saying who they are, not renaming a thing that is not there.
     const store = new InMemoryPersonIdentityStore(null);
 
     const result = await useCase(store).use({ displayName: "Ada" });
@@ -367,8 +358,7 @@ describe("PersonIdentityUseCase.off", () => {
   });
 
   // A file holding an empty `person_id` parses to "nobody chose" while still sitting on
-  // disk. Deciding removal from that read left it there with no verb able to remove it,
-  // against the contract's own "withdrawing removes the whole declaration".
+  // disk, and withdrawing removes the whole declaration.
   it("removes a file that exists but names nobody, rather than reading it as already off", async () => {
     const store = new InMemoryPersonIdentityStore(null);
     store.filePresent = true;
@@ -395,10 +385,8 @@ describe("PersonIdentityUseCase.off", () => {
     expect(result.identity.personId).not.toBe("withdrawn-id");
   });
 
-  // The store reads back nothing, because the file is a directory - a shape that cannot
-  // also parse to an identity. Seeding one here would let `removed` come from the identity
-  // instead of from the file, which is exactly the confusion `forget()` answering from the
-  // filesystem exists to end.
+  // The store reads back nothing because the file is a directory — a shape that cannot also
+  // parse to an identity, so `removed` can only come from the filesystem.
   it("discards a damaged identity file rather than leaving a person unable to withdraw", async () => {
     const store = new InMemoryPersonIdentityStore(null);
     store.filePresent = true;
@@ -438,17 +426,8 @@ describe("PersonIdentityUseCase.off", () => {
 });
 
 /**
- * Every command an error names is a command the CLI still has.
- *
- * An error message is the one surface that tells a person what to run next, and it is the
- * one nothing typechecks. Reducing `identity` from seven verbs to four left
- * `EmptyDisplayNameError` saying "run `aidd telemetry identity name`" — a verb the same
- * change had just deleted, reachable from an ordinary typo, and invisible to every gate
- * because the only test asserted the error's *class* and never its sentence.
- *
- * So this reads the sentences instead. It is deliberately a scan of the source rather than
- * a list of expected strings: a list would have to be updated by the same hand that forgets
- * to update the message, which is how the first one went stale.
+ * Every command an error names must be a command the CLI still has, and no gate typechecks
+ * a message — so this scans the source rather than a list that goes stale the same way.
  */
 describe("what the errors tell a person to run", () => {
   /** The verbs `registerTelemetryIdentityCommand` actually registers, plus the bare noun. */

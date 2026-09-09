@@ -108,12 +108,11 @@ interface GlobalOptions {
 interface Deps extends TelemetryDeps {
   fs: FileReader & FileWriter & FileMerger;
   manifestRepo: ManifestRepository;
-  /** `--scope user`'s own manifest repository — `userConfigDir()/manifest.json`,
-   * never nested under a project's `.aidd/`. See `SetupMachineScopeUseCase`. */
+  /** `--scope user`'s own manifest repository: `userConfigDir()/manifest.json`, never nested
+   * under a project's `.aidd/`. */
   userManifestRepo: ManifestRepository;
-  /** The one resolver for the OS home directory presentation ever calls — never
-   * `os.homedir()` directly, so a test can point it elsewhere the same way every use
-   * case's own injected `homedir` already can. */
+  /** The one home-directory resolver presentation calls, never `os.homedir()` directly, so a
+   * test can point it elsewhere. */
   homedir: () => string;
   logger: Logger;
   currentVersionProvider: VersionReader;
@@ -138,8 +137,7 @@ interface Deps extends TelemetryDeps {
   pluginInstallUseCase: PluginInstallUseCase;
   marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase;
   doctorUseCase: DoctorUseCase;
-  /** The registration check alone, reused directly by `doctor --scope user` — see
-   * where it is constructed for why the same instance serves both scopes. */
+  /** The registration check alone, reused directly by `doctor --scope user`. */
   doctorRegistrationUseCase: DoctorRegistrationUseCase;
   releaseResolver: LatestReleaseResolver;
   setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase;
@@ -212,12 +210,10 @@ export async function createDeps(
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
   const { nativePluginActivators, hostMarketplaceRegistries } = wireTools();
-  // Read once, reused everywhere a use case needs to know what a host's own plugin
-  // registry says: removal (to uninstall at the scope actually registered), clean (the
-  // same), and doctor's own registration check.
+  // Read once, reused wherever a use case needs the scope a plugin is actually registered
+  // at: removal, clean, and doctor's own registration check.
   const hostPluginRegistries = hostPluginRegistryReaders();
-  // Built here, ahead of every use case that reads a shared-source claim
-  // (`pluginRemoveUseCase` first, `cleanUseCase` further below): depends only on `fs`
+  // Built ahead of every use case that reads a shared-source claim: it depends only on `fs`
   // and `userConfigDir`, neither of which distribution's own wiring produces.
   const userSourceReferences = new UserSourceReferencesAdapter(fs, userConfigDir);
   const {
@@ -245,10 +241,9 @@ export async function createDeps(
     marketplaceRegistry,
     prompter
   );
-  // `marketplace add --overwrite` removes before it adds, and removing deletes the
-  // installed plugin files — framework work. The orchestration belongs here, where
-  // both distribution's and framework's use cases are already in scope, rather than
-  // pulling framework into distribution's own wiring (see tests/architecture/context-graph).
+  // `marketplace add --overwrite` removes before it adds, and removing deletes installed
+  // plugin files — framework work — so the orchestration belongs here rather than pulling
+  // framework into distribution's own wiring.
   const marketplaceAddUseCase = new MarketplaceAddUseCase(
     marketplaceRegistry,
     marketplaceTrustStore,
@@ -262,16 +257,10 @@ export async function createDeps(
     resolveMarketplaceUseCase
   );
   const assetProvider = new BundledAssetProviderAdapter();
-  // force:true is safe here: outDir is always builtMarketplaceDir(), an aidd-owned
-  // disposable cache under .aidd/cache/built/, never a user-owned directory. A
-  // collision only means "the cache from a previous build already exists" — the
-  // whole point of a rebuild. The real user --force (framework.ts) is unrelated
-  // and already threaded correctly for the direct `translate --as flat` path.
-  // The build's own diagnostics belong to `aidd translate`, where the user asked
-  // for a build and wants to know what it skipped. Here the build is a cache being
-  // brought up to date, which happens behind almost every command — repeating those
-  // lines each time would report an implementation detail as if it were news. They are
-  // still traced, so `--verbose` shows them.
+  // `force: true` is safe here: `outDir` is always an aidd-owned disposable cache, never a
+  // user-owned directory, so a collision only means a previous build's cache exists. Its
+  // diagnostics drop to debug because this build runs behind almost every command, where
+  // they would report an implementation detail as news; `--verbose` still shows them.
   const cacheBuildLogger: Logger = {
     debug: (message) => logger.debug(message),
     info: (message) => logger.debug(message),
@@ -381,9 +370,8 @@ export async function createDeps(
   const doctorPluginUseCase = new DoctorPluginUseCase(detectPluginDriftUseCase);
   const doctorReferencesUseCase = new DoctorReferencesUseCase(fs);
   const doctorLayoutUseCase = new DoctorLayoutUseCase(fs, authReader);
-  // Named so `doctor --scope user` can reuse this same instance directly — the check
-  // itself takes `manifest`/`projectRoot`/`allowedIds` per call, never a fixed
-  // manifest repository, so nothing about it is project-scope-specific.
+  // Named so `doctor --scope user` reuses this instance: the check takes its manifest and
+  // project root per call, so nothing about it is project-scope-specific.
   const doctorRegistrationUseCase = new DoctorRegistrationUseCase(
     fs,
     marketplaceRegistry,
@@ -438,8 +426,8 @@ export async function createDeps(
     currentVersionProvider
   );
   const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher, detectPluginDriftUseCase);
-  // Lets restore re-materialize cursor/opencode plugins via the build pipeline,
-  // matching what install wrote (otherwise restore rewrites raw content → drift).
+  // Restore re-materializes through the build pipeline, matching what install wrote:
+  // rewriting raw content instead would itself be drift.
   const builtMaterializationDeps = {
     ensureBuilt: ensureBuiltMarketplaceUseCase,
     marketplaceRegistry,

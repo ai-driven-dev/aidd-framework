@@ -85,7 +85,6 @@ describe("InstallCommandsUseCase", () => {
         contentFiles,
       });
 
-      // Only claude's file passes; cursor's is rejected by acceptsFileName
       expect(files).toHaveLength(1);
       expect(files[0].frameworkPath).toBe("commands/04_code/implement.claude.md");
     });
@@ -108,7 +107,6 @@ describe("InstallCommandsUseCase", () => {
 
     it("converts frontmatter via the capability's convertFrontmatter", () => {
       const { useCase } = buildUseCase();
-      // Claude commands capability converts frontmatter (name, description, argument-hint, model)
       const rawContent =
         "---\nname: test-cmd\ndescription: test description\nargument-hint: $ARG\n---\n# body\n";
       const contentFiles = new Map([["commands/04_code/test-cmd.claude.md", rawContent]]);
@@ -141,8 +139,6 @@ describe("InstallCommandsUseCase", () => {
         contentFiles,
       });
 
-      // Only SKILL.md (matches entryFile) — but SKILL.md has no tool suffix, still accepted
-      // other.claude.md is filtered by entryFile check
       const paths = files.map((f) => f.frameworkPath);
       expect(paths).not.toContain("commands/other.claude.md");
     });

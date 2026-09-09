@@ -1,6 +1,5 @@
-// Codex enables plugins through its own CLI (`codex plugin add`), which writes the
-// user-global `~/.codex/config.toml` and plugin cache — a project-local settings file is
-// inert. This test asserts the sync drives the CodexActivator and writes NO `.codex/config.json`.
+// Codex enables plugins through its own CLI, which writes the user-global
+// `~/.codex/config.toml` and plugin cache, so a project-local settings file is inert.
 import "../../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -21,11 +20,9 @@ import { InMemoryMarketplaceRegistry } from "../../../../../helpers/ports/in-mem
 const PROJECT_ROOT = "/test-project";
 const MARKETPLACE_NAME = "aidd-framework";
 
-/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
- * "codex" to, at codex's own `distributionProbes.marketplace` relative path — a real
- * build always leaves one there, so a fixture standing in for one must too, now that an
- * unreadable catalog is a hard failure rather than a silent fall back to this project's
- * own local alias (`UnreadableBuiltCatalogError`). */
+/** A readable catalog at the path `fakeEnsureBuiltMarketplace()` resolves "codex" to, at its
+ * own `distributionProbes.marketplace` relative path: a real build always leaves one there, and
+ * an unreadable catalog is now `UnreadableBuiltCatalogError` rather than a fall back. */
 async function seedBuiltCatalog(fs: InMemoryFileAdapter, name = MARKETPLACE_NAME): Promise<void> {
   await fs.writeFile(
     "/built/codex/.agents/plugins/marketplace.json",

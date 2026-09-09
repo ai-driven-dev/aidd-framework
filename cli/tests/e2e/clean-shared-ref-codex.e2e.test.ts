@@ -1,21 +1,6 @@
 /**
- * `clean` in one project must not disable a plugin another project on the same
- * machine still needs — the fix `clean-shared-ref-guard.integration.test.ts` proves
- * against substituted ports, run here once against the real built binary.
- *
- * Two motifs combined: the fake host binary that logs its own invocations
- * (`marketplace-add-conflict.e2e.test.ts`) and one `fakeHome` shared by two projects
- * (`sync-recreates-machine-scope-registration.e2e.test.ts`). Codex declares no
- * `NativeActivation.scopeArgs` at all, so it enables a plugin machine-wide — exactly
- * the case this guard exists for.
- *
- * `--plugins none`, which every other e2e fixture passes, records no
- * `NativeRegistrations.pluginRefs` at all (nothing was ever asked to install), so this
- * suite passes a real plugin name instead — confirmed by a throwaway probe against
- * the real built binary before this file was written: `setup --ai codex --plugins
- * aidd-vcs` against a fake codex binary populates the project's own
- * `nativeRegistrations.codex.pluginRefs` with `aidd-vcs@aidd-framework`, which is what
- * this guard needs to have anything to guard.
+ * Codex enables a plugin machine-wide (no `NativeActivation.scopeArgs`), so a `clean` here
+ * must not disable it. `--plugins none` records no `pluginRefs`, so a real name is passed.
  */
 import { readFile, realpath } from "node:fs/promises";
 import { delimiter, join, resolve } from "node:path";
@@ -53,9 +38,7 @@ describe("E2E: clean leaves a codex ref enabled while another project still shar
       ];
 
       // Both projects share one machine: one `fakeHome` (`first.fakeHome`), never
-      // `second.fakeHome` — the same pattern
-      // `sync-recreates-machine-scope-registration.e2e.test.ts` uses for two projects
-      // on one machine-scope registration.
+      // `second.fakeHome`.
       const firstSetup = await runCli(setupArgs, first.projectDir, first.fakeHome, { env });
       expect(firstSetup.exitCode).toBe(0);
       const secondSetup = await runCli(setupArgs, second.projectDir, first.fakeHome, { env });

@@ -96,8 +96,8 @@ describe("RestoreAllPluginsUseCase — Mode A marketplace tools (claude/codex/co
     const plugin = manifest.getPlugins("claude").find((p) => p.name === "sample-plugin");
     if (plugin === undefined) throw new Error("plugin not found");
 
-    // Simulate the pre-fix bug: a buggy update/restore materialized files and recorded
-    // them on the manifest entry, even though Mode A's contract is register-only.
+    // Files materialized and recorded on the manifest entry, though Mode A's own contract
+    // is register-only.
     const strayFiles = new Map([
       [".claude/plugins/sample-plugin/commands/greet.md", "stray-hash-1"],
       [".claude/plugins/sample-plugin/agents/reviewer.md", "stray-hash-2"],
@@ -136,9 +136,8 @@ describe("RestoreAllPluginsUseCase — Mode A marketplace tools (claude/codex/co
     const untrackedPath = ".claude/plugins/sample-plugin/notes.md";
     manifest.updatePlugin("claude", plugin.withFiles(new Map([[trackedPath, "stray-hash"]])));
     await deps.fs.writeFile(join(PROJECT_ROOT, trackedPath), "stray content");
-    // Not in the manifest entry — a file the user (or something else) placed alongside the
-    // plugin's tracked files. The cleanup must never delete this, since it only ever
-    // iterates the manifest's own keys.
+    // Not in the manifest entry — a file placed alongside the plugin's tracked ones, which
+    // the cleanup must never delete, since it only iterates the manifest's own keys.
     await deps.fs.writeFile(join(PROJECT_ROOT, untrackedPath), "keep me");
 
     await makeRestoreUseCase(deps, registry).execute({

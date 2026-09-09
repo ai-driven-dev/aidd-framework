@@ -48,17 +48,14 @@ export const opencode: AiTool<
   displayName: "OpenCode",
   telemetryLocalRead: {
     kind: "declared",
-    // Counters per message, and no amount: `info.cost` is `0` in every message captured
-    // and its denomination was never established, so it is deliberately never read. No
-    // field names a running skill either.
+    // Counters per message, and no amount: `info.cost` is `0` in every message captured and its
+    // denomination was never established, so it is deliberately never read. No field names a
+    // running skill either.
     supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
-    // Measured 2026-08-20: `input` is exclusive of `cache.read` for providerID "anthropic",
-    // matching that API's own documented behaviour. A second provider was probed 2026-08-24
-    // (providerID "opencode") and reconciled the same way, but never exercised its cache
-    // across two turns of one session — no capture puts a large `cache.read` beside `input`
-    // for a non-Anthropic provider, so that probe corroborates without confirming. A
-    // provider that reports prompt tokens inclusive of the cached ones, the way native
-    // OpenAI's usage does, has never been captured here. See plugins/aidd-telemetry/README.md.
+    // `input` is measured exclusive of `cache.read` for providerID "anthropic", matching that
+    // API's own documented behaviour. A second, OpenAI-compatible provider reconciled the same
+    // way but never exercised its cache across two turns, so it corroborates without confirming;
+    // a provider reporting prompt tokens inclusive of the cached ones has never been captured.
     limitation:
       "Its four counters are measured disjoint for the anthropic provider and for one " +
       "OpenAI-compatible provider whose cache was exercised — not confirmed for a " +
@@ -118,9 +115,8 @@ export const opencode: AiTool<
         return "opencode.json";
       },
     }),
-    // marketplaceSettings is not available in flat mode (FlatPluginsParams has no such field).
-    // Additionally, opencode's plugin[] array accepts only npm package name strings —
-    // there is no source/version concept that a marketplace entry could express.
+    // Flat mode has no `marketplaceSettings` field, and opencode's `plugin[]` array accepts
+    // only npm package names — no source or version a marketplace entry could express.
     plugins: new PluginsCapability({
       mode: "flat",
       flatNamespacePrefix: "aidd-",

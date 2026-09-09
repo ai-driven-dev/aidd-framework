@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// JSON validator for framework files. It always checks JSON syntax, validates
-// Claude metadata against SchemaStore when available, and falls back to local
-// structural checks if remote schemas cannot be loaded.
-
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import Ajv from "ajv";

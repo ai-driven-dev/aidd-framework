@@ -13,10 +13,8 @@ import { AuthStorage } from "../../../src/runtime/auth/auth-storage.js";
 import { makeAuthConfig } from "../../helpers/auth.js";
 
 /**
- * `process.platform` is a plain value property, so it is redefined rather than spied on.
- * The win32 branch is the only one that shells out, and no CI runner this suite runs on
- * is Windows, so it would otherwise never be exercised at all. `USERNAME` comes with it:
- * every Windows session has one and no POSIX one does.
+ * `process.platform` is a plain value property, so it is redefined rather than spied on; the
+ * win32 branch alone shells out, and it needs `USERNAME`, which no POSIX session has.
  */
 async function asWin32<T>(run: () => Promise<T>, account = "tester"): Promise<T> {
   const platform = Object.getOwnPropertyDescriptor(process, "platform");
@@ -131,11 +129,8 @@ describe("AuthStorage", () => {
     });
 
     it("passes a path carrying shell metacharacters as one verbatim argument", async () => {
-      // `"` is illegal in an NTFS filename — `storage.write` really writes this file to
-      // disk before the (mocked) icacls call, so it must stay legal on every filesystem
-      // this suite runs on. `&`, the space, `;` and `$` are all NTFS-legal and still prove
-      // the point: `execFileSync` receives this as one array element, never concatenated
-      // into a shell string a real shell would split on them.
+      // No `"`: the file is really written to disk, and that is illegal on NTFS. `&`, the
+      // space, `;` and `$` are legal there and still split under a real shell.
       const path = join(tempDir, "a & echo pwned; $HOME & b.json");
       vi.mocked(execFileSync).mockClear();
 

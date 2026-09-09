@@ -16,10 +16,8 @@ import type { PersonIdentityStore } from "../domain/ports/person-identity-store.
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 
-// A file with no `origin` at all is read as `"minted"`, never guessed as anything else:
-// every file written before this change - by this adapter's own earlier shape, or by the
-// plugin's now-deleted `identity.cjs` - is exactly what `"minted"` describes, and `origin`
-// is only ever knowable at the moment an identity is created or adopted, never afterwards.
+// A file with no `origin` reads as `"minted"`: that is what the plugin's own deleted
+// `identity.cjs` wrote, and `origin` is knowable only when an identity is created or adopted.
 function parseIdentity(raw: string): PersonIdentity | null {
   const parsed = asPlainObjectOrEmpty(JSON.parse(raw));
   if (typeof parsed.person_id !== "string" || parsed.person_id === "") return null;
@@ -36,9 +34,8 @@ function parseIdentity(raw: string): PersonIdentity | null {
   return identity;
 }
 
-// `also_me` is omitted from the written file when empty, the same way `display_name` is
-// omitted when unset - an empty array is what most identities have, and writing it out on
-// every file would make the common case noisier than the shape it describes.
+// `also_me` is omitted when empty, like `display_name` when unset: the common case stays the
+// quietest shape on disk.
 function serializeIdentity(identity: PersonIdentity): string {
   const record: {
     person_id: string;
@@ -51,14 +48,10 @@ function serializeIdentity(identity: PersonIdentity): string {
   return `${JSON.stringify(record, null, 2)}\n`;
 }
 
-/** Reads and writes only this machine's own user profile - `resolveHomeDir()` honors `HOME`
- * on every platform, and this adapter never reads `AIDD_USER_CONFIG_DIR`. That variable is documented as a location
- * a team or a CI can point every figure at; a choice reachable that way would not be this
- * person's own.
- *
- * `filePath` is resolved exactly once, in the constructor, and frozen from then on — a
- * relocation of `HOME` after construction can never change what this instance answers,
- * matching `TelemetrySinkAdapter.rootDir`. */
+/** Reads and writes only this machine's own user profile, never `AIDD_USER_CONFIG_DIR`: a
+ * team or CI can point that variable at a shared location, and an identity reachable that way
+ * would not be this person's own. `filePath` is resolved once, in the constructor, so a later
+ * relocation of `HOME` cannot change what this instance answers. */
 export class PersonIdentityAdapter implements PersonIdentityStore {
   readonly filePath: string;
 
@@ -114,13 +107,9 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
     return next;
   }
 
-  // `recursive: true` is what lets this discard a damaged identity file that turns out to
-  // be a directory (the Test Scope's own "the identity file is unreadable" edge case) —
-  // `off` is a privacy control, and withdrawing must not depend on the damage taking one
-  // particular shape. `force: true` is deliberately NOT set: forcing folds "already gone"
-  // into success, and that is the one case this has to report back - see the port. `path`
-  // is never `this.filePath` re-derived here — see the port's own doc for why the caller
-  // supplies it.
+  // `recursive: true` so withdrawing works even where the damaged identity file is a
+  // directory; `force: true` deliberately not set, since "already gone" is the one case this
+  // must report back rather than fold into success. `path` is the caller's, never re-derived.
   async forget(path: string): Promise<boolean> {
     try {
       await rm(path, { recursive: true });
@@ -131,10 +120,8 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
     }
   }
 
-  // `addAlsoMe`/`removeAlsoMe` assume a person exists to add onto - the use case that
-  // calls them already refused "nobody opted in" against its own read of the identity
-  // before ever reaching here. This is the defensive fallback for that contract, not a
-  // path a normal call takes.
+  // The calling use case already refuses "nobody opted in", so this is the defensive
+  // fallback for that contract, not a path a normal call takes.
   private async requireCurrent(action: "add" | "remove"): Promise<PersonIdentity> {
     const current = await this.readStrict();
     if (current !== null) return current;

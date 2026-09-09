@@ -3,24 +3,11 @@ import type {
   TranscriptLineAccumulator,
 } from "../ports/session-cost-reader.js";
 
-// Measured 2026-08-20 against two real rollouts on Codex CLI 0.145.0-alpha.27:
-// ~/.codex/sessions/2026/07/29/rollout-*-019fae6f-....jsonl (a resumed session, where
-// `session_meta.id` and `session_id` differ) and .../2026/07/16/rollout-*-019f69d0-....jsonl
-// (that resumed session's own parent, a fresh session where the two agree). If Codex moves
-// any of these field names,
-// tests/contexts/telemetry/domain/formats/codex-rollout.unit.test.ts turns red against the
-// captured fixtures before a zero could be stored in the moved field's place.
-//
-// A `token_count` event's `info` carries `total_token_usage` (cumulative for the whole
-// rollout) and `last_token_usage` (this call's own increment) — summing the totals across
-// calls double-counts every call after the first. `info` carries no model and no request
-// id at all; those live on the `turn_context` event that precedes the run of `token_count`
-// events belonging to one turn, keyed by `turn_id`. And `last_token_usage.input_tokens` is
-// *inclusive* of `cached_input_tokens` (OpenAI's Responses API convention), unlike Claude
-// Code's `usage.input_tokens`, which is exclusive of its own cache figure — subtracting
-// `cached_input_tokens` here is what keeps `input_tokens` meaning the same thing across
-// tools. `reasoning_output_tokens` is a subset of `output_tokens`, not a sibling of it, so
-// it is never added to it.
+// A `token_count` event carries a cumulative `total_token_usage` beside this call's own
+// `last_token_usage`, so summing the totals double-counts every call after the first; it names
+// no model and no request id, which live on the `turn_context` opening the turn. Its
+// `input_tokens` is *inclusive* of `cached_input_tokens`, unlike Claude Code's exclusive figure,
+// so cached is subtracted; `reasoning_output_tokens` is a subset of `output_tokens`, never added.
 const VENDOR_FIELD = "session_meta.id";
 const TURN_FIELD = "turn_id";
 
@@ -76,9 +63,8 @@ function parseLine(line: string): CodexLine | null {
   }
 }
 
-// `at` is the turn's own start, taken from the `turn_context` line rather than from any
-// counted event: a record here covers a whole turn, so a moment inside it would claim a
-// precision the record does not have. It is what a step interval is matched against.
+// `at` is the turn's own start, off the `turn_context` line rather than a counted event: a
+// record covers a whole turn, so a moment inside it would claim a precision it does not have.
 function startTurn(
   payload: NonNullable<CodexLine["payload"]>,
   at: string | undefined
@@ -88,10 +74,9 @@ function startTurn(
   return { turnId, model: asString(payload.model), effort: asString(payload.effort), at };
 }
 
-/** Adds this event's own increment to the turn's running sums — never the cumulative
- * `total_token_usage`. A metric absent from every event in the turn (Codex sometimes omits
- * `cache_write_input_tokens` entirely rather than sending zero) stays unset rather than
- * being summed into a fabricated zero. */
+/** The event's own increment, never the cumulative `total_token_usage`. A metric absent from
+ * every event of the turn — Codex omits `cache_write_input_tokens` rather than sending zero —
+ * stays unset rather than summed into a fabricated zero. */
 function addUsage(pending: PendingTurn, usage: CodexTokenUsage): void {
   const rawInput = asNumber(usage.input_tokens);
   const cached = asNumber(usage.cached_input_tokens);
@@ -107,17 +92,10 @@ function addUsage(pending: PendingTurn, usage: CodexTokenUsage): void {
   if (output !== undefined) pending.outputTokens = (pending.outputTokens ?? 0) + output;
 }
 
-/** The cumulative figure as a comparable tuple, or null when this event carries none.
- *
- * Codex re-emits the last `token_count` of a turn verbatim: the same `last_token_usage`
- * arrives twice while `total_token_usage` does not move. Measured on 400 real rollouts, 291
- * of 16,415 events (1.8%) across 38 rollouts, inflating a summed reading of this tool by
- * ~0.9% on input and cache-read and ~1.2% on output. A cumulative that has not moved cannot
- * carry consumption that was billed: that is what the cumulative means, so this is a
- * consequence of the format rather than a guess about it.
- *
- * `null` when the event states no cumulative at all — then the increment is counted, because
- * an absent figure is not evidence that nothing happened. */
+/** Codex re-emits a turn's last `token_count` verbatim, the increment arriving twice while the
+ * cumulative does not move — and a cumulative that has not moved cannot carry billed consumption.
+ * `null` when the event states none: the increment is then counted, an absent figure being no
+ * evidence that nothing happened. */
 function cumulativeKey(usage: CodexTokenUsage | undefined): string | null {
   if (!usage) return null;
   const parts = [
@@ -160,26 +138,14 @@ function buildRecord(vendorId: string, pending: PendingTurn): LocalCostCandidate
   };
 }
 
-/** Pairs each `turn_context` with the `token_count` events that follow it, up to the next
- * `turn_context` (or end of file), and emits one record per turn — never per line, since a
- * `token_count` event alone carries no model, no request id, and only a cumulative figure.
- *
- * `build()`'s own final `flush()` cannot tell "the session ended here" from "the session is
- * still running and this turn is not done yet" apart — a rollout has no line that says a
- * turn, or the session, is finished; a turn is closed only by the *next* `turn_context`, and
- * a still-running session's last turn has none. This module does not attempt that
- * distinction itself: it always emits whatever the counters sum to so far, and does not need
- * to say anything more than what it counted. Whether a later read's own record for the same
- * `turn_id` is a genuine correction is decided downstream, in `read-local-cost-use-case.ts`'s
- * `storeNewCandidates` — by comparing it against what is already stored, never by asking
- * whether the session "should" be finished by now: a candidate whose counters are strictly
- * larger than what is stored is itself the only proof this module's own file can ever offer
- * that an earlier reading was not the last word. */
+/** One record per turn, never per line. A turn is closed by the *next* `turn_context`, and a
+ * rollout has no line saying the session is finished, so the final flush cannot tell an ended
+ * session from a running one: it emits what the counters sum to so far, and whether a later
+ * read's record for the same `turn_id` corrects it is decided downstream. */
 class CodexRolloutAccumulator implements TranscriptLineAccumulator {
   private vendorId: string | undefined;
   private pending: PendingTurn | undefined;
-  /** The cumulative last counted, so a verbatim re-emission of a turn's final
-   * `token_count` is not added a second time. See `cumulativeKey`. */
+  /** The cumulative last counted, so a re-emitted final `token_count` is not added twice. */
   private lastCumulative: string | undefined;
   private readonly records: LocalCostCandidateRecord[] = [];
 
@@ -229,9 +195,8 @@ export function createCodexRolloutAccumulator(): TranscriptLineAccumulator {
   return new CodexRolloutAccumulator();
 }
 
-/** A `(content: string) => records[]` shape, for a fixture-driven test to target directly.
- * The adapter instead streams `createCodexRolloutAccumulator` one line at a time, so a
- * large rollout is never held whole in memory. */
+/** For a fixture-driven test to target directly: the adapter streams the accumulator one line
+ * at a time, so a large rollout is never held whole in memory. */
 export function mapCodexRolloutToSinkRecords(content: string): readonly LocalCostCandidateRecord[] {
   const accumulator = createCodexRolloutAccumulator();
   for (const line of content.split("\n")) accumulator.push(line);

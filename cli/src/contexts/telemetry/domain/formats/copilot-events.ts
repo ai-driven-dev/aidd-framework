@@ -1,32 +1,10 @@
 import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 
-// Measured 2026-08-21/22 against real files on `@github/copilot@1.0.80`:
-// ~/.copilot/session-state/<id>/events.jsonl. `session.shutdown` fires once, at the end of
-// the session — never per turn — and its own `tokenDetails` is the four-counter breakdown
-// this reader carries. Confirmed arithmetically against the same capture:
-// `tokenDetails.input.tokenCount` (10) + `tokenDetails.cache_write.tokenCount` (21070) =
-// `modelMetrics.<model>.usage.inputTokens` (21080) — the `usage` object is *inclusive* of
-// the cache-write figure, `tokenDetails` already exclusive, matching every other reader's
-// convention here. **Confirmed the same way for `cache_read` on 1.0.82, 2026-09-06**
-// (tests/fixtures/local-cost/.copilot/session-state/55555555-.../events.jsonl): 9 + 42038 +
-// 21404 = 63451 = `usage.inputTokens`, with Copilot's own terminal line reading
-// `↑ 63.5k (42.0k cached, 21.4k written)`. That is the capture the earlier one could not
-// give: at `cache_read: 0` an inclusive and an exclusive `input` produce the same number,
-// at 42038 they do not — an inclusive one would read 63451, not 9. `modelMetrics.<model>.requests.cost` (and its session-level twin,
-// `totalPremiumRequests`) is a count times a per-model multiplier, invariant to
-// consumption — measured across fourteen local sessions, it read `0.33` for every
-// single-request `claude-haiku-4.5` session regardless of tokens spent — so neither is ever
-// read as `cost_usd`. No `model` is stamped either: `currentModel` names only the last
-// model a session used, and `session.model_change` is a real, captured event, so
-// attributing a whole session's tokens to it would repeat the sticky-attribution mistake
-// this codebase already corrected for `skill.name`.
-//
-// The session id is never read off the file's own content — `session.shutdown` carries
-// none, and reading it from a preceding `session.start` line would give the file's own
-// answer rather than the session the caller already asked for, the one case where the two
-// could disagree (a truncated capture, a copy missing its first line). The directory this
-// file lives in already names the session; `CopilotCostReaderAdapter` reads that name once
-// and hands it straight through.
+// `session.shutdown` fires once at the end of a session, never per turn, and its `tokenDetails`
+// is exclusive of the cache figures where the sibling `usage` object is inclusive of them —
+// which is why this reader takes the first. `requests.cost` and `totalPremiumRequests` are a
+// count times a per-model multiplier, invariant to consumption, so neither is read as `cost_usd`;
+// no `model` is stamped either, `currentModel` naming only the last one a session used.
 const VENDOR_FIELD = "sessionId";
 const TURN_FIELD = "id";
 
@@ -65,9 +43,8 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** All four or none — every real capture reports them together, and a shape this file has
- * not been taught (a renamed field, a `tokenDetails` present but empty) must yield no
- * record rather than one silently missing every counter. */
+/** All four or none: a shape this file has not been taught — a renamed field, an empty
+ * `tokenDetails` — yields no record rather than one silently missing every counter. */
 function readCounters(details: CopilotShutdownData["tokenDetails"]): CopilotCounters | null {
   const input = asNumber(details?.input?.tokenCount);
   const output = asNumber(details?.output?.tokenCount);
@@ -110,17 +87,10 @@ function parseLine(line: string): CopilotEventLine | null {
   }
 }
 
-/**
- * One record at most, from `session.shutdown`'s own `tokenDetails` — never per turn, since
- * no per-request figure exists on this tool's file at all. A session that never
- * shut down, or one that shut down with no billed request (no `tokenDetails` at all,
- * `modelMetrics: {}`), yields nothing: a session held and found empty, never a record of
- * zeros. Only the first matching line is kept — `session.shutdown` fires once.
- *
- * `vendorId` is the caller's own — never re-derived from the file, see the header comment
- * above for why. Pure and synchronous: the one part of this reader allowed to open a file
- * is `CopilotCostReaderAdapter`, which calls this with what it read.
- */
+/** One record at most: no per-request figure exists on this tool's file at all, and a session
+ * that never shut down or shut down unbilled yields nothing rather than a record of zeros.
+ * `vendorId` is the caller's own — the directory already names the session, where a truncated
+ * copy of the file would not — and this stays pure; the adapter is what opens a file. */
 export function mapCopilotEventsToSinkRecords(
   content: string,
   vendorId: string

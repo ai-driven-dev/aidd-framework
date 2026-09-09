@@ -17,9 +17,8 @@ import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-ad
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";
 
 const REAL_FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework-real");
-// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
-// drive-relative and prepends the current drive, so production's own resolve(outDir)
-// would otherwise write under a different key than this constant's raw string names.
+// resolve(), never the bare literal: on Windows path.resolve prepends the current drive to a
+// leading "/", so production's own resolve(outDir) would write under a different key.
 const OUT_DIR = resolve("/tmp/aidd-claude-test-out");
 
 // Avoid biome noTemplateCurlyInString: split literal

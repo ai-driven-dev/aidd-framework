@@ -5,24 +5,11 @@ import { describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/runtime/git/git-environment.js";
 import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./helpers.js";
 
-/**
- * `aidd telemetry check` — the local route alone (hook fired, session journalled, tool
- * files readable, records join). The export route (export configured, identifier
- * joinable) was deleted in "one route, and every sentence about it true"
- * (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/): the OTLP export writer,
- * and every diagnostic claim that graded it, are gone — a healthy install has nothing
- * left to grade but the route that actually produces a record. An earlier phase pinned
- * this same suite's claims against the plugin's own `telemetry-check.cjs` while both
- * existed; that script is long deleted (`02-check` calls `aidd telemetry check` instead),
- * so this covers the gate and edge cases without a second process to compare against.
- */
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const REPO_ROOT = resolve(process.cwd(), "..");
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 // Built from two literals, so this definition itself holds no literal `${...}`: biome's
-// noTemplateCurlyInString flags a bare `${CLAUDE_PLUGIN_ROOT}` inside a plain string as an
-// accidental template placeholder — the same reason the source plugin's own path-rewrite
-// token is built the same way (`plugin-root-token-rewrite.ts`).
+// noTemplateCurlyInString flags a bare `${CLAUDE_PLUGIN_ROOT}` inside a plain string.
 const CLAUDE_PLUGIN_ROOT_TOKEN = "$" + "{CLAUDE_PLUGIN_ROOT}";
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
@@ -77,10 +64,8 @@ async function seedUnrecognisedPayload(projectDir: string, at: string): Promise<
   );
 }
 
-/** `~/.codex/config.toml`'s own trust table shape, for one event name. Approving a hook
- * under `eventName` and then checking under a *different* one — the "renamed event" edge
- * case — is exactly why this takes the event name as a parameter rather than hardcoding
- * `session_start`. */
+/** `~/.codex/config.toml`'s own trust table shape. The event name is a parameter because
+ * the renamed-event case approves a hook under one name and checks under another. */
 async function writeCodexHookTrust(fakeHome: string, eventName: string): Promise<void> {
   await mkdir(join(fakeHome, ".codex"), { recursive: true });
   await writeFile(
@@ -91,13 +76,12 @@ trusted_hash = "deadbeef"
   );
 }
 
-// Matched by label, not by position: phase 1 prints a "what is in place" section ahead of
-// the four claims, so slicing the first four lines of stdout no longer lands on them.
+// Matched by label, not by position: a "what is in place" section prints ahead of the
+// four claims, so slicing the first four lines of stdout does not land on them.
 const CLAIM_LINE = /^ {2}(hook fired|session journalled|tool files readable|records join)\b/u;
 
-/** Every claim line the union covers — all four, in the fixed order `diagnoseTelemetryClaims`
- * prints in — never the "not covered" lines after them, whose count depends on which tools
- * this machine happens to have wired. */
+/** Every claim line the union covers, in the fixed order `diagnoseTelemetryClaims` prints
+ * in - never the "not covered" lines after them, whose count depends on the machine. */
 function allClaimLines(stdout: string): string[] {
   return stdout.split("\n").filter((line) => CLAIM_LINE.test(line));
 }
@@ -161,8 +145,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       expect(result.stdout).toMatch(/hook fired\s+FAIL\s+no run file/u);
       expect(result.stdout).toMatch(/never been observed firing/u);
       // "Nothing has run yet" is not "everything is broken": with no journal at all, the
-      // three claims that read from it have no material to judge, and say so - never a
-      // cascade of failures downstream of the one genuine one.
+      // three claims that read from it have no material to judge, and say so.
       expect(result.stdout).toMatch(/session journalled\s+--/u);
       expect(result.stdout).toMatch(/tool files readable\s+--/u);
       expect(result.stdout).toMatch(/records join\s+--/u);
@@ -199,8 +182,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
 
       expect(result.exitCode, result.stderr).toBe(1);
       // A run file demonstrably exists here (torn though it is) — this is never read as
-      // "no run file", declared or not: that would say a file this build can see does not
-      // exist.
+      // "no run file": that would say a file this build can see does not exist.
       expect(result.stdout).toMatch(/hook fired\s+FAIL\s+1 run file\(s\)/u);
       expect(result.stdout).toMatch(/none carry a readable session_start/u);
       expect(result.stdout).not.toMatch(/matched no known host/u);
@@ -307,30 +289,15 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       await cleanup();
     }
   });
-  /**
-   * The one fact this command shares with the hook, proven by making the hook state it.
-   *
-   * `unrecognised_payload` is written in `hooks/lib/record.cjs` (plain CommonJS, no CLI) and
-   * read in `telemetry-evidence-adapter.ts` (TypeScript, a different package). Every other
-   * case in this file writes the marker by hand, which checks the reader against a literal
-   * the same file typed — it passes whatever the hook actually writes. Measured: renaming the
-   * hook's own literal left this suite 11/11 green and the plugin's 186/186 green, because
-   * the plugin side asserts only that the marker file exists, never its `type`.
-   *
-   * The cost of that blind spot is not a failed run, it is a wrong answer: with the marker
-   * unread, a payload that did arrive reports as "the hook has never been observed firing" —
-   * an unknown printed as a nothing, which is the one thing this layer promises never to do.
-   * So this case seeds nothing. It runs the hook the plugin ships, on a payload matching no
-   * declared host, and lets the file the hook writes be the fixture.
-   */
+  /** `unrecognised_payload` is written by the hook and read by `telemetry-evidence-adapter.ts`;
+   * seeding the marker by hand would only check the reader against a literal this file typed. */
   it("names an unrecognised payload the real hook wrote, not one this test typed", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("check-unrecognised-real");
     try {
       await gitInit(projectDir);
       await writeSwitch(projectDir, true);
 
-      // Neither a transcript path nor a timestamp: the shape no declared host matches, and
-      // the same one `aidd-telemetry-journal.test.js` uses to drive this branch.
+      // Neither a transcript path nor a timestamp: the shape no declared host matches.
       execFileSync(process.execPath, [JOURNAL_HOOK, "session-start"], {
         input: JSON.stringify({ session_id: "not-a-known-host", cwd: projectDir }),
         cwd: projectDir,
@@ -363,8 +330,7 @@ async function writeEnabledPlugin(projectDir: string, pluginKey: string): Promis
 }
 
 // A hooks block a headless CI, or `aidd framework build --target claude --flat`'s own
-// output, can declare directly — never through `enabledPlugins` at all. The route this
-// suite's "declared nowhere" case used to miss entirely (see the defect this covers).
+// output, can declare directly — never through `enabledPlugins` at all.
 async function writeClaudeHooksBlock(projectDir: string, command: string): Promise<void> {
   await mkdir(join(projectDir, ".claude"), { recursive: true });
   await writeFile(
@@ -373,9 +339,8 @@ async function writeClaudeHooksBlock(projectDir: string, command: string): Promi
   );
 }
 
-// Cursor's own plugin-scope hooks never fire (see `cursor-hooks-project-merge.ts`'s doc
-// comment) — this project-scope flat file is the only place a Cursor install's hook
-// declaration is ever real.
+// Cursor's own plugin-scope hooks never fire — this project-scope flat file is the only
+// place a Cursor install's hook declaration is ever real.
 async function writeCursorHooksBlock(projectDir: string, command: string): Promise<void> {
   await mkdir(join(projectDir, ".cursor"), { recursive: true });
   await writeFile(
@@ -385,10 +350,8 @@ async function writeCursorHooksBlock(projectDir: string, command: string): Promi
 }
 
 /**
- * The "what is in place" section phase 1 adds ahead of the four claims — a machine that
- * has never been measured still gets an answer, and a person switched off still sees
- * everything but the verdicts. See spec.md's own Done-when: this is the half that states,
- * never grades.
+ * A machine that has never been measured still gets an answer, and a person switched
+ * off still sees everything but the verdicts: this half states, it never grades.
  */
 describe("aidd telemetry check — what is in place, before any verdict", () => {
   it("states what is in place on a machine that has never measured anything, naming the file behind each fact", async () => {
@@ -625,10 +588,8 @@ describe("aidd telemetry check — what is in place, before any verdict", () => 
 });
 
 /**
- * Phase 2: the same absence — no run file — reads two different ways depending on the
- * one thing that tells them apart: whether the recorder is declared. Proven here by
- * mutation, on the same project, so the distinction is shown to actually bite rather than
- * asserted from two unrelated fixtures.
+ * The same absence — no run file — reads two different ways depending on whether the
+ * recorder is declared. Proven by mutation on one project, never two fixtures.
  */
 describe("aidd telemetry check — not yet stops being a failure", () => {
   it("reports nothing to evaluate, never a failure, once the recorder is declared — and a failure naming it before that", async () => {
@@ -661,8 +622,7 @@ describe("aidd telemetry check — not yet stops being a failure", () => {
       await gitInit(projectDir);
       await writeSwitch(projectDir, true);
       // No settings, no manifest — the recorder is declared nowhere — yet a run file
-      // already exists for this very session, so the claim it earns is "ok", never the
-      // new "declared nowhere" failure.
+      // already exists for this very session, so the claim it earns is "ok".
       await seedJournal(
         projectDir,
         CLAUDE_RUN_ID,
@@ -692,9 +652,7 @@ describe("aidd telemetry check — not yet stops being a failure", () => {
       await writeSwitch(projectDir, true);
       await writeEnabledPlugin(projectDir, "aidd-telemetry@ai-driven-dev/framework");
       // Reachable, not synthetic: a hooks block registering PostToolUse/Stop but never
-      // SessionStart writes exactly this shape — journal lines with no session_start to
-      // anchor them. The recorder demonstrably ran (it wrote the file); the claim must
-      // never say "no run file … yet, nothing to evaluate" about a file this build can see.
+      // SessionStart writes exactly this shape — journal lines with no session_start.
       await seedTornRunFile(projectDir);
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);

@@ -17,9 +17,8 @@ import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-ad
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
-// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
-// drive-relative and prepends the current drive, so production's own resolve(outDir)
-// would otherwise write under a different key than this constant's raw string names.
+// resolve(), not the bare literal: on Windows path.resolve prepends the current drive to a
+// leading "/", so production's own resolve(outDir) would key writes under a different name.
 const ABS_OUT = resolve("/tmp/aidd-flat-test");
 // FlatBuildStrategy embeds this into written JSON content ("/"-joined, forward-slash - see
 // resolveClaudeRootAbsolute), never ABS_OUT's own native separators.
@@ -72,14 +71,9 @@ function makeAssetProvider(): AssetProvider {
   };
 }
 
-/**
- * isDirectory probe for InMemoryFileAdapter:
- * A path is a "directory" if it has no exact file entry but has child paths.
- */
 function makeIsDirectory(fs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
-  // listUnder() normalizes path before comparing; a hand-rolled prefix scan here would
-  // compare a native-separator outDir against the adapter's "/"-only keys and never match
-  // on Windows, where production's resolve(outDir) is backslash-joined.
+  // listUnder() normalizes before comparing; a hand-rolled prefix scan would compare a
+  // native-separator outDir against the adapter's "/"-only keys and never match on Windows.
   return async (path: string): Promise<boolean> => {
     if (fs.has(path)) return false;
     return fs.listUnder(path).length > 0;
@@ -379,9 +373,8 @@ describe("FlatOutputStrategy integration", () => {
   describe("AC #11: unsupported hooks warn-and-skip", () => {
     it("warns and skips hooks for a hooks-bearing plugin when hooks is unsupported", async () => {
       const captLogger = new CapturingLogger();
-      // No shipped flat contract declares hooks unsupported any more (every tool's
-      // acceptsHooks is true) — this exercises writeHooks's own unsupported branch
-      // directly, on a contract built for that case rather than on any real tool's.
+      // No shipped flat contract declares hooks unsupported any more, so this exercises
+      // writeHooks's own unsupported branch on a contract built for that case.
       const base = buildOpencodeFlatContract();
       const strategy = new FlatBuildStrategy(
         memFs,
@@ -394,11 +387,9 @@ describe("FlatOutputStrategy integration", () => {
         captLogger
       );
       const pluginSrc = `${FIXTURE_DIR}/plugins/${PLUGIN}`;
-      // plugin fixture has hooks — ensure hooks.json exists
       memFs.setFile(`${FIXTURE_DIR}/plugins/${PLUGIN}/hooks/hooks.json`, '{"hooks":{}}');
       await strategy.writeHooks(PLUGIN, pluginSrc);
       expect(captLogger.warnMessages.some((m) => m.includes("hooks"))).toBe(true);
-      // No hooks file emitted in the output
       const hooksFiles = memFs
         .listAll()
         .filter((p) => p.startsWith(ABS_OUT) && p.includes("hooks"));

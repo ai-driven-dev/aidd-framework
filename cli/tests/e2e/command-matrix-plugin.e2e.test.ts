@@ -1,14 +1,3 @@
-/**
- * Command Matrix E2E — Plugin, Marketplace & Auth surface
- * Automated counterpart of: aidd_docs/tasks/2026_05/2026_05_06-cli-v5-cleanup-command-matrix.md
- *
- * Already covered by existing E2E journeys (not duplicated here):
- *   plugin-install.e2e.test.ts — marketplace add/list/remove/browse/check/overwrite,
- *                                plugin search/install
- *
- * See also: command-matrix-help.e2e.test.ts
- */
-
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -39,11 +28,6 @@ async function writeMarketplace(
   await mkdir(join(dir, ".claude-plugin"), { recursive: true });
   await writeFile(join(dir, ".claude-plugin", "marketplace.json"), JSON.stringify({ plugins }));
 }
-
-// ---------------------------------------------------------------------------
-// Plugin — install / remove / list / doctor / update / restore
-// (plugin search/install from marketplace are in plugin-install.e2e.test.ts)
-// ---------------------------------------------------------------------------
 
 describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
   it("plugin install <local-path> exits 0 with success message", async () => {
@@ -121,11 +105,8 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
   });
 
   it("doctor --plugin stays 0/healthy when non-plugin drift exists (regression: silent exit 1)", async () => {
-    // Regression for a silent exit-1: `plugin doctor` (now `doctor --plugin`) used to
-    // gate on the FULL doctor health (tracked-file / reference / layout warnings
-    // included) while only rendering pluginIssues — so unrelated drift made it exit 1
-    // printing nothing. Here a tracked file is mutated (non-plugin drift): unscoped
-    // doctor must flag it (exit 1), `doctor --plugin` must stay scoped (exit 0 + healthy).
+    // A tracked file is mutated here — non-plugin drift — so unscoped doctor must flag it while
+    // `doctor --plugin` stays scoped to plugin issues.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("plugin-doctor-scope");
     try {
       await seedWithClaude(projectDir, fakeHome);
@@ -225,10 +206,6 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Marketplace — refresh / cache (add/list/browse/check/remove in plugin-install.e2e.test.ts)
-// ---------------------------------------------------------------------------
-
 describe.concurrent("Command Matrix: Marketplace cache + refresh", () => {
   it("marketplace refresh exits 0 (no-op when no marketplaces registered)", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("mkt-refresh-empty");
@@ -279,7 +256,7 @@ describe.concurrent("Command Matrix: Marketplace cache + refresh", () => {
   });
 
   it("marketplace add with file:// URI exits 1 — unsupported format", async () => {
-    // NOTE from matrix: file:// URI format not supported; use absolute path instead
+    // `file://` URIs are unsupported; a marketplace source is an absolute path.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("mkt-add-file-uri");
     try {
       await seedManifest(projectDir);
@@ -295,10 +272,6 @@ describe.concurrent("Command Matrix: Marketplace cache + refresh", () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// Auth — offline operations only
-// ---------------------------------------------------------------------------
 
 describe.concurrent("Command Matrix: Auth (offline)", () => {
   it("auth status exits 0 and reports authentication state", async () => {

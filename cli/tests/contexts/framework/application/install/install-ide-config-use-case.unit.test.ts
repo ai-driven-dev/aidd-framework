@@ -91,9 +91,7 @@ describe("InstallIdeConfigUseCase", () => {
 
     expect(result.skipped).toBe(false);
     const content = deps.fs.getFile(settingsPath) ?? "";
-    // user-prime strategy preserves user modifications on force reinstall
     expect(content).toContain('"modified"');
-    // framework keys are also present
     expect(content).toContain('"editor.formatOnSave"');
   });
 
