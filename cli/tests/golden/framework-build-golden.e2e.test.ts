@@ -97,6 +97,14 @@ function normalizeLineEndings(content: Buffer): Buffer {
   return Buffer.from(text.replace(/\r\n/g, "\n"), "utf-8");
 }
 
+function canonical(snapshot: TargetSnapshot): string {
+  return JSON.stringify(
+    Object.keys(snapshot)
+      .sort()
+      .map((key) => [key, snapshot[key]])
+  );
+}
+
 function describeDrift(stored: TargetSnapshot, captured: TargetSnapshot): string {
   const keys = new Set([...Object.keys(stored), ...Object.keys(captured)]);
   const moved = [...keys]
@@ -236,8 +244,11 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
       // Every mismatching cell at once. Asserting inside the loop stops at the first, so a
       // change landing across several profiles reads as one, and the next is found only
       // after a fix and a re-run.
+      // Compared as sorted entries, never as serialised objects: a snapshot's key order is
+      // the order the directory was listed in, which differs by platform, while the fact
+      // under test is which files exist and what they hash to.
       const drifted = [...FROZEN_CELLS].filter(
-        (key) => JSON.stringify(captured[key]) !== JSON.stringify(stored[key])
+        (key) => canonical(captured[key] ?? {}) !== canonical(stored[key] ?? {})
       );
       // Named per file, not per cell: a run on another platform has no way to diff the
       // trees by hand, so the message carries the first keys whose presence or hash moved.
