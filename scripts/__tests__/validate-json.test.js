@@ -46,6 +46,7 @@ describe("validate-json", () => {
     assert.equal(schemaFor("plugins/x/.claude-plugin/plugin.json").type, "pluginManifest");
     assert.equal(schemaFor(".claude-plugin/marketplace.json").type, "marketplace");
     assert.equal(schemaFor(".claude/settings.local.json").type, "claudeSettings");
+    assert.equal(schemaFor(path.join("plugins", "x", ".claude-plugin", "plugin.json")).type, "pluginManifest");
     assert.equal(schemaFor("package.json"), null);
   });
 

@@ -17,7 +17,9 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function schemaFor(file) {
+export function schemaFor(input) {
+  // A path handed in with the host separator names the same file; Windows would otherwise skip it in silence.
+  const file = input.split(path.sep).join("/");
   if (file.endsWith(".claude-plugin/plugin.json") || file.includes("/.claude-plugin/plugin.json")) {
     return { type: "pluginManifest", url: SCHEMAS.pluginManifest };
   }
