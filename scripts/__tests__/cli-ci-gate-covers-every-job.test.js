@@ -59,3 +59,49 @@ test("the changes filter names the workflow file itself as relevant", () => {
     `${ownPath} must be a case of the relevance filter, on its own line`
   );
 });
+
+test("only a previously gated next snapshot skips the promotion mutation matrix", () => {
+  const workflow = cliCiWorkflow();
+  const changes = workflow.jobs.changes;
+  const promotion = changes.steps.find((step) => step.id === "promotion");
+  const mutation = changes.steps.find((step) => step.id === "mutation");
+
+  assert.equal(workflow.permissions.actions, "read");
+  assert.equal(changes.outputs.trusted_promotion, "${{ steps.promotion.outputs.trusted }}");
+  assert.equal(promotion.name, "Check whether a promotion snapshot passed next");
+  assert.match(promotion.run, /EVENT_NAME.*pull_request/);
+  assert.match(promotion.run, /BASE_REF.*main/);
+  assert.match(promotion.run, /HEAD_REF.*\^promote\/next-to-main-\[0-9\]\+\$/);
+  assert.match(promotion.run, /branch=next&event=push&status=completed&head_sha=\$HEAD_SHA/);
+  assert.match(promotion.run, /\.conclusion == "success"/);
+  assert.match(promotion.run, /\.name == "cli \/ gate" and \.conclusion == "success"/);
+  assert.match(promotion.run, /2>\/dev\/null \|\| true/);
+
+  assert.match(mutation.run, /steps\.promotion\.outputs\.trusted.*== "true"/);
+  assert.match(mutation.run, /scopes='\[\]'/);
+  assert.match(mutation.run, /else[\s\S]*mutation-scopes-to-run\.mjs/);
+  assert.equal(workflow.jobs["cli-mutation"].if, "needs.changes.outputs.mutation_scopes != '[]'");
+
+  // These checks validate GitHub's pull-request merge ref; they are not evidence that next's
+  // source snapshot passed, so mutation reuse must not turn any of them off.
+  for (const name of [
+    "cli-typecheck",
+    "cli-lint",
+    "cli-architecture",
+    "cli-coverage",
+    "cli-smoke",
+    "cli-build",
+    "cli-knip",
+    "identifier-join",
+    "cli-jscpd",
+    "kanban-checks",
+    "windows",
+  ]) {
+    assert.deepEqual(workflow.jobs[name].needs, ["changes"], `${name} must still depend on changes`);
+    assert.equal(
+      workflow.jobs[name].if,
+      "needs.changes.outputs.relevant == 'true'",
+      `${name} must still run for a relevant promotion PR`
+    );
+  }
+});
