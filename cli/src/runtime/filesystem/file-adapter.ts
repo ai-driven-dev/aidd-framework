@@ -10,7 +10,7 @@ import {
   rmdir,
   stat,
 } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
 import { JsonParseError } from "../../kernel/errors.js";
 import type { FileHash } from "../../kernel/file.js";
@@ -19,6 +19,7 @@ import {
   type MergeStrategy,
   type PerKeyMergeStrategy,
 } from "../../kernel/merge.js";
+import { posixRelative } from "../../kernel/paths.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../kernel/ports/hasher.js";
@@ -106,7 +107,7 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
       if (entry.isDirectory()) {
         await this.collectFiles(baseDir, fullPath, results);
       } else {
-        results.push(relative(baseDir, fullPath).split(sep).join("/"));
+        results.push(posixRelative(baseDir, fullPath));
       }
     }
   }

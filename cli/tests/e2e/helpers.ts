@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
-import { copyFile, cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -338,5 +338,28 @@ export async function initProject(projectDir: string, _frameworkPath: string): P
   const deps = await createDeps(projectDir, { verbose: false }, output);
   await new InitUseCase(deps.fs, deps.manifestRepo).execute({
     projectRoot: projectDir,
+  });
+}
+
+/**
+ * A stand-in for a tool's own CLI that records every invocation, one line of arguments
+ * per call, and succeeds. On Windows a bare shell script is not executable; what a
+ * Windows `PATH` really holds is a `.cmd` shim, so that is what the stand-in is there.
+ */
+export async function writeFakeToolBinary(
+  binDir: string,
+  name: string,
+  logFile: string
+): Promise<void> {
+  await mkdir(binDir, { recursive: true });
+  if (process.platform === "win32") {
+    await writeFile(
+      join(binDir, `${name}.cmd`),
+      `@echo off\r\necho %* >> "${logFile}"\r\nexit /b 0\r\n`
+    );
+    return;
+  }
+  await writeFile(join(binDir, name), `#!/bin/sh\necho "$@" >> "${logFile}"\nexit 0\n`, {
+    mode: 0o755,
   });
 }

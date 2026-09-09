@@ -76,6 +76,13 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // build isolates either lot's own delta from the other's, since both changed in the
 // same working tree at once; a future raise from 641 is the number to measure the next
 // lot's own delta against. 641 leaves ~2.0 % headroom over the measured 628.26 KB.
+// 654 was set 2026-09-09 after the review and Windows passes over the same branch: the
+// shared plugin left enabled where another project still needs it, plugin remove and
+// marketplace add narrowing, the lefthook/husky-aware telemetry hook, the code-scanning
+// answers, and the Windows executable lookup (PATHEXT, `.cmd` through the interpreter)
+// and POSIX-relative manifest paths. Measured 641.0 KB, exactly the old budget, so the
+// next byte would have failed CI for a reason no lot owns. 654 leaves ~2.0 % headroom
+// over the measured 641.0 KB.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

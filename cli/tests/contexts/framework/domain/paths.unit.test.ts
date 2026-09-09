@@ -7,6 +7,7 @@ import {
   parseUserBuiltMarketplaceDir,
   pathContainsOrEquals,
   pathsOverlap,
+  posixRelative,
   samePathSegment,
   userBuiltCacheRoot,
   userBuiltMarketplaceDir,
@@ -279,5 +280,23 @@ describe("parseBuiltMarketplaceDirAtAnyRoot()", () => {
       marketplaceName: "aidd-framework",
       target: "codex",
     });
+  });
+});
+
+describe("posixRelative()", () => {
+  it("spells a Windows-joined path with forward slashes, the form a manifest records", () => {
+    expect(posixRelative("C:\\proj\\plugin", "C:\\proj\\plugin\\hooks\\check.sh", "win32")).toBe(
+      "hooks/check.sh"
+    );
+  });
+
+  it("leaves a POSIX path as it is", () => {
+    expect(posixRelative("/proj/plugin", "/proj/plugin/skills/commit/SKILL.md", "linux")).toBe(
+      "skills/commit/SKILL.md"
+    );
+  });
+
+  it("answers an empty string for the base itself", () => {
+    expect(posixRelative("C:\\proj", "C:\\proj", "win32")).toBe("");
   });
 });

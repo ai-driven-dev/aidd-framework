@@ -17,20 +17,13 @@
  * `nativeRegistrations.codex.pluginRefs` with `aidd-vcs@aidd-framework`, which is what
  * this guard needs to have anything to guard.
  */
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createTestEnv, pathWithoutAidd, runCli } from "./helpers.js";
+import { createTestEnv, pathWithoutAidd, runCli, writeFakeToolBinary } from "./helpers.js";
 
 const FRAMEWORK_REAL_PATH = resolve(process.cwd(), "tests/fixtures/framework-real");
 const PLUGIN_NAME = "aidd-vcs";
-
-async function writeFakeCodexBinary(binDir: string, logFile: string): Promise<void> {
-  await mkdir(binDir, { recursive: true });
-  await writeFile(join(binDir, "codex"), `#!/bin/sh\necho "$@" >> "${logFile}"\nexit 0\n`, {
-    mode: 0o755,
-  });
-}
 
 async function readJson(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(path, "utf-8")) as Record<string, unknown>;
@@ -43,7 +36,7 @@ describe("E2E: clean leaves a codex ref enabled while another project still shar
     try {
       const logFile = join(first.tempDir, "codex-invocations.log");
       const binDir = join(first.tempDir, "bin");
-      await writeFakeCodexBinary(binDir, logFile);
+      await writeFakeToolBinary(binDir, "codex", logFile);
       const env = { PATH: `${binDir}${delimiter}${pathWithoutAidd()}` };
 
       const setupArgs = [

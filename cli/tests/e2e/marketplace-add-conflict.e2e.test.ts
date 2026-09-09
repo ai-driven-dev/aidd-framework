@@ -1,7 +1,14 @@
 import { cp, mkdir, realpath, writeFile } from "node:fs/promises";
 import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createTestEnv, FRAMEWORK_PATH, initProject, pathWithoutAidd, runCli } from "./helpers.js";
+import {
+  createTestEnv,
+  FRAMEWORK_PATH,
+  initProject,
+  pathWithoutAidd,
+  runCli,
+  writeFakeToolBinary,
+} from "./helpers.js";
 
 const PLUGIN_FIXTURE = resolve(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
 
@@ -31,13 +38,6 @@ async function writeCatalog(dir: string, name: string, pluginName: string): Prom
   await cp(PLUGIN_FIXTURE, join(dir, "plugins", pluginName), { recursive: true });
 }
 
-async function writeFakeClaudeBinary(binDir: string, logFile: string): Promise<void> {
-  await mkdir(binDir, { recursive: true });
-  await writeFile(join(binDir, "claude"), `#!/bin/sh\necho "$@" >> "${logFile}"\nexit 0\n`, {
-    mode: 0o755,
-  });
-}
-
 /** Stands in for what `claude plugin marketplace add` itself would have written to
  * `known_marketplaces.json` for an earlier registration — only `installLocation` is
  * read by this project's own guard. */
@@ -62,7 +62,7 @@ describe("E2E: marketplace add surfaces the source-conflict guard's refusal inst
     try {
       const logFile = join(tempDir, "claude-invocations.log");
       const binDir = join(tempDir, "bin");
-      await writeFakeClaudeBinary(binDir, logFile);
+      await writeFakeToolBinary(binDir, "claude", logFile);
       const env = { PATH: `${binDir}${delimiter}${pathWithoutAidd()}` };
 
       await initProject(projectDir, FRAMEWORK_PATH);
@@ -100,7 +100,7 @@ describe("E2E: marketplace add surfaces the source-conflict guard's refusal inst
     try {
       const logFile = join(tempDir, "claude-invocations.log");
       const binDir = join(tempDir, "bin");
-      await writeFakeClaudeBinary(binDir, logFile);
+      await writeFakeToolBinary(binDir, "claude", logFile);
       const env = { PATH: `${binDir}${delimiter}${pathWithoutAidd()}` };
 
       await initProject(projectDir, FRAMEWORK_PATH);
@@ -140,7 +140,7 @@ describe("E2E: marketplace add surfaces the source-conflict guard's refusal inst
     try {
       const logFile = join(tempDir, "claude-invocations.log");
       const binDir = join(tempDir, "bin");
-      await writeFakeClaudeBinary(binDir, logFile);
+      await writeFakeToolBinary(binDir, "claude", logFile);
       const env = { PATH: `${binDir}${delimiter}${pathWithoutAidd()}` };
 
       await initProject(projectDir, FRAMEWORK_PATH);

@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 import { repositoryRootAbove } from "./reading/repository-root.js";
 
 export const AIDD_DIR = ".aidd";
@@ -271,3 +271,19 @@ export function userManifestPath(userConfigDir: string): string {
  * at one site would have made the rows contradict each other again, which is the defect that
  * pairing was introduced to close. */
 export const MANIFEST_FILENAME = "manifest.json";
+
+/**
+ * `target` relative to `base`, spelled with forward slashes whatever the platform. The
+ * form every file this CLI records for another machine to read takes — a manifest's
+ * `files[].relativePath`, a snapshot key, a plugin ref — so a tree written on Windows and
+ * read on Linux names the same file. Every caller that used to spell its own
+ * `relative(...).replace(...)` goes through here instead: one fact, one home.
+ */
+export function posixRelative(
+  base: string,
+  target: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  const impl = platform === "win32" ? win32 : posix;
+  return impl.relative(base, target).split(impl.sep).join("/");
+}

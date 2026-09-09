@@ -10,6 +10,7 @@ import { InstallationFile } from "../../../../../kernel/file.js";
  * existing local-marketplace behavior in PluginUpdateUseCase.
  */
 import { flatHooksPathWithLoaderEntry } from "../../../../../kernel/materialization/flat-paths.js";
+import { posixRelative } from "../../../../../kernel/paths.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../../kernel/ports/hasher.js";
@@ -129,7 +130,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     const absPaths = await this.fs.listFilesRecursive(pluginSrc);
     return Promise.all(
       absPaths.map(async (abs) => {
-        const rel = abs.slice(pluginSrc.length + 1);
+        const rel = posixRelative(pluginSrc, abs);
         const content = await this.fs.readFile(abs);
         return new InstallationFile({
           // relativePath is always "/"-separated (see withoutHooksPrefix and
@@ -163,7 +164,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     const absPaths = await this.fs.listFilesRecursive(builtDir);
     const files: InstallationFile[] = [];
     for (const abs of absPaths) {
-      const rel = abs.slice(builtDir.length + 1);
+      const rel = posixRelative(builtDir, abs);
       if (!this.belongsToPlugin(rel, name) && !hookPaths.has(rel)) continue;
       const content = await this.fs.readFile(abs);
       files.push(

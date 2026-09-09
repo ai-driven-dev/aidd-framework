@@ -1,9 +1,13 @@
-import { spawnSync } from "node:child_process";
-import { accessSync, constants } from "node:fs";
-import { delimiter, join } from "node:path";
+import { type SpawnSyncReturns, spawnSync } from "node:child_process";
 import { NativePluginCliError } from "../../../kernel/errors.js";
 import type { MarketplaceScope } from "../../../kernel/scope.js";
 import type { NativePluginActivator } from "../domain/ports/native-plugin-activator.js";
+import {
+  hostExecutableLookup,
+  resolveExecutableOnPath,
+  runsThroughShell,
+  windowsCommandLine,
+} from "./executable-on-path.js";
 
 // `plugin add/install` may fetch and cache a marketplace snapshot from a git remote.
 const COMMAND_TIMEOUT_MS = 120000;
@@ -21,15 +25,23 @@ export abstract class AbstractNativePluginCliAdapter implements NativePluginActi
    * spawn failures); a PATH lookup is what "callable on PATH" actually means.
    */
   isAvailable(): boolean {
-    const dirs = (process.env.PATH ?? "").split(delimiter).filter((dir) => dir !== "");
-    return dirs.some((dir) => {
-      try {
-        accessSync(join(dir, this.binary), constants.X_OK);
-        return true;
-      } catch {
-        return false;
-      }
-    });
+    return resolveExecutableOnPath(this.binary, hostExecutableLookup()) !== undefined;
+  }
+
+  /** The binary as the OS will run it. A `.cmd`/`.bat` shim — what npm installs on
+   * Windows — cannot be spawned directly, so it goes through the command interpreter with
+   * its arguments quoted; anything else is spawned by its bare name, the OS resolving
+   * `PATH` exactly as a person's shell would. */
+  private spawn(
+    args: readonly string[],
+    stdio: ["ignore", "ignore" | "pipe", "ignore" | "pipe"]
+  ): SpawnSyncReturns<string> {
+    const options = { timeout: COMMAND_TIMEOUT_MS, stdio, encoding: "utf-8" as const };
+    const executable = resolveExecutableOnPath(this.binary, hostExecutableLookup());
+    if (executable !== undefined && runsThroughShell(executable)) {
+      return spawnSync(windowsCommandLine(executable, args), { ...options, shell: true });
+    }
+    return spawnSync(this.binary, [...args], options);
   }
 
   /** Scope arguments the profile declares, empty for a tool whose registry is global. */
@@ -60,19 +72,12 @@ export abstract class AbstractNativePluginCliAdapter implements NativePluginActi
 
   /** Runs a command purely for its exit code; never throws. */
   protected succeeds(args: readonly string[]): boolean {
-    const result = spawnSync(this.binary, [...args], {
-      timeout: COMMAND_TIMEOUT_MS,
-      stdio: ["ignore", "ignore", "ignore"],
-    });
+    const result = this.spawn(args, ["ignore", "ignore", "ignore"]);
     return result.error === undefined && result.status === 0;
   }
 
   protected run(args: readonly string[], label: string): void {
-    const result = spawnSync(this.binary, [...args], {
-      timeout: COMMAND_TIMEOUT_MS,
-      stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf-8",
-    });
+    const result = this.spawn(args, ["ignore", "pipe", "pipe"]);
     if (result.error) {
       throw new NativePluginCliError(`${this.binary} ${label} failed: ${result.error.message}`);
     }

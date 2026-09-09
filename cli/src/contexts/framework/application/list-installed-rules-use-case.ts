@@ -1,4 +1,5 @@
-import { join, relative } from "node:path";
+import { join } from "node:path";
+import { posixRelative } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
 import { hasRules } from "../../tools/domain/contracts.js";
@@ -27,7 +28,7 @@ function locationOf(toolId: AiToolId): { directory: string; extension: string } 
  * and compares, not a path it opens. A Windows checkout answering `.claude\rules\a.md`
  * would make the same project's rules read differently on two machines. */
 function projectRelative(projectRoot: string, absolutePath: string): string {
-  return relative(projectRoot, absolutePath).replaceAll("\\", "/");
+  return posixRelative(projectRoot, absolutePath);
 }
 
 /**

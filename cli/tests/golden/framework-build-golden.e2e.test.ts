@@ -97,6 +97,20 @@ function normalizeLineEndings(content: Buffer): Buffer {
   return Buffer.from(text.replace(/\r\n/g, "\n"), "utf-8");
 }
 
+function describeDrift(stored: TargetSnapshot, captured: TargetSnapshot): string {
+  const keys = new Set([...Object.keys(stored), ...Object.keys(captured)]);
+  const moved = [...keys]
+    .filter((k) => stored[k] !== captured[k])
+    .sort()
+    .slice(0, 6)
+    .map((k) => {
+      if (stored[k] === undefined) return `+${k}`;
+      if (captured[k] === undefined) return `-${k}`;
+      return `~${k}`;
+    });
+  return moved.join(", ");
+}
+
 async function hashDirectory(dir: string): Promise<TargetSnapshot> {
   const result: TargetSnapshot = {};
   const entries = await readdir(dir, { recursive: true });
@@ -225,7 +239,12 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
       const drifted = [...FROZEN_CELLS].filter(
         (key) => JSON.stringify(captured[key]) !== JSON.stringify(stored[key])
       );
-      expect(drifted, "cells differing from their stored baseline").toEqual([]);
+      // Named per file, not per cell: a run on another platform has no way to diff the
+      // trees by hand, so the message carries the first keys whose presence or hash moved.
+      const detail = drifted
+        .map((key) => `${key}: ${describeDrift(stored[key] ?? {}, captured[key] ?? {})}`)
+        .join("\n");
+      expect(drifted, `cells differing from their stored baseline\n${detail}`).toEqual([]);
       for (const key of FROZEN_CELLS) {
         expect(captured[key], `cell ${key}`).toStrictEqual(stored[key]);
       }
