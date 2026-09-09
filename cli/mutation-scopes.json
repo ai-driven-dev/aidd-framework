@@ -30,7 +30,7 @@
     },
     "framework": {
       "mutate": "src/contexts/framework/**/*.ts",
-      "break": 69
+      "break": 93
     },
     "presentation": {
       "mutate": "src/presentation/**/*.ts",
