@@ -72,7 +72,10 @@ test("only a previously gated next snapshot skips the promotion mutation matrix"
   assert.match(promotion.run, /EVENT_NAME.*pull_request/);
   assert.match(promotion.run, /BASE_REF.*main/);
   assert.match(promotion.run, /HEAD_REF.*\^promote\/next-to-main-\[0-9\]\+\$/);
-  assert.match(promotion.run, /branch=next&event=push&status=completed&head_sha=\$HEAD_SHA/);
+  assert.match(
+    promotion.run,
+    /actions\/workflows\/cli-ci\.yml\/runs\?branch=next&event=push&status=completed&head_sha=\$HEAD_SHA/
+  );
   assert.match(promotion.run, /\.conclusion == "success"/);
   assert.match(promotion.run, /\.name == "cli \/ gate" and \.conclusion == "success"/);
   assert.match(promotion.run, /2>\/dev\/null \|\| true/);

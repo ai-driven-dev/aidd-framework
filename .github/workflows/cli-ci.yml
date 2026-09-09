@@ -100,7 +100,7 @@ jobs:
           trusted=false
 
           if [[ "$EVENT_NAME" == "pull_request" && "$BASE_REF" == "main" && "$HEAD_REF" =~ ^promote/next-to-main-[0-9]+$ ]]; then
-            run_ids="$(gh api --paginate "/repos/$REPO/actions/runs?branch=next&event=push&status=completed&head_sha=$HEAD_SHA&per_page=100" \
+            run_ids="$(gh api --paginate "/repos/$REPO/actions/workflows/cli-ci.yml/runs?branch=next&event=push&status=completed&head_sha=$HEAD_SHA&per_page=100" \
               --jq '.workflow_runs[] | select(.conclusion == "success") | .id' 2>/dev/null || true)"
             while IFS= read -r run_id; do
               [[ -z "$run_id" ]] && continue
