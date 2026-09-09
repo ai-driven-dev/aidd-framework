@@ -1,10 +1,11 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
 import { UnreadableUserSourceReferencesError } from "../../../../src/kernel/errors.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 
 const USER_CONFIG_DIR = "/fake-home/.config/aidd";
-const REFERENCES_PATH = `${USER_CONFIG_DIR}/references.json`;
+const REFERENCES_PATH = join(USER_CONFIG_DIR, "references.json");
 
 function adapter(fs: InMemoryFileAdapter = new InMemoryFileAdapter()): UserSourceReferencesAdapter {
   return new UserSourceReferencesAdapter(fs, () => USER_CONFIG_DIR);
@@ -234,7 +235,7 @@ describe("the shared source's own project references", () => {
       const refs = adapter(fs);
 
       await expect(refs.listAllReferencingProjects()).rejects.toThrow(
-        /registry at \/fake-home\/\.config\/aidd\/references\.json: Unexpected token/
+        `registry at ${REFERENCES_PATH}: Unexpected token`
       );
     });
 

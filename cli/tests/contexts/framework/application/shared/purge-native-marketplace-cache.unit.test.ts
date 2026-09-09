@@ -43,7 +43,7 @@ describe("purgeAllNativeCaches", () => {
     );
 
     expect(logger.allMessages).toStrictEqual([]);
-    expect(fs.listAll()).toStrictEqual([join(HOME, ".cursor", "plugins", "a.json")]);
+    expect(fs.listAll()).toStrictEqual([`${HOME}/.cursor/plugins/a.json`]);
   });
 });
 
