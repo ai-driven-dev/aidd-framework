@@ -1,7 +1,8 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { JsonSchemaValidator } from "../../../../src/contexts/tools/domain/ports/schema-validator.js";
 import { buildCopilotMarketplaceContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
+import type { BuildOutputStrategy } from "../../../../src/contexts/translate/application/strategies/build-output-strategy.js";
 import { MarketplaceBuildStrategy } from "../../../../src/contexts/translate/application/strategies/marketplace-build-strategy.js";
 import { FrameworkBuildUseCase } from "../../../../src/contexts/translate/application/translate-source.js";
 import {
@@ -295,10 +296,11 @@ describe("FrameworkBuildUseCase", () => {
         target: "copilot",
       });
       const [plugin] = result.plugins;
-      expect(plugin.skippedSections).toContain("commands");
-      expect(plugin.skippedSections).toContain("rules");
-      expect(logger.warnMessages.some((m) => m.includes("commands"))).toBe(true);
-      expect(logger.warnMessages.some((m) => m.includes("rules"))).toBe(true);
+      expect(plugin.skippedSections).toEqual(["commands", "rules"]);
+      expect(logger.warnMessages).toEqual([
+        "Skipping commands/ in plugin 'aidd-test' (out of scope for MVP1).",
+        "Skipping rules/ in plugin 'aidd-test' (out of scope for MVP1).",
+      ]);
     });
   });
 
@@ -332,7 +334,7 @@ describe("FrameworkBuildUseCase", () => {
       const uc = makeUseCase(fs);
       await expect(
         uc.execute({ sourceDir: SOURCE_DIR, outDir: OUT_DIR, target: "copilot" })
-      ).rejects.toThrow(InvalidSourceMarketplaceError);
+      ).rejects.toThrow(/^Invalid source marketplace: malformed JSON: /);
     });
 
     it("throws InvalidSourceMarketplaceError when 'plugins' array is missing", async () => {
@@ -343,7 +345,7 @@ describe("FrameworkBuildUseCase", () => {
       const uc = makeUseCase(fs);
       await expect(
         uc.execute({ sourceDir: SOURCE_DIR, outDir: OUT_DIR, target: "copilot" })
-      ).rejects.toThrow(InvalidSourceMarketplaceError);
+      ).rejects.toThrow("Invalid source marketplace: missing 'plugins' array.");
     });
 
     it("throws InvalidSourceMarketplaceError when a plugin name does not match a directory", async () => {
@@ -358,8 +360,52 @@ describe("FrameworkBuildUseCase", () => {
       const uc = makeUseCase(fs);
       await expect(
         uc.execute({ sourceDir: SOURCE_DIR, outDir: OUT_DIR, target: "copilot" })
-      ).rejects.toThrow(InvalidSourceMarketplaceError);
+      ).rejects.toThrow(
+        `Invalid source marketplace: plugin 'nonexistent-plugin' not found at ${join(
+          SOURCE_DIR,
+          "plugins",
+          "nonexistent-plugin"
+        )}.`
+      );
     });
+
+    it("names the catalog it could not read at all", async () => {
+      await fs.deleteFile(`${SOURCE_DIR}/.claude-plugin/marketplace.json`);
+      const uc = makeUseCase(fs);
+      await expect(
+        uc.execute({ sourceDir: SOURCE_DIR, outDir: OUT_DIR, target: "copilot" })
+      ).rejects.toThrow(
+        `Invalid source marketplace: cannot read ${join(
+          SOURCE_DIR,
+          ".claude-plugin/marketplace.json"
+        )}.`
+      );
+    });
+
+    for (const root of ["null", '"a catalog"', "[]"]) {
+      it(`refuses a catalog whose root reads ${root}`, async () => {
+        fs.setFile(`${SOURCE_DIR}/.claude-plugin/marketplace.json`, root);
+        const uc = makeUseCase(fs);
+        await expect(
+          uc.execute({ sourceDir: SOURCE_DIR, outDir: OUT_DIR, target: "copilot" })
+        ).rejects.toThrow("Invalid source marketplace: root must be an object.");
+      });
+    }
+
+    for (const entry of ["null", "5", "{}"]) {
+      it(`refuses a plugin entry that reads ${entry}`, async () => {
+        fs.setFile(
+          `${SOURCE_DIR}/.claude-plugin/marketplace.json`,
+          `{ "name": "test", "owner": { "name": "X" }, "plugins": [${entry}] }`
+        );
+        const uc = makeUseCase(fs);
+        await expect(
+          uc.execute({ sourceDir: SOURCE_DIR, outDir: OUT_DIR, target: "copilot" })
+        ).rejects.toThrow(
+          "Invalid source marketplace: each plugin entry must have a 'name' string."
+        );
+      });
+    }
   });
 
   describe("marketplace field sourcing", () => {
@@ -496,5 +542,56 @@ describe("FrameworkBuildUseCase", () => {
         expect(firstRunFiles[key]).toBe(secondRunFiles[key]);
       }
     });
+  });
+});
+
+/** Each layout step reports what it wrote, and the use case is the only place those counts are
+ * added up; a stub layout states them so the arithmetic is readable. */
+const countingStrategy: BuildOutputStrategy = {
+  preBuild: () => Promise.resolve(),
+  writePluginManifest: () => Promise.resolve(1),
+  writeAgents: () => Promise.resolve(2),
+  writeSkills: () => Promise.resolve(4),
+  writeHooks: () => Promise.resolve(8),
+  writeMcp: () => Promise.resolve(16),
+  postBuild: () => Promise.resolve(32),
+};
+
+describe("what a build reports having written", () => {
+  it("adds each layout step's own count per plugin, then what the layout wrote after them", async () => {
+    const fs = await makeSeededFs();
+    const v = makeValidator();
+    const ap = makeAssetProvider();
+    const uc = new FrameworkBuildUseCase(fs, v, ap, new CapturingLogger(), countingStrategy);
+    const result = await uc.execute({
+      sourceDir: SOURCE_DIR,
+      outDir: OUT_DIR,
+      target: "copilot",
+    });
+    expect(result).toEqual({
+      outDir: OUT_DIR,
+      totalFiles: 63,
+      plugins: [{ name: "aidd-test", filesWritten: 31, skippedSections: ["commands", "rules"] }],
+    });
+  });
+
+  it("reports no skipped section for a plugin shipping neither commands nor rules", async () => {
+    const fs = await makeSeededFs();
+    for (const section of ["commands", "rules"]) {
+      for (const path of fs.listUnder(`${SOURCE_DIR}/plugins/aidd-test/${section}`)) {
+        fs.deleteFile(path);
+      }
+    }
+    const logger = new CapturingLogger();
+    const v = makeValidator();
+    const ap = makeAssetProvider();
+    const uc = new FrameworkBuildUseCase(fs, v, ap, logger, countingStrategy);
+    const result = await uc.execute({
+      sourceDir: SOURCE_DIR,
+      outDir: OUT_DIR,
+      target: "copilot",
+    });
+    expect(result.plugins).toEqual([{ name: "aidd-test", filesWritten: 31, skippedSections: [] }]);
+    expect(logger.warnMessages).toEqual([]);
   });
 });

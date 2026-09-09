@@ -22,7 +22,7 @@
     },
     "translate": {
       "mutate": "src/contexts/translate/**/*.ts",
-      "break": 66
+      "break": 85
     },
     "distribution": {
       "mutate": "src/contexts/distribution/**/*.ts",

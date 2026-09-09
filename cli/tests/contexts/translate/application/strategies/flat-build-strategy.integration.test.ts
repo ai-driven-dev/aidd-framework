@@ -1,5 +1,9 @@
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import type {
+  ArtifactContract,
+  ToolBuildContract,
+} from "../../../../../src/contexts/tools/domain/build-contract.js";
 import type { JsonSchemaValidator } from "../../../../../src/contexts/tools/domain/ports/schema-validator.js";
 import { buildCopilotFlatContract } from "../../../../../src/contexts/tools/domain/profiles/copilot/build.js";
 import { buildOpencodeFlatContract } from "../../../../../src/contexts/tools/domain/profiles/opencode/build.js";
@@ -8,6 +12,7 @@ import { FrameworkBuildUseCase } from "../../../../../src/contexts/translate/app
 import { AjvSchemaValidatorAdapter } from "../../../../../src/contexts/translate/infrastructure/schema-validator.js";
 import {
   FlatTargetExistsError,
+  FrameworkPlaceholderInPluginError,
   JsonSchemaValidationError,
   OutDirNotDirectoryError,
 } from "../../../../../src/kernel/errors.js";
@@ -395,5 +400,368 @@ describe("FlatOutputStrategy integration", () => {
         .filter((p) => p.startsWith(ABS_OUT) && p.includes("hooks"));
       expect(hooksFiles).toHaveLength(0);
     });
+  });
+});
+
+/** A layout stated in the test itself: the shipped contracts cover no artifact that declares
+ * no transform, no extension and no merge, and those are the branches a flat build turns on. */
+const STUB_OUT = resolve("/tmp/aidd-flat-stub-test");
+const STUB_PLUGIN_SRC = "/src/plugins/aidd-test";
+
+function supportedArtifact(
+  path: (plugin: string, relPath: string) => string,
+  extra: Partial<Extract<ArtifactContract, { supported: true }>> = {}
+): ArtifactContract {
+  return {
+    supported: true,
+    source: { kind: "fullTree", srcDir: "." },
+    path,
+    ...extra,
+  };
+}
+
+function stubContract(over: Partial<ToolBuildContract> = {}): ToolBuildContract {
+  return {
+    manifestFileRelative: null,
+    synthesizeManifest: null,
+    manifestSchemaName: null,
+    artifacts: {
+      agents: supportedArtifact((plugin, rel) => `.stub/agents/${plugin}-${rel.slice(7)}`),
+      skills: supportedArtifact((plugin, rel) => `.stub/skills/${plugin}/${rel.slice(7)}`),
+      hooks: supportedArtifact((plugin, rel) => `.stub/hooks/${plugin}/${rel.slice(6)}`),
+      mcp: { supported: false },
+      rules: { supported: false },
+      commands: { supported: false },
+    },
+    buildMarketplaceCatalog: null,
+    buildMarketplaceEntry: null,
+    ...over,
+  };
+}
+
+function stubStrategy(
+  memFs: InMemoryFileAdapter,
+  contract: ToolBuildContract,
+  logger?: CapturingLogger
+): FlatBuildStrategy {
+  return new FlatBuildStrategy(
+    memFs,
+    new AjvSchemaValidatorAdapter(),
+    makeAssetProvider(),
+    contract,
+    false,
+    STUB_OUT,
+    makeIsDirectory(memFs),
+    logger
+  );
+}
+
+function writtenUnder(memFs: InMemoryFileAdapter, dir: string): Record<string, string | undefined> {
+  return Object.fromEntries(memFs.listUnder(dir).map((path) => [path, memFs.getFile(path)]));
+}
+
+describe("the agents a flat layout writes", () => {
+  const reviewer = "---\nname: reviewer\n---\n\nReview the diff.\n";
+
+  it("writes each agent markdown at the path the layout names, and nothing else under agents/", async () => {
+    const memFs = new InMemoryFileAdapter({
+      [`${STUB_PLUGIN_SRC}/agents/reviewer.md`]: reviewer,
+      [`${STUB_PLUGIN_SRC}/agents/notes.txt`]: "not an agent",
+    });
+    const written = await stubStrategy(memFs, stubContract()).writeAgents(
+      "aidd-test",
+      STUB_PLUGIN_SRC
+    );
+    expect(written).toBe(1);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({
+      [`${STUB_OUT}/.stub/agents/aidd-test-reviewer.md`]:
+        "---\nname: 'reviewer'\n---\n\nReview the diff.\n",
+    });
+  });
+
+  it("hands the agent to the layout's own transform when it declares one", async () => {
+    const memFs = new InMemoryFileAdapter({ [`${STUB_PLUGIN_SRC}/agents/reviewer.md`]: reviewer });
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        agents: supportedArtifact((plugin, rel) => `.stub/agents/${plugin}-${rel.slice(7)}`, {
+          transform: (content, plugin, base) => `${plugin}:${base}\n${content}`,
+        }),
+      },
+    });
+    await stubStrategy(memFs, contract).writeAgents("aidd-test", STUB_PLUGIN_SRC);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({
+      [`${STUB_OUT}/.stub/agents/aidd-test-reviewer.md`]: `aidd-test:reviewer.md\n${reviewer}`,
+    });
+  });
+
+  it("writes nothing for a layout hosting no agent", async () => {
+    const memFs = new InMemoryFileAdapter({ [`${STUB_PLUGIN_SRC}/agents/reviewer.md`]: reviewer });
+    const contract = stubContract({
+      artifacts: { ...stubContract().artifacts, agents: { supported: false } },
+    });
+    expect(await stubStrategy(memFs, contract).writeAgents("aidd-test", STUB_PLUGIN_SRC)).toBe(0);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({});
+  });
+
+  it("names the agent that references the framework's tools directory", async () => {
+    const memFs = new InMemoryFileAdapter({
+      [`${STUB_PLUGIN_SRC}/agents/nested/reviewer.md`]: "See @{{TOOLS}}/x.md\n",
+    });
+    await expect(
+      stubStrategy(memFs, stubContract()).writeAgents("aidd-test", STUB_PLUGIN_SRC)
+    ).rejects.toThrow(
+      new FrameworkPlaceholderInPluginError("aidd-test", "agents/nested/reviewer.md")
+    );
+  });
+});
+
+describe("the skills a flat layout writes", () => {
+  const entry = "---\nname: hello\n---\n\nHello, see @./reference.json\n";
+  const asset = '{ "see": "@./SKILL.md" }\n';
+
+  function skillFs(): InMemoryFileAdapter {
+    return new InMemoryFileAdapter({
+      [`${STUB_PLUGIN_SRC}/skills/hello/SKILL.md`]: entry,
+      [`${STUB_PLUGIN_SRC}/skills/hello/reference.json`]: asset,
+    });
+  }
+
+  it("rewrites a skill markdown's own links and carries every other file as it is", async () => {
+    const memFs = skillFs();
+    expect(
+      await stubStrategy(memFs, stubContract()).writeSkills("aidd-test", STUB_PLUGIN_SRC)
+    ).toBe(2);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({
+      [`${STUB_OUT}/.stub/skills/aidd-test/hello/SKILL.md`]:
+        "---\nname: hello\n---\n\nHello, see [reference.json](./reference.json)\n",
+      [`${STUB_OUT}/.stub/skills/aidd-test/hello/reference.json`]: asset,
+    });
+  });
+
+  it("names the entry file after its own folder where the layout asks for it", async () => {
+    const memFs = skillFs();
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        skills: supportedArtifact((plugin, rel) => `.stub/skills/${plugin}-${rel.slice(7)}`, {
+          rewriteSkillName: true,
+        }),
+      },
+    });
+    await stubStrategy(memFs, contract).writeSkills("aidd-test", STUB_PLUGIN_SRC);
+    expect(memFs.getFile(`${STUB_OUT}/.stub/skills/aidd-test-hello/SKILL.md`)).toBe(
+      "---\nname: 'aidd-test-hello'\n---\n\nHello, see [reference.json](./reference.json)\n"
+    );
+  });
+
+  it("leaves the entry file alone when its flat destination has no folder to name it after", async () => {
+    const memFs = skillFs();
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        skills: supportedArtifact((_plugin, rel) => basename(rel), { rewriteSkillName: true }),
+      },
+    });
+    await stubStrategy(memFs, contract).writeSkills("aidd-test", STUB_PLUGIN_SRC);
+    expect(memFs.getFile(`${STUB_OUT}/SKILL.md`)).toBe(
+      "---\nname: hello\n---\n\nHello, see [reference.json](./reference.json)\n"
+    );
+  });
+
+  it("writes nothing for a layout hosting no skill", async () => {
+    const memFs = skillFs();
+    const contract = stubContract({
+      artifacts: { ...stubContract().artifacts, skills: { supported: false } },
+    });
+    expect(await stubStrategy(memFs, contract).writeSkills("aidd-test", STUB_PLUGIN_SRC)).toBe(0);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({});
+  });
+});
+
+describe("the hooks a flat layout writes", () => {
+  const hooksJson = '{ "hooks": { "PreToolUse": [] } }';
+
+  function hooksFs(): InMemoryFileAdapter {
+    return new InMemoryFileAdapter({
+      [`${STUB_PLUGIN_SRC}/hooks/hooks.json`]: hooksJson,
+      [`${STUB_PLUGIN_SRC}/hooks/lib/check.sh`]: "#!/bin/sh\n",
+    });
+  }
+
+  it("writes the manifest per plugin and every script beside it", async () => {
+    const memFs = hooksFs();
+    expect(await stubStrategy(memFs, stubContract()).writeHooks("aidd-test", STUB_PLUGIN_SRC)).toBe(
+      2
+    );
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({
+      [`${STUB_OUT}/.stub/hooks/aidd-test/aidd-test.hooks.json`]:
+        '{\n  "hooks": {\n    "PreToolUse": []\n  }\n}\n',
+      [`${STUB_OUT}/.stub/hooks/aidd-test/lib/check.sh`]: "#!/bin/sh\n",
+    });
+  });
+
+  it("hands the rewritten manifest to the layout's own hooks transform", async () => {
+    const memFs = hooksFs();
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        hooks: supportedArtifact((plugin, rel) => `.stub/hooks/${plugin}/${rel.slice(6)}`, {
+          hooksTransform: (json) => `transformed:${json}`,
+        }),
+      },
+    });
+    await stubStrategy(memFs, contract).writeHooks("aidd-test", STUB_PLUGIN_SRC);
+    expect(memFs.getFile(`${STUB_OUT}/.stub/hooks/aidd-test/aidd-test.hooks.json`)).toBe(
+      'transformed:{\n  "hooks": {\n    "PreToolUse": []\n  }\n}\n'
+    );
+  });
+
+  it("merges the manifest into the shared file the layout names, reporting what the merge said", async () => {
+    const memFs = hooksFs();
+    const logger = new CapturingLogger();
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        hooks: supportedArtifact((plugin, rel) => `.stub/hooks/${plugin}/${rel.slice(6)}`, {
+          hooksMerge: (existing, incoming) => ({
+            content: `${existing ?? "none"}+${incoming}`,
+            warnings: ["one event has no equivalent"],
+          }),
+          hooksMergeDest: (outDir) => `${outDir}/.stub/settings.json`,
+        }),
+      },
+    });
+    await stubStrategy(memFs, contract, logger).writeHooks("aidd-test", STUB_PLUGIN_SRC);
+    expect(memFs.getFile(`${STUB_OUT}/.stub/settings.json`)).toBe(
+      'none+{"hooks":{"PreToolUse":[]}}'
+    );
+    expect(logger.warnMessages).toEqual(["one event has no equivalent"]);
+  });
+
+  it("generates the bridge a layout with no manifest of its own declares", async () => {
+    const memFs = hooksFs();
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        hooks: supportedArtifact((plugin, rel) => `.stub/hooks/${plugin}/${rel.slice(6)}`, {
+          skipHooksJson: true,
+          hooksBridge: {
+            generate: (raw, plugin) => `bridge(${plugin}):${raw}`,
+            path: (plugin) => `.stub/plugin/${plugin}.js`,
+            skipIfSourceHas: "own-plugin.js",
+          },
+        }),
+      },
+    });
+    expect(await stubStrategy(memFs, contract).writeHooks("aidd-test", STUB_PLUGIN_SRC)).toBe(2);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({
+      [`${STUB_OUT}/.stub/plugin/aidd-test.js`]: `bridge(aidd-test):${hooksJson}`,
+      [`${STUB_OUT}/.stub/hooks/aidd-test/lib/check.sh`]: "#!/bin/sh\n",
+    });
+  });
+
+  it("generates none where the bridge maps nothing the plugin declared", async () => {
+    const memFs = hooksFs();
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        hooks: supportedArtifact((plugin, rel) => `.stub/hooks/${plugin}/${rel.slice(6)}`, {
+          skipHooksJson: true,
+          hooksBridge: {
+            generate: () => null,
+            path: (plugin) => `.stub/plugin/${plugin}.js`,
+            skipIfSourceHas: "own-plugin.js",
+          },
+        }),
+      },
+    });
+    expect(await stubStrategy(memFs, contract).writeHooks("aidd-test", STUB_PLUGIN_SRC)).toBe(1);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({
+      [`${STUB_OUT}/.stub/hooks/aidd-test/lib/check.sh`]: "#!/bin/sh\n",
+    });
+  });
+
+  it("generates no bridge for a plugin shipping its own", async () => {
+    const memFs = hooksFs();
+    memFs.setFile(`${STUB_PLUGIN_SRC}/hooks/own-plugin.js`, "export const plugin = () => {};\n");
+    const contract = stubContract({
+      artifacts: {
+        ...stubContract().artifacts,
+        hooks: supportedArtifact((plugin, rel) => `.stub/hooks/${plugin}/${rel.slice(6)}`, {
+          skipHooksJson: true,
+          hooksBridge: {
+            generate: (raw, plugin) => `bridge(${plugin}):${raw}`,
+            path: (plugin) => `.stub/plugin/${plugin}.js`,
+            skipIfSourceHas: "own-plugin.js",
+          },
+        }),
+      },
+    });
+    expect(await stubStrategy(memFs, contract).writeHooks("aidd-test", STUB_PLUGIN_SRC)).toBe(2);
+    expect(memFs.has(`${STUB_OUT}/.stub/plugin/aidd-test.js`)).toBe(false);
+  });
+
+  it("writes nothing for a plugin shipping no hooks manifest", async () => {
+    const memFs = new InMemoryFileAdapter({ [`${STUB_PLUGIN_SRC}/skills/hello/SKILL.md`]: "# H" });
+    expect(await stubStrategy(memFs, stubContract()).writeHooks("aidd-test", STUB_PLUGIN_SRC)).toBe(
+      0
+    );
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({});
+  });
+
+  it("says once that a layout hosting no hook skips the plugin's own", async () => {
+    const memFs = hooksFs();
+    const logger = new CapturingLogger();
+    const contract = stubContract({
+      artifacts: { ...stubContract().artifacts, hooks: { supported: false } },
+    });
+    expect(
+      await stubStrategy(memFs, contract, logger).writeHooks("aidd-test", STUB_PLUGIN_SRC)
+    ).toBe(0);
+    expect(logger.warnMessages).toEqual([
+      "Skipping hooks/ in plugin 'aidd-test' (hooks not supported for this target).",
+    ]);
+  });
+
+  it("skips them silently where the build was given nobody to tell", async () => {
+    const memFs = hooksFs();
+    const contract = stubContract({
+      artifacts: { ...stubContract().artifacts, hooks: { supported: false } },
+    });
+    expect(await stubStrategy(memFs, contract).writeHooks("aidd-test", STUB_PLUGIN_SRC)).toBe(0);
+    expect(writtenUnder(memFs, STUB_OUT)).toEqual({});
+  });
+});
+
+describe("what a flat layout writes once every plugin is built", () => {
+  it("writes no per-plugin manifest", async () => {
+    const memFs = new InMemoryFileAdapter({});
+    expect(await stubStrategy(memFs, stubContract()).writePluginManifest()).toBe(0);
+  });
+
+  it("counts nothing where the layout emits no configuration of its own", async () => {
+    const memFs = new InMemoryFileAdapter({});
+    expect(
+      await stubStrategy(memFs, stubContract()).postBuild({ name: "m", plugins: [] }, [], STUB_OUT)
+    ).toBe(0);
+  });
+
+  it("hands every built plugin's name, the output and the source to the layout's own step", async () => {
+    const memFs = new InMemoryFileAdapter({});
+    const seen: { names: readonly string[]; outDir: string; sourceDir: string }[] = [];
+    const contract = stubContract({
+      emitConfigArtifact: (names, outDir, sourceDir) => {
+        seen.push({ names, outDir, sourceDir });
+        return Promise.resolve(1);
+      },
+    });
+    const strategy = stubStrategy(memFs, contract);
+    memFs.setFile(`${STUB_OUT}/.keep`, "");
+    await strategy.preBuild(STUB_OUT, "/src");
+    expect(
+      await strategy.postBuild({ name: "m", plugins: [] }, [{ name: "aidd-test" }], STUB_OUT)
+    ).toBe(1);
+    expect(seen).toEqual([{ names: ["aidd-test"], outDir: STUB_OUT, sourceDir: "/src" }]);
   });
 });
