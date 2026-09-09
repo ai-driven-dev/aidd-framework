@@ -98,20 +98,32 @@ jobs:
         run: |
           set -euo pipefail
           trusted=false
+          reason="not a promotion snapshot"
 
           if [[ "$EVENT_NAME" == "pull_request" && "$BASE_REF" == "main" && "$HEAD_REF" =~ ^promote/next-to-main-[0-9]+$ ]]; then
-            run_ids="$(gh api --paginate "/repos/$REPO/actions/workflows/cli-ci.yml/runs?branch=next&event=push&status=completed&head_sha=$HEAD_SHA&per_page=100" \
-              --jq '.workflow_runs[] | select(.conclusion == "success") | .id' 2>/dev/null || true)"
-            while IFS= read -r run_id; do
-              [[ -z "$run_id" ]] && continue
-              if gh api "/repos/$REPO/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
-                --jq 'any(.jobs[]; .name == "cli / gate" and .conclusion == "success")' 2>/dev/null | grep -qx true; then
-                trusted=true
-                break
-              fi
-            done <<< "$run_ids"
+            reason="no successful cli CI push run found for the snapshot SHA"
+            if run_ids="$(gh api --paginate "/repos/$REPO/actions/workflows/cli-ci.yml/runs?branch=next&event=push&status=completed&head_sha=$HEAD_SHA&per_page=100" \
+              --jq '.workflow_runs[] | select(.conclusion == "success") | .id' 2>/dev/null)"; then
+              while IFS= read -r run_id; do
+                [[ -z "$run_id" ]] && continue
+                if gate="$(gh api "/repos/$REPO/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+                  --jq 'any(.jobs[]; .name == "cli / gate" and .conclusion == "success")' 2>/dev/null)"; then
+                  if [[ "$gate" == "true" ]]; then
+                    trusted=true
+                    reason="reusing the successful cli CI gate from next run $run_id"
+                    break
+                  fi
+                  reason="cli / gate did not pass in next run $run_id"
+                else
+                  reason="could not inspect cli CI run $run_id"
+                fi
+              done <<< "$run_ids"
+            else
+              reason="could not list successful cli CI push runs"
+            fi
           fi
 
+          echo "promotion mutation reuse: $reason"
           echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
 
       - name: Decide which mutation scopes a change can move

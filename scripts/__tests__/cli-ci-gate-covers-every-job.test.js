@@ -78,7 +78,9 @@ test("only a previously gated next snapshot skips the promotion mutation matrix"
   );
   assert.match(promotion.run, /\.conclusion == "success"/);
   assert.match(promotion.run, /\.name == "cli \/ gate" and \.conclusion == "success"/);
-  assert.match(promotion.run, /2>\/dev\/null \|\| true/);
+  assert.match(promotion.run, /reason="could not list successful cli CI push runs"/);
+  assert.match(promotion.run, /reason="could not inspect cli CI run \$run_id"/);
+  assert.match(promotion.run, /echo "promotion mutation reuse: \$reason"/);
 
   assert.match(mutation.run, /steps\.promotion\.outputs\.trusted.*== "true"/);
   assert.match(mutation.run, /scopes='\[\]'/);
