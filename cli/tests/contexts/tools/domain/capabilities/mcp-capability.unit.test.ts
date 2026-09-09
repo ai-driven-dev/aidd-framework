@@ -91,3 +91,31 @@ describe("McpCapability", () => {
     });
   });
 });
+
+describe("McpCapability declarations", () => {
+  it("consumes nothing unless told otherwise", () => {
+    expect(new McpCapability({ outputPath: ".mcp.json", format: "json" }).consumes).toStrictEqual(
+      []
+    );
+    expect(
+      new McpCapability({ outputPath: ".mcp.json", format: "json", consumes: ["mcp"] }).consumes
+    ).toStrictEqual(["mcp"]);
+  });
+
+  it("is not equal to a capability that differs in entrySection or mergeStrategy alone", () => {
+    const base = { outputPath: ".mcp.json", format: "json" as const };
+    const cap = new McpCapability({ ...base, entrySection: "mcp", mergeStrategy: "user-prime" });
+
+    expect(
+      cap.equals(new McpCapability({ ...base, entrySection: "mcp", mergeStrategy: "user-prime" }))
+    ).toBe(true);
+    expect(
+      cap.equals(
+        new McpCapability({ ...base, entrySection: "servers", mergeStrategy: "user-prime" })
+      )
+    ).toBe(false);
+    expect(
+      cap.equals(new McpCapability({ ...base, entrySection: "mcp", mergeStrategy: "none" }))
+    ).toBe(false);
+  });
+});

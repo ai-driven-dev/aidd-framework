@@ -99,3 +99,39 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
     expect(buildHostRegistration([])).toEqual({ entries: [] });
   });
 });
+
+describe("the sentence each answer carries", () => {
+  it("names the missing marketplace, and builds no ref, when none was recorded or it is empty", () => {
+    for (const marketplace of [undefined, ""]) {
+      expect(only(evidence({ plugins: [{ name: "p", marketplace }] }))).toStrictEqual({
+        tool: "claude",
+        plugin: "p",
+        answer: "unanswerable",
+        detail: "AIDD records no marketplace for it, so no host registry can be asked",
+      });
+    }
+  });
+
+  it("names the registry and the ref it records as disabled", () => {
+    const entry = only(
+      evidence({
+        reading: {
+          location: REGISTRY,
+          refs: new Map([["aidd-telemetry@aidd-framework", { enabled: false }]]),
+        },
+      })
+    );
+
+    expect(entry.answer).toBe("registered-disabled");
+    expect(entry.detail).toBe(
+      `${REGISTRY} carries aidd-telemetry@aidd-framework and records it disabled`
+    );
+  });
+
+  it("says a registry that gave no reason could not be read, without inventing one", () => {
+    const entry = only(evidence({ reading: { location: REGISTRY } }));
+
+    expect(entry.answer).toBe("unanswerable");
+    expect(entry.detail).toBe(`${REGISTRY} could not be read — no reason given`);
+  });
+});

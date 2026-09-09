@@ -83,3 +83,69 @@ describe("RulesCapability", () => {
     });
   });
 });
+
+describe("RulesCapability installed location edge cases", () => {
+  it("answers an empty directory for an installer that files a rule at the project root", () => {
+    const cap = new RulesCapability({
+      directory: ".x/",
+      toolSuffix: ".x.md",
+      buildInstallPath: (fileName) => fileName.replace(/\.x\.md$/, ".mdc"),
+      convertFrontmatter: (fm) => fm,
+    });
+
+    expect(cap.installedLocation()).toStrictEqual({ directory: "", extension: ".mdc" });
+  });
+
+  it("reads the extension even when the installer prefixes the stem", () => {
+    const cap = new RulesCapability({
+      directory: ".x/",
+      toolSuffix: ".x.md",
+      buildInstallPath: (fileName) => `.x/rules/_${fileName.replace(/\.x\.md$/, ".mdc")}`,
+      convertFrontmatter: (fm) => fm,
+    });
+
+    expect(cap.installedLocation()).toStrictEqual({ directory: ".x/rules/", extension: ".mdc" });
+  });
+
+  it("answers nothing when the installer rewrote the stem past recognition", () => {
+    const cap = new RulesCapability({
+      directory: ".x/",
+      toolSuffix: ".x.md",
+      buildInstallPath: () => ".x/rules/renamed.mdc",
+      convertFrontmatter: (fm) => fm,
+    });
+
+    expect(cap.installedLocation()).toBeNull();
+  });
+});
+
+describe("RulesCapability file acceptance", () => {
+  const cap = new RulesCapability({
+    directory: ".claude/",
+    toolSuffix: ".claude.md",
+    buildInstallPath: (fileName) => fileName,
+    convertFrontmatter: (fm) => fm,
+  });
+
+  it("accepts its own suffix and a suffix belonging to no tool", () => {
+    expect(cap.acceptsFileName("rules/a.claude.md")).toBe(true);
+    expect(cap.acceptsFileName("rules/a.md")).toBe(true);
+  });
+
+  it("refuses another tool's suffix wherever the file sits", () => {
+    expect(cap.acceptsFileName("a/b/c.cursor.md")).toBe(false);
+  });
+
+  it("reads the input suffix as its own when the tool declares one", () => {
+    const mdc = new RulesCapability({
+      directory: ".cursor/",
+      toolSuffix: ".mdc",
+      inputSuffix: ".cursor.md",
+      buildInstallPath: (fileName) => fileName,
+      convertFrontmatter: (fm) => fm,
+    });
+
+    expect(mdc.acceptsFileName("a.cursor.md")).toBe(true);
+    expect(mdc.acceptsFileName("a.claude.md")).toBe(false);
+  });
+});

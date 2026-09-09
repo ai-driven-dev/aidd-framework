@@ -37,3 +37,61 @@ describe("HooksCapability", () => {
     });
   });
 });
+
+describe("HooksCapability declarations", () => {
+  it("consumes nothing unless told otherwise", () => {
+    expect(new HooksCapability({ outputPath: "h.json" }).consumes).toStrictEqual([]);
+    expect(
+      new HooksCapability({ outputPath: "h.json", consumes: ["hooks"] }).consumes
+    ).toStrictEqual(["hooks"]);
+  });
+
+  it("merges with the function the tool declares, and takes the incoming content whole without one", () => {
+    expect(
+      new HooksCapability({ outputPath: "h.json", mergeFn: (a, b) => `${a}+${b}` }).merge("x", "y")
+    ).toBe("x+y");
+    expect(new HooksCapability({ outputPath: "h.json" }).merge("x", "y")).toBe("y");
+  });
+
+  it("lets the user's file win unless the tool declares otherwise", () => {
+    expect(new HooksCapability({ outputPath: "h.json" }).getMergeStrategy()).toBe("user-prime");
+    expect(
+      new HooksCapability({ outputPath: "h.json", mergeStrategy: "none" }).getMergeStrategy()
+    ).toBe("none");
+  });
+
+  it("names its entry section only when one is declared", () => {
+    expect(new HooksCapability({ outputPath: "h.json" }).getEntrySection()).toBeNull();
+    expect(
+      new HooksCapability({ outputPath: "h.json", entrySection: "hooks" }).getEntrySection()
+    ).toBe("hooks");
+  });
+
+  it("differs on the merge strategy or the entry section alone", () => {
+    const cap = new HooksCapability({
+      outputPath: "h.json",
+      mergeStrategy: "none",
+      entrySection: "a",
+    });
+
+    expect(
+      cap.equals(
+        new HooksCapability({ outputPath: "h.json", mergeStrategy: "none", entrySection: "a" })
+      )
+    ).toBe(true);
+    expect(
+      cap.equals(
+        new HooksCapability({
+          outputPath: "h.json",
+          mergeStrategy: "user-prime",
+          entrySection: "a",
+        })
+      )
+    ).toBe(false);
+    expect(
+      cap.equals(
+        new HooksCapability({ outputPath: "h.json", mergeStrategy: "none", entrySection: "b" })
+      )
+    ).toBe(false);
+  });
+});

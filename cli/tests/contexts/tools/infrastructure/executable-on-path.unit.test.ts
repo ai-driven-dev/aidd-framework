@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   candidateExecutableNames,
   type ExecutableLookup,
+  hostExecutableLookup,
   resolveExecutableOnPath,
   runsThroughShell,
   windowsCommandLine,
@@ -73,5 +74,67 @@ describe("finding a tool's own CLI on PATH", () => {
     ).toBe(
       'C:\\tools\\claude.cmd plugin marketplace add "C:\\Users\\Jane Doe\\.aidd\\cache" --scope local'
     );
+  });
+});
+
+describe("the shape of a PATH lookup", () => {
+  it("skips an empty PATHEXT segment rather than spelling the bare name twice", () => {
+    expect(candidateExecutableNames("claude", "win32", ".EXE;;.CMD;")).toEqual([
+      "claude",
+      "claude.EXE",
+      "claude.exe",
+      "claude.CMD",
+      "claude.cmd",
+    ]);
+  });
+
+  it("asks about every spelling in every non-empty PATH directory, in order, and nowhere else", () => {
+    const asked: string[] = [];
+    const found = resolveExecutableOnPath("claude", {
+      platform: "linux",
+      pathExt: undefined,
+      pathEnv: "/usr/local/bin::/opt/bin:",
+      isExecutable: (path) => {
+        asked.push(path);
+        return false;
+      },
+    });
+
+    expect(found).toBeUndefined();
+    expect(asked).toStrictEqual(["/usr/local/bin/claude", "/opt/bin/claude"]);
+  });
+
+  it("asks nothing at all when PATH is unset", () => {
+    const asked: string[] = [];
+    resolveExecutableOnPath("claude", {
+      platform: "linux",
+      pathExt: undefined,
+      pathEnv: undefined,
+      isExecutable: (path) => {
+        asked.push(path);
+        return true;
+      },
+    });
+
+    expect(asked).toStrictEqual([]);
+  });
+
+  it("recognises a shim by its final extension only", () => {
+    expect(runsThroughShell("C:\\tools\\claude.cmd.txt")).toBe(false);
+  });
+
+  it("quotes an empty argument, doubles an embedded quote, and quotes the interpreter's own characters", () => {
+    expect(windowsCommandLine("claude.cmd", ["", 'say "hi"', "100%", "a^b", "x!y", "(p)"])).toBe(
+      'claude.cmd "" "say ""hi""" "100%" "a^b" "x!y" "(p)"'
+    );
+  });
+
+  it("describes this machine, and answers false rather than nothing for a path that is not there", () => {
+    const lookup = hostExecutableLookup();
+
+    expect(lookup.platform).toBe(process.platform);
+    expect(lookup.pathEnv).toBe(process.env.PATH);
+    expect(lookup.pathExt).toBe(process.env.PATHEXT);
+    expect(lookup.isExecutable("/definitely/not/here/claude")).toBe(false);
   });
 });
