@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.5.0](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.4.1...aidd-dev-v2.5.0) (2026-09-09)
+
+
+### Features
+
+* **framework:** measurement that works on five tools, each proven by a session that ran ([#706](https://github.com/ai-driven-dev/framework/issues/706)) ([627408f](https://github.com/ai-driven-dev/framework/commit/627408fba964b30d22b57fc99241083da1e0f294))
+* **telemetry:** a skill says when it is done, because nothing else can ([#756](https://github.com/ai-driven-dev/framework/issues/756)) ([cf66c22](https://github.com/ai-driven-dev/framework/commit/cf66c22856d3b00ad9ecc69582ad7b37f93e4401))
+
+
+### Bug Fixes
+
+* **plugins:** a skill links only inside itself ([#772](https://github.com/ai-driven-dev/framework/issues/772)) ([1efb3d9](https://github.com/ai-driven-dev/framework/commit/1efb3d958897b88c9fde814d6e1e941f8978c519))
+
+
+### Miscellaneous
+
+* back-merge main into next (conflicts) ([#610](https://github.com/ai-driven-dev/framework/issues/610)) ([a923d56](https://github.com/ai-driven-dev/framework/commit/a923d5661bb63cccc53bad7e6744b27cbbdc0a05))
+
 ## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.4.0...aidd-dev-v2.4.1) (2026-08-07)
 
 

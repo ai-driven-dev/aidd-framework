@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v3.0.0...aidd-refine-v3.0.1) (2026-09-09)
+
+
+### Miscellaneous
+
+* back-merge main into next (conflicts) ([#641](https://github.com/ai-driven-dev/framework/issues/641)) ([7d2d390](https://github.com/ai-driven-dev/framework/commit/7d2d390057c2e93f5160f068d038adf306405a17))
+
 ## [3.0.0](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.4...aidd-refine-v3.0.0) (2026-08-14)
 
 
