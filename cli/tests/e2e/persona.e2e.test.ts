@@ -1,40 +1,30 @@
 /**
- * Persona-driven E2E tests — deterministic, zero network, fixture-based.
- *
- * TTY scenarios (persona 1 & 5) use /usr/bin/expect to emulate a real terminal.
- * All other scenarios use runCli() (non-interactive flags, no TTY needed).
- *
- * Marketplace source: tests/fixtures/framework-real (pinned snapshot, no network).
+ * TTY scenarios use /usr/bin/expect; every other scenario uses runCli(). The marketplace
+ * source is a pinned fixture snapshot, so no scenario reaches the network.
  */
 
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { createTestEnv, runCli } from "./helpers.js";
+import { cliPath, createTestEnv, runCli } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 
 const REAL_FW = resolve(process.cwd(), "tests/fixtures/framework-real");
-const CLI_PATH = resolve(process.cwd(), "dist/cli.js");
 const EXPECT_BIN = "/usr/bin/expect";
 const AIDD_DIR = ".aidd";
 
-/**
- * Runs an expect(1) script that emulates TTY interaction with the CLI.
- * The script is written to a temp file then executed via /usr/bin/expect.
- */
+/** Runs an expect(1) script that emulates TTY interaction with the CLI. */
 async function runInteractive(
   projectDir: string,
   fakeHome: string,
   script: string
 ): Promise<{ stdout: string; exitCode: number }> {
-  const scriptPath = join(
-    tmpdir(),
-    `aidd-expect-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2)}.exp`
-  );
+  const scriptDir = await mkdtemp(join(tmpdir(), "aidd-expect-"));
+  const scriptPath = join(scriptDir, "interaction.exp");
   const fullScript = `
 set timeout 15
 set env(HOME) "${fakeHome}"
@@ -52,7 +42,7 @@ ${script}
     const e = err as { stdout?: string; stderr?: string; code?: number };
     return { stdout: (e.stdout ?? "") + (e.stderr ?? ""), exitCode: e.code ?? 1 };
   } finally {
-    await execFileAsync("rm", ["-f", scriptPath]).catch(() => undefined);
+    await rm(scriptDir, { recursive: true, force: true });
   }
 }
 
@@ -64,7 +54,7 @@ describe.concurrent("E2E: persona journeys", () => {
         projectDir,
         fakeHome,
         `
-spawn node ${CLI_PATH}
+spawn node ${cliPath()}
 expect {
   -re {AI-Driven Development CLI} { puts "BANNER_OK" }
   timeout { puts "TIMEOUT"; exit 1 }
@@ -112,11 +102,16 @@ exit 0
 
       const raw = await readFile(join(projectDir, AIDD_DIR, "manifest.json"), "utf-8");
       const manifest = JSON.parse(raw) as Record<string, unknown>;
-      expect(manifest.version).toBe(6);
+      expect(manifest.version).toBe(8);
       const tools = manifest.tools as Record<string, unknown>;
       expect(tools).toHaveProperty("claude");
 
-      const mktRaw = await readFile(join(projectDir, AIDD_DIR, "marketplaces.json"), "utf-8");
+      // The framework marketplace is machine-scope: every project on this machine shares one
+      // registration, so it lives under the user config dir, never under the project's `.aidd/`.
+      const mktRaw = await readFile(
+        join(fakeHome, ".config", "aidd", "marketplaces.json"),
+        "utf-8"
+      );
       const marketplaces = JSON.parse(mktRaw) as {
         marketplaces: Array<{ name: string; source: { kind: string; path: string } }>;
       };
@@ -132,7 +127,6 @@ exit 0
   it("Persona 3 — setup re-run: second run with extra tool updates manifest", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("persona-rerun");
     try {
-      // First run: claude only
       const first = await runCli(
         [
           "setup",
@@ -156,7 +150,6 @@ exit 0
       expect(manifestAfterFirst.tools).toHaveProperty("claude");
       expect(manifestAfterFirst.tools).not.toHaveProperty("cursor");
 
-      // Second run: add cursor
       const second = await runCli(
         [
           "setup",
@@ -228,12 +221,11 @@ exit 0
   it("Persona 5 — returning user: aidd alone with manifest shows full menu", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("persona-returning");
     try {
-      // Seed a minimal manifest so the menu knows the project is initialized
       await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
       await writeFile(
         join(projectDir, AIDD_DIR, "manifest.json"),
         JSON.stringify({
-          version: 5,
+          version: 8,
           tools: {
             claude: {
               toolId: "claude",
@@ -242,7 +234,6 @@ exit 0
               mergeFiles: [],
             },
           },
-          marketplaces: {},
         })
       );
 
@@ -250,7 +241,7 @@ exit 0
         projectDir,
         fakeHome,
         `
-spawn bash -c "cd '${projectDir}' && node ${CLI_PATH}"
+spawn bash -c "cd '${projectDir}' && node ${cliPath()}"
 expect {
   -re {AI-Driven Development CLI} { puts "BANNER_OK" }
   timeout { puts "TIMEOUT"; exit 1 }

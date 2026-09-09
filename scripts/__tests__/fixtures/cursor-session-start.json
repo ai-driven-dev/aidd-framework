@@ -1,0 +1,14 @@
+{
+  "conversation_id": "7059918f-ce9d-49ed-a33f-0f1906a79f27",
+  "generation_id": "7059918f-ce9d-49ed-a33f-0f1906a79f27",
+  "model": "default",
+  "is_background_agent": false,
+  "session_id": "7059918f-ce9d-49ed-a33f-0f1906a79f27",
+  "hook_event_name": "sessionStart",
+  "cursor_version": "2026.08.11-e8db854",
+  "workspace_roots": [
+    "/home/user/probe/project-cursor"
+  ],
+  "user_email": "user@example.com",
+  "transcript_path": null
+}

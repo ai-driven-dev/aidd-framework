@@ -11,11 +11,11 @@ flowchart LR
 
 ## 🏗️ Scaffold
 
-Pick a name (lowercase, `aidd-<x>`). For the directory shape, `plugin.json`, and `SKILL.md`/action format, follow [Anatomy of a plugin](ARCHITECTURE.md#-anatomy-of-a-plugin). Minimum: `.claude-plugin/plugin.json` + `skills/<NN>-<name>/` (with `SKILL.md` + `actions/`).
+Pick a name (lowercase, `aidd-<x>`). For the directory shape, `plugin.json`, and `SKILL.md`/action format, follow [Anatomy of a plugin](ARCHITECTURE.md#-anatomy-of-a-plugin). Minimum: `<plugin>/.claude-plugin/plugin.json` + `skills/<NN>-<name>/` (with `SKILL.md` + `actions/`).
 
 ## 📝 Register
 
-- **Marketplace** — append an entry to `.claude-plugin/marketplace.json`: `name`, `source` (required, `./plugins/aidd-<x>`), `strict: true`, `recommended: false` (keeps it off the curated install path until it stabilises).
+- **Marketplace** — append an entry to `.claude-plugin/marketplace.json`: `name`, `source` (required, `./plugins/aidd-<x>`), `strict: true`, `metadata: { "recommended": false }` (keeps it off the curated install path until it stabilises; under `metadata` because Claude Code warns on any other field of its own).
 - **Release** — add the package to `release-please-config.json` `packages` **and** `.release-please-manifest.json`, or it never versions.
 
 ## 🧪 Try locally

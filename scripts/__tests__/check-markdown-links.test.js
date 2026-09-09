@@ -6,6 +6,7 @@ const test = require("node:test");
 
 const {
   formatIssue,
+  problemForTarget,
   reportProblems,
 } = require("../check-markdown-links.js");
 
@@ -92,11 +93,15 @@ test("--help documents supported links, exclusions, fixes, and examples", () => 
 test("CLI checks one markdown file covering supported, ignored, and broken forms", () => {
   const tempDir = fs.mkdtempSync(path.join(root, "scripts/__tests__/.tmp-check-markdown-links-"));
   const fixture = path.join(tempDir, "all-cases.md");
-  const readmePath = path.relative(tempDir, path.join(root, "README.md"));
-  const logoPath = path.relative(tempDir, path.join(root, "docs/assets/logo.png"));
-  const claudePath = path.relative(tempDir, path.join(root, "CLAUDE.md"));
-  const contributingPath = path.relative(tempDir, path.join(root, "CONTRIBUTING.md"));
-  const outsidePath = path.relative(tempDir, path.resolve(root, "..", "outside.md"));
+  // A real markdown link is always "/"-separated, like a URL - never path.relative's
+  // platform-native separator. Matches how the checker itself normalises before
+  // reporting (check-markdown-links.js's own repoRelative/relative handling).
+  const relLink = (to) => path.relative(tempDir, to).replaceAll(path.sep, "/");
+  const readmePath = relLink(path.join(root, "README.md"));
+  const logoPath = relLink(path.join(root, "docs/assets/logo.png"));
+  const claudePath = relLink(path.join(root, "CLAUDE.md"));
+  const contributingPath = relLink(path.join(root, "CONTRIBUTING.md"));
+  const outsidePath = relLink(path.resolve(root, "..", "outside.md"));
   const outsideSuggestion = "https://github.com/ai-driven-dev/framework/blob/main/outside.md";
 
   fs.writeFileSync(
@@ -197,4 +202,71 @@ test("repository scan ignores interrupted test temp directories", () => {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("repository scan ignores a mutation sandbox and an e2e build, which copy the tree", () => {
+  const sandboxes = [
+    path.join(root, "cli", ".stryker-tmp", "sandbox-probe"),
+    path.join(root, "cli", ".e2e-build", "run-probe"),
+  ];
+
+  try {
+    for (const dir of sandboxes) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "copied.md"), "[Missing](./missing.md)\n", "utf8");
+    }
+
+    const result = spawnSync(process.execPath, [script], { cwd: root, encoding: "utf8" });
+
+    assert.equal(result.status, 0, result.stdout);
+    assert.match(result.stdout, /✅ Links: 0 broken in \d+ files/u);
+  } finally {
+    for (const dir of sandboxes) fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("problemForTarget reports a fragment no heading in the target file answers", () => {
+  const tempDir = fs.mkdtempSync(path.join(root, "scripts/__tests__/.tmp-check-markdown-links-"));
+
+  try {
+    const target = path.join(tempDir, "target.md");
+    fs.writeFileSync(target, ["# Target", "", "## Commits", "", "## ✅ Code decisions", ""].join("\n"));
+    const source = path.join(tempDir, "source.md");
+
+    // The five anchors this repository shipped dead for months all had this shape: a
+    // target file that resolves, a fragment nothing in it answers.
+    assert.deepEqual(problemForTarget("./target.md#types", source), {
+      raw: "./target.md#types",
+      reason: "anchor-not-found",
+    });
+
+    // Slugging is GitHub's: punctuation dropped, every remaining space a hyphen — so a
+    // leading emoji leaves the hyphen it was separated by, and `&` leaves two.
+    assert.equal(problemForTarget("./target.md#commits", source), null);
+    assert.equal(problemForTarget("./target.md#-code-decisions", source), null);
+
+    // A target that does not resolve is already reported as a missing path; naming the
+    // fragment too would be two findings for one fix.
+    assert.deepEqual(problemForTarget("./missing.md#commits", source), {
+      raw: "./missing.md#commits",
+      reason: "local-path-not-found",
+    });
+
+    // GitHub's line fragments resolve against the file, not a heading.
+    assert.equal(problemForTarget("./target.md#L119", source), null);
+    assert.equal(problemForTarget("./target.md#L119-L130", source), null);
+
+    // Only markdown carries headings. A fragment on anything else is the reader's business.
+    const asset = path.relative(tempDir, path.join(root, "docs/assets/logo.png")).replaceAll(path.sep, "/");
+    assert.equal(problemForTarget(`${asset}#anything`, source), null);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("formatIssue explains a dead fragment", () => {
+  assert.equal(
+    formatIssue({ raw: "aidd_docs/memory/vcs.md#types", reason: "anchor-not-found" }),
+    "aidd_docs/memory/vcs.md#types (no heading in the target file answers that fragment)",
+  );
 });

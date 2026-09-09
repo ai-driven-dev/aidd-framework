@@ -1,15 +1,8 @@
 name: Close finished milestones
 
-# A milestone whose last issue just closed should close too, so its due date
-# stops reading as "overdue" and the roadmap view drops the finished group.
-# GitHub has no native rule for this. This closes any OPEN milestone that has
-# at least one closed issue and zero open ones. An empty milestone (no issues
-# at all) is left untouched — it is a freshly created bucket, not finished work.
-#
-# Runs when an issue closes (the moment a milestone can become finished) and on
-# a weekly safety net for anything the event missed. Reopening a milestone by
-# hand is safe: this only ever acts on milestones that have become empty of open
-# issues, so it will not re-close one you deliberately reopened to add work.
+# GitHub has no native rule for closing a milestone whose last issue closed, so its due date
+# keeps reading as "overdue". An empty milestone is left alone: a fresh bucket, not finished
+# work. Reopening one by hand is safe, since only a milestone with no open issue is touched.
 
 on:
   issues:
@@ -38,7 +31,7 @@ jobs:
           set -euo pipefail
           gh api --paginate "repos/$REPO/milestones?state=open&per_page=100" \
             --jq '.[] | select(.closed_issues > 0 and .open_issues == 0) | "\(.number)\t\(.title)"' \
-            > finished.tsv || true
+            > finished.tsv
 
           if [ ! -s finished.tsv ]; then
             echo "No finished milestone to close."

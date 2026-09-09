@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// Validates YAML syntax using the repository's Node dependency, avoiding Python in hooks.
+// Node, not Python: a hook cannot assume a Python interpreter is installed.
 
 import { readFile } from "node:fs/promises";
-import { load } from "js-yaml";
+import { loadAll } from "js-yaml";
 
 const files = process.argv.slice(2).filter((file) => file !== "--");
 const errors = [];
 
 for (const file of files) {
   try {
-    load(await readFile(file, "utf8"), { filename: file });
+    // `loadAll`, not `load`: pnpm 12 writes a multi-document lockfile, and `load` rejects
+    // one as "expected a single document". Document count is not a syntax error.
+    loadAll(await readFile(file, "utf8"), null, { filename: file });
   } catch (error) {
     errors.push(`${file}: ${error.message}`);
   }

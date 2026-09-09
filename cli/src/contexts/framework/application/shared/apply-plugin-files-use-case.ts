@@ -1,0 +1,117 @@
+import { join } from "node:path";
+import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
+import type { Hasher } from "../../../../kernel/ports/hasher.js";
+import type { AiToolId } from "../../../../kernel/tool.js";
+import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
+import type { PluginFetcher } from "../../../distribution/domain/ports/plugin-fetcher.js";
+import type { ToolConfig } from "../../../tools/domain/registry.js";
+import { PluginContentTranslator } from "../../../translate/domain/content-translator.js";
+import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
+import type { Manifest } from "../../domain/manifest.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
+import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
+import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
+import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
+import {
+  deleteOldFiles,
+  isPluginFileAtDesiredState,
+  materializeViaTranslator,
+} from "../plugin/plugin-helpers.js";
+import { resolveBaseDirFromRecord } from "../plugin/plugin-target-resolution.js";
+import type { EnsureBuiltMarketplace } from "./ensure-built-marketplace-use-case.js";
+
+interface ApplyPluginFilesOptions {
+  toolId: AiToolId;
+  plugin: InstalledPlugin;
+  toolConfig: ToolConfig;
+  projectRoot: string;
+  cacheDir: string;
+  manifest: Manifest;
+  fileFilter?: ((relativePath: string) => boolean) | null;
+}
+
+/** Optional deps that let restore re-materialize through the build pipeline, as install does. */
+export interface BuiltMaterializationDeps {
+  ensureBuilt: EnsureBuiltMarketplace;
+  marketplaceRegistry: MarketplaceRegistry;
+  homedir: () => string;
+}
+
+export class ApplyPluginFilesUseCase {
+  constructor(
+    private readonly fs: FileReader & FileWriter,
+    private readonly hasher: Hasher,
+    private readonly pluginFetcher: PluginFetcher,
+    private readonly pluginDistributionReader: PluginDistributionReader,
+    private readonly builtDeps?: BuiltMaterializationDeps
+  ) {}
+
+  async execute(options: ApplyPluginFilesOptions): Promise<number> {
+    const localPath = await this.pluginFetcher.fetch(options.plugin.source, options.cacheDir);
+    const dist = await this.pluginDistributionReader.read(localPath);
+    const translator = this.resolveTranslator(options.toolConfig);
+    if (translator !== null && options.plugin.marketplace !== undefined) {
+      return this.restoreViaTranslator(translator, dist, options);
+    }
+    return this.restoreViaTranslate(dist, options);
+  }
+
+  // Materializing tools (cursor/opencode) must re-materialize from the BUILT tree so
+  // restored content + hashes match what install wrote, and Mode A marketplace tools
+  // (claude/codex/copilot) must re-register without writing files — not the raw source
+  // transform in either case.
+  private resolveTranslator(toolConfig: ToolConfig): PluginTranslator | null {
+    if (this.builtDeps === undefined) return null;
+    return resolvePluginTranslator(toolConfig, {
+      fs: this.fs,
+      hasher: this.hasher,
+      homedir: this.builtDeps.homedir,
+      ensureBuilt: this.builtDeps.ensureBuilt,
+      marketplaceRegistry: this.builtDeps.marketplaceRegistry,
+    });
+  }
+
+  private async restoreViaTranslator(
+    translator: PluginTranslator,
+    dist: PluginDistribution,
+    options: ApplyPluginFilesOptions
+  ): Promise<number> {
+    const { toolId, plugin, projectRoot, manifest } = options;
+    // Mode A never materializes files, so any manifest-tracked path here is a leftover from a run
+    // before that was true. Scoped to the manifest's own keys under the plugin's base dir — never a
+    // directory scan — so it cannot touch files the plugin never wrote.
+    if (translator.mode === "marketplace" && this.builtDeps !== undefined) {
+      const baseDir = resolveBaseDirFromRecord(
+        plugin.scope,
+        toolId,
+        projectRoot,
+        this.builtDeps.homedir
+      );
+      await deleteOldFiles(plugin.files, baseDir, this.fs);
+    }
+    return materializeViaTranslator(translator, dist, toolId, plugin, projectRoot, manifest);
+  }
+
+  private async restoreViaTranslate(
+    dist: PluginDistribution,
+    options: ApplyPluginFilesOptions
+  ): Promise<number> {
+    const { toolId, plugin, toolConfig, projectRoot, manifest, fileFilter } = options;
+    const files = new PluginContentTranslator(this.hasher).translate(dist, toolConfig);
+    let restored = 0;
+    for (const f of files) {
+      if (fileFilter !== null && fileFilter !== undefined && !fileFilter(f.relativePath)) continue;
+      const outputPath = join(projectRoot, f.relativePath);
+      if (!(await isPluginFileAtDesiredState(this.fs, this.hasher, outputPath, f.hash.value))) {
+        await this.fs.writeFile(outputPath, f.content);
+        restored++;
+      }
+    }
+    manifest.updatePlugin(
+      toolId,
+      plugin.withFiles(new Map(files.map((f) => [f.relativePath, f.hash.value])))
+    );
+    return restored;
+  }
+}

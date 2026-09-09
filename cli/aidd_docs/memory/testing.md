@@ -1,116 +1,48 @@
-# Testing Guidelines
+# Testing
 
-## Tools and Frameworks
+How this package is tested: the layers, the tools, the conventions.
 
-- Framework: `vitest` with workspace configuration (`vitest.workspace.ts`)
-- Runner: `pnpm test` (runs `pnpm build` first, then `vitest run`)
-- Test files: in `tests/` directory (not co-located with `src/`)
-- Watch mode: `pnpm test:watch`
-- Mutation testing: `pnpm test:mutation` (Stryker, scoped to `domain/models/manifest.ts`)
+## Strategy
 
-## Test Pyramid — 3 Tiers
+- Four vitest projects (`vitest.workspace.ts`): `unit`, `integration`, `e2e` select by extension anywhere under `tests/`; `architecture` selects `tests/architecture/**/*.arch.test.ts` only, so a stray `*.arch.test.ts` runs nowhere.
+- Unit: pure logic. Integration: a use case or adapter, ports substituted. E2E: the real built binary. Architecture: ratchets over source text.
+- A pyramid; read the split live.
 
-Tier is identified by **file extension**, not folder:
+## Tools
 
-| Extension               | Tier        | Scope                                      |
-| ----------------------- | ----------- | ------------------------------------------ |
-| `*.unit.test.ts`        | Unit        | Domain models, value objects, pure functions |
-| `*.integration.test.ts` | Integration | Use-cases (application) + adapters (infra) |
-| `*.e2e.test.ts`         | E2E         | Full CLI journeys — main happy paths only  |
+- `vitest`, `fast-check` for properties, `ink-testing-library` for terminal views.
+- `stryker` for mutation, per scope, a gate in CI on the scopes a change touches.
+- `knip`, `jscpd`, `biome`.
 
-### Tier 1 — Unit (`*.unit.test.ts`)
+## Conventions
 
-- Scope: `src/domain/models/`, value objects, pure functions — exhaustive coverage
-- No mocks, no I/O, no infrastructure dependencies
-- `describe.concurrent()` forbidden
-- Property tests: `tests/domain/models/manifest.property.unit.test.ts` (fast-check)
+- `tests/` mirrors `src/`; where it does not, the mirror is wrong.
+- Doubles from `tests/helpers/ports/`. Substitute at the seam; never mock functional behaviour.
+- Fixtures in `tests/fixtures/`, read-only, excluded from JSON and link checks. Mutate a copy in a temp directory.
+- `.gitattributes`'s `tests/fixtures/** text eol=lf` keeps byte-for-byte comparisons (`manifest-round-trip.unit.test.ts`) passing on Windows.
+- A temp directory: `await mkdtemp(join(tmpdir(), "aidd-<thing>-"))`, never a fixed name (a plantable symlink). The prefix is what `scripts/sweep-stale-test-dirs.cjs` reclaims.
+- A test name is a phrase of observable behaviour; nested `describe` reads as a sentence. `E2E:` is a recurring legacy prefix, not one to copy.
+- A golden snapshot is machine-independent, never derived from an absolute path: [`golden-machine-independence.md`](../../.claude/skills/test/references/golden-machine-independence.md).
+- `describe.concurrent` appears in no unit or integration file; in e2e the golden and command-matrix suites use it, most `telemetry-*` suites do not. An observed split, not a rule.
+- A bug fix's review reproduces the user's scenario against the built binary: [`bug-empirical-reproduction.md`](../../.claude/skills/test/references/bug-empirical-reproduction.md).
+- A sandboxed run reaches no tool binary and no real profile: `tests/e2e/helpers.ts` narrows `PATH`, relocates `HOME`/`XDG_CONFIG_HOME`/`USERPROFILE`/`APPDATA`; `sandbox-reaches-no-tool-binary.e2e.test.ts` holds it. `CODEX_HOME` is never overridden: a machine setting it points a real `codex` at its own profile regardless.
+- Records land under `AppData\Roaming` on Windows, `.config` elsewhere. Assert through the helper.
+- Green unit and integration tests prove output shape, never that a tool consumes it: that is `pnpm smoke`.
 
-### Tier 2 — Integration (`*.integration.test.ts`)
+## Run
 
-Two sub-scopes:
+- `pnpm test` runs every project; `test:unit`, `test:integration`, `test:e2e`, `test:arch` select one.
+- `pnpm smoke` drives the real binary over the command matrix, hermetically. `pnpm smoke:full` adds the remote fetch.
+- `pnpm smoke:real` reaches real host registries: [`smoke-real.md`](internal/smoke-real.md).
+- `pnpm test:mutation:<scope>`; `mutation-scopes.json` declares each scope's globs (a leading `!` excludes) and the floor its score must hold. `tools` is split one scope per tool profile (`tools-claude`, `tools-codex`, …): a profile is a static declaration whose every mutant reruns each test that loads it, and the profiles together outlasted every other scope on a two-core runner. A weekly scheduled run replays every mutant with `--force`, so drift through a dependency an incremental run never replays is bounded to a week. `scripts/run-mutation.mjs` fails under the floor and keeps one incremental file per scope under `reports/mutation/<scope>/`; `--force` reruns every mutant. Before a run the runner prunes the incremental file to kills alone: stryker reuses a result unless the mutant's file or a test that covered it changed, so a test written after the fact never reaches a mutant recorded as survived, uncovered or static, and a scope measured 74 read 67 in CI until it did. Raise a floor to the measured score after a run; never lower one without the reason in that file.
+- A unit or integration test reads the repository through `tests/helpers/repository-root.ts`, never by climbing `../` or `process.cwd()`: a mutation run copies `cli/` into a sandbox, where a relative climb lands nowhere (`tests-reach-the-repository-through-one-helper.arch.test.ts`).
+- Read counts live: a suite failing before producing a test contributes zero.
 
-**Application** (`tests/application/`):
-- Use-cases with real temp filesystem
-- Mock all ports via in-memory implementations from `tests/helpers/ports/`
-- Never mock: `FileSystem`, `ManifestRepository`, `Hasher`
-- Covers specific cases NOT covered by E2E: conflict resolution, non-interactive branches, edge cases
+## Gotchas
 
-**Infrastructure** (`tests/infrastructure/`):
-- Adapters tested in isolation with mock server responses or file fixtures
-- One file per adapter
-- Covers technical behaviors not visible in E2E (error parsing, retry logic, format transformation)
-
-### Tier 3 — E2E (`*.e2e.test.ts`)
-
-- Scope: main user journeys only — 5 to 10 scenarios per command max
-- Full CLI invocation via `runCli()` from `tests/e2e/helpers.ts`
-- `describe.concurrent()` required
-- `try/finally` required for cleanup
-- No edge cases (those belong in integration)
-
-E2E files live in `tests/e2e/*.e2e.test.ts` — one per journey (persona, greenfield setup,
-clean, plugin install/create, update, command-surface matrices,
-framework build). List them live: `ls tests/e2e/*.e2e.test.ts`. Each new command journey
-adds one file here.
-
-## Test Fixtures
-
-- `tests/fixtures/framework/` — minimal synthetic fixture
-- `tests/fixtures/framework-real/` — pinned real framework tag; used for E2E and integration tests requiring real plugin content (plugins: `aidd-async-dev`, etc.)
-- `scripts/refresh-framework-fixture.sh` — updates pinned real fixture
-
-## Test Count
-
-Counts drift fast — read them live, don't trust a snapshot:
-
-```shell
-find tests -name '*.unit.test.ts' | wc -l        # unit files
-find tests -name '*.integration.test.ts' | wc -l # integration files
-find tests -name '*.e2e.test.ts' | wc -l         # e2e files
-pnpm test                                         # total tests passing
-```
-
-Shape stays pyramid: unit ≫ integration > e2e.
-
-## Running Tests
-
-```shell
-pnpm test:unit        # domain models only
-pnpm test:integration # use-cases + adapters
-pnpm test:e2e         # functional journeys
-pnpm test             # all tiers
-pnpm test:mutation    # Stryker mutation (slow)
-```
-
-## Naming Rule
-
-Test names must describe user-visible or system-level behaviour:
-
-- Banned: "calls execute()", "returns Y", "throws an error"
-- Required: "installs tool when not present", "fails in non-interactive mode without --tools flag"
-
-`describe` blocks must not be named after the class under test — use a behavioral label.
-
-## Mocking and Stubbing
-
-- Never mock functional behavior
-- Application integration: mock all ports via in-memory implementations from `tests/helpers/ports/`
-- Infrastructure integration: mock only the HTTP/external layer
-- E2E: no mocks — full real CLI binary invocation
-
-## Smoke / dogfood install isolation
-
-- Smoke harness: single `pnpm smoke` → `scripts/smoke-tools.sh`. Drives the real built binary across the full command matrix (all leaf commands × tools); robust `perl alarm` per-command timeout + `grep`-based content guards; coverage-gated.
-- Smoke-tests and dogfood CLI installs (`ai install`, `marketplace add`, `plugin install`) MUST run in a fresh `/tmp/<name>` dir with `git init` — NEVER in the repo root.
-- In-repo installs leak tracked per-tool residue (`.codex/`, `.cursor/`, `.github/copilot/`, `.opencode/`, `opencode.json`, `.vscode/`) that gets committed by accident (cleaned in PR #276).
-- This repo is Claude-only: only `.claude/` and `.aidd/` are legitimate in-repo install artifacts.
-- If an in-repo per-tool install is unavoidable for a test, gitignore the non-Claude install dirs.
-- A smoke case counts only once **executed** against the real binary — a plausible-looking guard can be silently dead (e.g. a filesystem-find heuristic that returns empty). Pick a tool's tracked file from the manifest (the source of truth), never by walking the filesystem.
-- **Native-activation tools touch USER-GLOBAL state, not just the project dir.** `codex`/`copilot` plugin installs land in `~/.codex` / `~/.copilot` (`claude` in `~/.claude`). Sandbox them per run — `codex` honors `CODEX_HOME`, `copilot`/`claude` honor `HOME`, aidd's own user config honors `AIDD_USER_CONFIG_DIR` — or snapshot+restore the real dir. A fresh `/tmp` project dir alone does NOT isolate these. (This work polluted the repo + `~/.copilot` twice before the env-sandbox was right.)
-- **Verify tool integrations against the real tool's CLI/IDE, not code+doc inference.** Whether a tool loads a project config is empirical: probe the real tool (`codex debug prompt-input`, `opencode debug skill`, `copilot plugin list`, the Cursor/VS Code plugins panel). Inference from the source + vendor docs was wrong twice here (Cursor assumed broken but works; Copilot assumed fully inert but registers the marketplace). Green unit/integration tests prove aidd's output shape, not that the tool consumes it.
-
-## Golden / snapshot machine-independence
-
-- Golden/snapshot tests MUST be machine-independent. Never snapshot a value derived from an absolute path — including content hashes computed over path-bearing content.
-- Symptom of violation: passes locally, fails CI with a different hash (different absolute path on the runner).
-- Fix pattern + full detail: `.claude/skills/test/references/golden-machine-independence.md` (recompute hash over normalized content).
+- Concurrent runs are safe: each e2e run builds under `.e2e-build/`. Nothing under `tests/` resolves into `dist/`.
+- `pnpm test` does not build; `dist/` is another run's output.
+- A reproduction or manual smoke runs in a fresh temp directory, never at the repository root, which tracks `.codex/config.toml` and `.codex/environments/environment.toml` and gitignores `.vscode/`.
+- `setup`'s auto-register always names the marketplace `aidd-framework` (`FRAMEWORK_MARKETPLACE_NAME`, `contexts/distribution/domain/marketplace.ts`); no flag overrides it. Claude's own `add` silently overwrites a known name, which is why `smoke:real` never drives auto-register.
+- Alias versus `hostName`, and why two projects sharing one build are no conflict: [`marketplace-identity-is-name-plus-plugins.md`](internal/decisions/marketplace-identity-is-name-plus-plugins.md).
+- `pnpm smoke` shares one relocated `$HOME` while `new_project()` spins a fresh directory per cell; several cells auto-register from different paths. Identity by name plus plugin set is what makes that pass.

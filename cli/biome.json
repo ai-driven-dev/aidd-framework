@@ -1,10 +1,30 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "recommended",
+      "performance": {
+        "noBarrelFile": "error",
+        "noReExportAll": "error"
+      },
+      "suspicious": {
+        "noImportCycles": "error",
+        "noTsIgnore": "error"
+      },
+      "correctness": {
+        "noUnresolvedImports": "error"
+      },
+      "style": {
+        "noExportedImports": "error"
+      }
     }
   },
   "formatter": {
@@ -23,6 +43,7 @@
     "includes": [
       "**",
       "!**/dist",
+      "!**/.e2e-build",
       "!**/node_modules",
       "!**/example",
       "!**/temp",
@@ -44,8 +65,507 @@
   },
   "overrides": [
     {
+      "includes": ["src/kernel/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/domain/**",
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "kernel must not import any context \u2014 it is the shared vocabulary contexts speak, not a consumer of one"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tests/helpers/**/*.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/package.json"],
-      "formatter": { "enabled": false }
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["src/contexts/framework/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "domain must not import application, infrastructure, presentation or runtime"
+                  },
+                  {
+                    "group": ["**/telemetry/**"],
+                    "message": "framework may import translate, tools and distribution, never telemetry \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/framework/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/infrastructure/**"],
+                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                  },
+                  {
+                    "group": ["**/telemetry/**"],
+                    "message": "framework may import translate, tools and distribution, never telemetry \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/framework/infrastructure/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/telemetry/**", "**/presentation/**", "**/runtime/**"],
+                    "message": "framework/infrastructure may import translate, tools and distribution, never telemetry, presentation or runtime \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/translate/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "domain must not import application, infrastructure, presentation or runtime"
+                  },
+                  {
+                    "group": ["**/framework/**", "**/distribution/**", "**/telemetry/**"],
+                    "message": "translate may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/translate/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/infrastructure/**"],
+                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                  },
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/distribution/**",
+                      "**/telemetry/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "translate may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/translate/infrastructure/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/distribution/**",
+                      "**/telemetry/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "translate may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/tools/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "domain must not import application, infrastructure, presentation or runtime"
+                  },
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/distribution/**",
+                      "**/telemetry/**"
+                    ],
+                    "message": "tools imports no other context \u2014 every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/tools/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/infrastructure/**"],
+                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                  },
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/distribution/**",
+                      "**/telemetry/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "tools imports no other context \u2014 every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/tools/infrastructure/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/distribution/**",
+                      "**/telemetry/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "tools imports no other context \u2014 every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/distribution/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "domain must not import application, infrastructure, presentation or runtime"
+                  },
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/tools/**",
+                      "**/telemetry/**",
+                      "**/manifest.js"
+                    ],
+                    "message": "distribution knows no tool, no translation and no installation record \u2014 it says where content comes from, not what is done with it (context-graph.arch.test.ts)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/distribution/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/infrastructure/**"],
+                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                  },
+                  {
+                    "group": [
+                      "**/translate/**",
+                      "**/tools/**",
+                      "**/telemetry/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "distribution knows no tool, no translation and no installation record (context-graph.arch.test.ts)"
+                  },
+                  {
+                    "group": ["**/manifest.js"],
+                    "message": "distribution reads a marketplace, never framework's installation record \u2014 marketplace-add-use-case.ts's own MarketplaceRemoveUseCase dependency is the one grandfathered exception (context-graph.arch.test.ts BASELINE), not a licence to read manifest.js too"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/distribution/infrastructure/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/tools/**",
+                      "**/telemetry/**",
+                      "**/presentation/**"
+                    ],
+                    "message": "distribution knows no tool, no translation and no installation record, and reaches no presentation (context-graph.arch.test.ts). Its runtime imports are the grandfathered exception recorded there as BASELINE, not extended here"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/telemetry/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "domain must not import application, infrastructure, presentation or runtime"
+                  },
+                  {
+                    "group": ["**/framework/**", "**/translate/**", "**/distribution/**"],
+                    "message": "telemetry may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/telemetry/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/infrastructure/**"],
+                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                  },
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/distribution/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "telemetry may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/telemetry/infrastructure/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/framework/**",
+                      "**/translate/**",
+                      "**/distribution/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "telemetry may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/*/domain/**/*.ts", "src/contexts/*/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "process": "domain and application read no environment fact directly - take a port injected by the composition root, such as framework/domain/ports/environment.ts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/kernel/**", "src/contexts/**", "src/runtime/**"],
+      "plugins": ["./biome-plugins/no-process-exit.grit"]
+    },
+    {
+      "includes": ["src/**", "tests/**", "!**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "error"
+          }
+        }
+      }
     }
   ]
 }

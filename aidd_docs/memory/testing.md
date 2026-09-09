@@ -1,20 +1,49 @@
-# Testing Guidelines
+# Testing
 
-## Tools and Frameworks
+How the project is tested: the layers, the tools, and the conventions. Where tests live and how to run them.
 
-- **Playwright MCP**: browser automation available via `.playwright-mcp/` config, used for manual or AI-driven UI testing on downstream projects
+> CLI internals (tiers, fixtures, naming, mocking) live in [`cli/aidd_docs/memory/testing.md`](../../cli/aidd_docs/memory/testing.md). This page is the repository-wide view.
 
-## Testing Strategy
+## Strategy
 
-- No unit test runner configured at framework level
-- Skills are validated by running each action's `## Test` end-to-end against a real environment
-- Framework correctness validated by running actual skills against a real project (integration)
+| Surface | Validated by |
+| --- | --- |
+| Skills, agents, rules (markdown) | each action's own `## Test`, run end to end against a real project |
+| `scripts/` and bundled hooks | `node --test` under the wrapper below |
+| `cli/` | vitest, four projects — see the CLI bank |
+| `kanban/` | its own vitest suite. It shares no code with `cli/` |
+| Per-tool distributions | golden snapshots in `cli/tests/golden/`, mirrored by the `build-per-tool` CI matrix; Claude Code's own `plugin validate` over a fresh claude build, in `cli-ci.yml` |
+| Browser journeys | `aidd-dev:11-browser-qa`, see below |
 
-## Test Execution Process
+## Tools
 
-- Each action declares a `## Test` (a command to run, an artifact check, or an observable side-effect) that must pass before the next action runs
-- `scripts/build-dist-verification.md` documents how to verify the build output
+| Tool | Use |
+| --- | --- |
+| vitest | `cli/`, `kanban/` |
+| stryker | mutation, per CLI scope, gated in `cli-ci.yml` on the scopes a change touches |
+| knip | dead code, before push and in `cli-ci.yml` |
+| `@playwright/cli` | browser QA evidence, pinned, never an app dependency |
 
-## Mocking and Stubbing
+## Conventions
 
-Not applicable: the framework has no runtime; all logic is markdown interpreted by an LLM.
+- A plugin never holds its own tests: `hooks/` ships recursively into user projects. Tests for a bundled script go in `scripts/__tests__/`.
+- The scripts suite writes into a git repository. Run it wrapped, never bare: unwrapped it can overwrite this repository's own `.git/hooks`, and `.git` is in no history.
+
+## Run
+
+| Command | Scope |
+| --- | --- |
+| `pnpm test:changed` | only the specs a change can break — vitest resolves the CLI's import graph, and the plugin specs are selected by the paths their own text names. What to run while working |
+| `node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/**/*.test.js'` | repository scripts and hooks |
+| `cd cli && pnpm test` | the four CLI projects. It does not build |
+| `cd cli && pnpm smoke` | built binary against `cli/scripts/smoke-tools.sh` |
+| `cd kanban && pnpm test` | the board |
+| `pnpm exec lefthook run pre-push` | the local gate before pushing |
+
+CI runs more: `validate.yml` re-runs the whole pre-commit over the whole tree on every push and pull request, and `cli-ci.yml` adds jobs no local hook has. Both are in `deployment.md`.
+
+## Browser QA
+
+- Runner: `npx --yes @playwright/cli@0.1.17`, the framework pin. Never `latest` during QA.
+- Also required: `ffmpeg` and `ffprobe`. Output is WebM evidence per scenario.
+- Owned by `aidd-dev:11-browser-qa`; this repository ships the capability, it has no browser journey of its own.

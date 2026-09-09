@@ -1,93 +1,112 @@
 # Codebase Map
 
-## Where Things Live
+Where things live. The architecture rules carry no paths on purpose, so this is the single place that says — and `tests/architecture/codebase-map.arch.test.ts` holds it to the tree in both directions.
 
-```
+```txt
 src/
-├── cli.ts                    # Entry point — commander setup, global flags, preAction hook
-├── application/
-│   ├── commands/             # CLI wiring only (1 file per command)
-│   ├── use-cases/            # Business orchestration
-│   │   ├── auth/             # login / logout / status / require-auth
-│   │   ├── doctor/           # orchestrator + layout / merge-files / plugin / references / tracked-files
-│   │   ├── global/           # cross-tool chains: update-all / status-all / restore-all / doctor-all
-│   │   ├── install/          # capability sub-use-cases: runtime-config / ide-config / agents / commands / rules / skills / config
-│   │   ├── marketplace/      # marketplace lifecycle: add / list / remove / refresh / check / register-framework / sync-settings
-│   │   ├── plugin/           # create / add / install / install-from-marketplace / remove / list / update / search / pick
-│   │   ├── restore/          # orchestrator + tool-files / all-plugins / plugin
-│   │   ├── setup/            # sub-use-cases: marketplace-source / tools / plugins-prompt
-│   │   ├── sync/             # conflict-resolver only — drift/conflict resolution reused by the update flow
-│   │   ├── uninstall/        # orchestrator + tools / plugin / mcp-exclusion / ide
-│   │   └── shared/           # helpers called by use-cases only (never by commands)
-│   ├── error-handler.ts      # central error handling
-│   ├── errors.ts             # application typed exceptions
-│   └── output.ts             # stdout/stderr formatting
-├── domain/
-│   ├── formats/              # pure string transforms — no I/O (command, json, jsonc, markdown, toml, placeholders, cursor-hooks, mcp-format, markdown-references, *-marketplace parsers)
-│   ├── models/               # entities, value objects, discriminant types
-│   ├── ports/                # interface contracts (FileSystem, Hasher, Logger, Prompter, LatestReleaseResolver, etc.)
-│   ├── capabilities/         # one capability class per Has* interface (agents, commands, rules, skills, hooks, mcp, settings, plugins, marketplace-entry)
-│   └── tools/
-│       ├── contracts.ts      # AiTool<C>, Has* interfaces, IdeToolConfig, UserFileSectionKey
-│       ├── registry.ts       # ToolConfig union, isAiTool(), registerTool(), getToolConfig(), hasToolSignals()
-│       ├── ai/               # one file per AI tool (claude, cursor, copilot, opencode, codex)
-│       └── ide/              # one file per IDE tool (vscode)
-└── infrastructure/
-    ├── adapters/             # port implementations — one adapter per port (incl. auth-reader, auth-storage, http-client)
-    ├── assets/               # asset-loader.ts — typed loader for configs/stubs bundled in binary
-    ├── deps.ts               # dependency injection wiring
-    └── errors.ts             # infrastructure typed exceptions (internal only)
+├── contexts/    # bounded contexts — no barrel, nothing reaches inside another
+│   ├── distribution/    # where content comes from and how it is fetched
+│   │   ├── application/
+│   │   ├── domain/
+│   │   │   ├── catalog-parsers/
+│   │   │   └── ports/
+│   │   └── infrastructure/
+│   ├── framework/    # the installation record and everything done to a project
+│   │   ├── application/
+│   │   │   ├── clean/
+│   │   │   ├── doctor/
+│   │   │   ├── flows/
+│   │   │   ├── framework/
+│   │   │   │   └── translator/
+│   │   │   ├── global/
+│   │   │   ├── install/
+│   │   │   │   └── content/
+│   │   │   ├── plugin/
+│   │   │   ├── restore/
+│   │   │   ├── setup/
+│   │   │   ├── shared/
+│   │   │   └── uninstall/
+│   │   ├── domain/
+│   │   │   ├── formats/
+│   │   │   ├── manifest/
+│   │   │   ├── plugins/
+│   │   │   └── ports/
+│   │   └── infrastructure/
+│   ├── telemetry/    # what a session cost and who it was for
+│   │   ├── application/
+│   │   ├── domain/
+│   │   │   ├── formats/
+│   │   │   ├── ports/
+│   │   │   └── report/
+│   │   │       └── axes/
+│   │   └── infrastructure/
+│   ├── tools/    # what a project targets, and what each target declares
+│   │   ├── domain/
+│   │   │   ├── capabilities/
+│   │   │   ├── formats/
+│   │   │   ├── models/
+│   │   │   ├── ports/
+│   │   │   └── profiles/    # one directory per tool
+│   │   │       ├── claude/
+│   │   │       ├── codex/
+│   │   │       ├── copilot/
+│   │   │       ├── cursor/
+│   │   │       ├── opencode/
+│   │   │       └── vscode/
+│   │   └── infrastructure/
+│   └── translate/    # canonical source to target-native content
+│       ├── application/
+│       │   └── strategies/
+│       ├── domain/
+│       │   └── formats/
+│       └── infrastructure/
+├── kernel/    # shared vocabulary — imports no context, carries no business logic
+│   ├── materialization/    # where content lands and how its links follow
+│   ├── ports/    # a port two or more contexts both need
+│   └── reading/    # getting at a file's location and its content safely
+├── presentation/    # everything that talks to a human — depends on contexts, never the reverse
+│   ├── commands/    # one file per command, wiring only
+│   ├── display/    # rendering a result
+│   └── prompts/    # asking the user; the decision stays in the context
+└── runtime/    # technical services that are not a context
+    ├── assets/
+    ├── auth/
+    │   └── ports/
+    ├── filesystem/
+    ├── git/
+    ├── http/
+    ├── platform/
+    ├── project-root/
+    ├── prompter/
+    ├── self-update/
+    └── wiring/    # one composition module per context, plus the composition root
 ```
 
-## Use-Case Structure
+## Areas
 
-| Domain | Orchestrator | Sub-use-cases |
-|---|---|---|
-| doctor | `doctor-use-case.ts` | layout, merge-files, plugin, references, tracked-files |
-| restore | `restore-use-case.ts` | tool-files, all-plugins, plugin (shared: restore-merge-files, restore-regular-files) |
-| uninstall | `uninstall-use-case.ts` | tools, plugin, mcp-exclusion, ide |
-| setup | `setup-use-case.ts` | marketplace-source, tools, plugins-prompt |
-| global | — | update-all, status-all, restore-all, doctor-all (4 chain orchestrators) + update-ai-tools / update-ide-tools helpers |
+- `src/kernel/`: what two or more contexts both speak. No context import, no business logic.
+- `src/contexts/`: the five bounded contexts. Nothing reaches inside another; the allowed edges are in `architecture.md`.
+- `src/presentation/`: commands, rendering, prompts. Depends on contexts, never the reverse.
+- `src/runtime/`: services that are not a context — http, git, auth, assets, filesystem, self-update — and the wiring that composes everything.
+- `tests/`: mirrors `src/`, one tier per file extension. `tests/architecture/` holds the ratchets, `tests/golden/` the snapshots, `tests/helpers/ports/` the doubles.
+- `assets/`: configs inlined at build time, schemas copied beside the binary.
+- `scripts/`: bundle budget, mutation runner, smoke harness.
 
-## Where to Add Things
+## Entry points
+
+- `src/cli.ts` → `dist/cli.js`, bin `aidd`.
+- `src/runtime/wiring/framework.ts` — the composition root. Start here when wiring anything.
+
+## Where to add things
 
 | What | Where |
-|------|-------|
-| New CLI command | `application/commands/` + top-level use-case |
-| New use-case | `application/use-cases/<subdir>/` or root for top-level |
-| Shared use-case helper | `application/use-cases/shared/` |
-| New AI tool | `domain/tools/ai/<toolname>.ts` |
-| New capability | `Has*` in `contracts.ts` + class in `domain/capabilities/` |
-| New string transform | `domain/formats/` |
-| New domain type | `domain/models/` |
-| New port | `domain/ports/` + adapter in `infrastructure/adapters/` |
-
-## Tests
-
-```
-tests/
-├── application/use-cases/    # unit — use-cases with in-memory ports from tests/helpers/ports/
-├── domain/capabilities/      # unit — capability class tests
-├── domain/formats/           # unit — format parser tests (incl. *-marketplace parsers)
-├── domain/models/            # unit — pure value object tests; manifest.property.unit.test.ts (property-based)
-├── domain/tools/             # unit — tool config tests
-├── e2e/                      # full CLI invocation via runCli()
-├── infrastructure/           # adapter tests with mock servers/fixtures
-└── fixtures/
-    ├── framework/            # minimal synthetic framework fixture
-    └── framework-real/       # pinned real framework tag (plugins: aidd-async-dev, etc.)
-```
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `infrastructure/deps.ts` | Full dependency graph — start here when wiring new deps |
-| `infrastructure/assets/asset-loader.ts` | Typed loader for configs/stubs bundled in binary |
-| `domain/tools/contracts.ts` | All tool/capability interfaces |
-| `domain/tools/registry.ts` | Tool lookup, guards, signal detection |
-| `application/use-cases/shared/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
-| `application/use-cases/shared/ensure-built-marketplace-use-case.ts` | Per-target built-tree cache — install/update materialize tools from it (build/install parity) |
-| `domain/models/manifest.ts` | Aggregate root — all installed file tracking + schema migration (v1→v6) on load |
-| `domain/models/normalized-plugin.ts` | Internal AST for foreign-format plugin ingestion |
-| `domain/models/setup-flow.ts` | Aggregate — setup orchestration state |
+| ---- | ----- |
+| a command | `presentation/commands/`, plus the use case in whichever context owns the concept |
+| a prompt | `presentation/prompts/`; the decision it feeds stays in the context |
+| a use case | the context whose concept it serves. There is no landing zone: one that fits nowhere means the contexts are wrong |
+| a tool | one profile directory under `contexts/tools/domain/profiles/` |
+| a transform shared by two profiles | `contexts/tools/domain/formats/`; used by one, that profile's own directory |
+| a port used by one context | that context's `domain/ports/`, adapter in its `infrastructure/` |
+| a port used by two | `kernel/ports/`, adapter in `runtime/` |
+| a runtime service | `runtime/<service>/`, wired from `runtime/wiring/` |
+| a cost-report axis (its own key, sentinels, group shape, order) | `contexts/telemetry/domain/report/axes/`; the pass that fills it stays in `cost-report.ts`, which the axis reaches only through `import type` |

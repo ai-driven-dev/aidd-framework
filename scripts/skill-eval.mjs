@@ -1,23 +1,8 @@
 #!/usr/bin/env node
-// Behavioral eval harness for the framework skills.
-//
-// Each case runs the skill for real through a headless `claude -p`, in an
-// isolated temp project where the skill is installed under a unique name as a
-// project skill (`.claude/skills/<evalName>/`). The unique name guarantees the
-// worktree copy runs, never a globally-installed plugin of the same name.
-//
-// Usage:
-//   node scripts/skill-eval.mjs                 # run every case (deterministic checks)
-//   node scripts/skill-eval.mjs --model=opus    # override the model (default: sonnet)
-//   node scripts/skill-eval.mjs --jobs=1        # run serially (default: 4 at a time)
-//   node scripts/skill-eval.mjs --repeat=3      # run each case 3 times, to measure flakiness
-//   node scripts/skill-eval.mjs --case=refresh  # run only cases whose name matches
-//   node scripts/skill-eval.mjs 03-shadow-areas # run cases for one skill
-//   node scripts/skill-eval.mjs --judge         # also run LLM-judge criteria (metered)
-//   node scripts/skill-eval.mjs --keep          # keep temp dirs for inspection
-//
-// Local / opt-in only: needs an authenticated `claude` CLI and spends tokens.
-// Not a CI gate.
+// Behavioral eval harness for the framework skills. Each case runs the skill for real
+// through a headless `claude -p`, in an isolated temp project where the skill is installed
+// under a unique name, so the worktree copy runs and never a globally-installed plugin of
+// the same name. Local and opt-in: it needs an authenticated `claude` and spends tokens.
 
 import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -135,7 +120,6 @@ function setupCase(c) {
   // the sandbox matches an installed plugin rather than a skill copied alone.
   const hooks = join(ROOT, "plugins", c.plugin || "aidd-refine", "hooks");
   if (existsSync(hooks)) cpSync(hooks, join(skillDst, "hooks"), { recursive: true });
-  // Rewrite the frontmatter name so it matches the unique eval folder.
   const skillMd = join(skillDst, "SKILL.md");
   const rewritten = readFileSync(skillMd, "utf8").replace(/^name:.*$/m, `name: ${c.evalName}`);
   writeFileSync(skillMd, rewritten);

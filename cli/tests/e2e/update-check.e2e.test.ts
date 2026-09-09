@@ -3,12 +3,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { cliPath } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
-const CLI_PATH = resolve(process.cwd(), "dist/cli.js");
 const FAKE_TAG = "v999.0.0"; // current CLI is 4.6.x → always outdated against this
 
 interface FakeRelease {
@@ -18,9 +18,8 @@ interface FakeRelease {
 }
 
 /**
- * Local stand-in for both upstreams the updater queries: the npm registry
- * (source of truth for the version) and GitHub (best-effort changelog).
- * Counts every hit.
+ * Local stand-in for both upstreams the updater queries: npm (the version) and GitHub
+ * (best-effort changelog). Counts every hit.
  */
 function startFakeRelease(tag: string): Promise<FakeRelease> {
   let hits = 0;
@@ -50,6 +49,8 @@ function startFakeRelease(tag: string): Promise<FakeRelease> {
 interface TestEnv {
   projectDir: string;
   cachePath: string;
+  /** Where this cache lived before it moved under `cache/` — still read, never written. */
+  legacyCachePath: string;
   env: Record<string, string>;
   server: FakeRelease;
   cleanup: () => Promise<void>;
@@ -62,13 +63,16 @@ async function setupEnv(prefix: string): Promise<TestEnv> {
   await mkdir(join(projectDir, ".aidd"), { recursive: true });
   await writeFile(
     join(projectDir, ".aidd", "manifest.json"),
-    JSON.stringify({ version: 5, tools: {}, marketplaces: {} }),
+    JSON.stringify({ version: 8, tools: {} }),
     "utf-8"
   );
   const server = await startFakeRelease(FAKE_TAG);
   return {
     projectDir,
-    cachePath: join(configDir, "update-check.json"),
+    // Under `cache/`, beside the other disposable things, rather than loose among the files
+    // a person chose. The path before the move is `legacyCachePath` below, still read.
+    cachePath: join(configDir, "cache", "update-check.json"),
+    legacyCachePath: join(configDir, "update-check.json"),
     env: {
       HOME: tempDir,
       AIDD_USER_CONFIG_DIR: configDir,
@@ -90,7 +94,7 @@ async function runCli(
   env: Record<string, string>
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   try {
-    const { stdout, stderr } = await execFileAsync("node", [CLI_PATH, ...args], {
+    const { stdout, stderr } = await execFileAsync("node", [cliPath(), ...args], {
       cwd,
       env: { ...process.env, ...env },
     });
@@ -105,9 +109,9 @@ describe("E2E: update-check piggyback", () => {
   it("hot path is read-only and offline: cold offline command makes no request and writes no cache", async () => {
     const t = await setupEnv("cold");
     try {
-      await runCli(["status"], t.projectDir, t.env);
+      await runCli(["doctor"], t.projectDir, t.env);
 
-      // `status` is not an online command → no piggyback refresh.
+      // `doctor` is not an online command → no piggyback refresh.
       expect(t.server.hits()).toBe(0);
       expect(existsSync(t.cachePath)).toBe(false);
     } finally {
@@ -125,7 +129,9 @@ describe("E2E: update-check piggyback", () => {
         "utf-8"
       );
 
-      const { stderr } = await runCli(["status"], t.projectDir, t.env);
+      // `update` is excluded from the preAction nag (it resolves the latest version
+      // itself), so any other command exercises the generic cache-only path.
+      const { stderr } = await runCli(["doctor"], t.projectDir, t.env);
 
       expect(stderr).toContain("CLI update available");
       expect(t.server.hits()).toBe(0); // hot path never touches the network
@@ -137,15 +143,37 @@ describe("E2E: update-check piggyback", () => {
   it("online command refreshes the cache via postAction (the regression guard)", async () => {
     const t = await setupEnv("refresh");
     try {
-      // Cold cache. `update` IS an online command → postAction must fetch + persist
-      // BEFORE the process exits. The old fire-and-forget design left this file absent.
-      const { exitCode } = await runCli(["update"], t.projectDir, t.env);
+      // Cold cache, and `marketplace list` IS an online command → postAction must fetch and
+      // persist BEFORE the process exits.
+      const { exitCode } = await runCli(["marketplace", "list"], t.projectDir, t.env);
 
       expect(exitCode).toBe(0);
       expect(existsSync(t.cachePath)).toBe(true);
       expect(t.server.hits()).toBeGreaterThanOrEqual(1);
       const cached = JSON.parse(readFileSync(t.cachePath, "utf-8")) as { latest: string };
       expect(cached.latest).toBe("999.0.0");
+    } finally {
+      await t.cleanup();
+    }
+  });
+
+  it("still reads a cache written before it moved, rather than refetching every install at once", async () => {
+    // Nothing rewrites the old path, but reading it keeps the move from costing every
+    // existing install a network call on its first online command.
+    const t = await setupEnv("legacy");
+    try {
+      await mkdir(dirname(t.legacyCachePath), { recursive: true });
+      await writeFile(
+        t.legacyCachePath,
+        JSON.stringify({ checkedAt: Date.now(), latest: "99.0.0" }),
+        "utf-8"
+      );
+
+      const { stderr } = await runCli(["doctor"], t.projectDir, t.env);
+
+      // `doctor` is offline: the notice can only have come from the file on disk.
+      expect(t.server.hits()).toBe(0);
+      expect(stderr).toContain("99.0.0");
     } finally {
       await t.cleanup();
     }

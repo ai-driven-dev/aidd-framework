@@ -1,0 +1,9 @@
+# Fixtures a test compares byte for byte (manifest-round-trip.unit.test.ts reads each one
+# and asserts `Manifest.toJSON()` reproduces it exactly) must check out with the same line
+# ending on every platform. Without this, a Windows checkout's default `core.autocrlf`
+# rewrites the committed LF to CRLF, and the comparison — which always rewrites LF,
+# regardless of host OS — fails on a line-ending mismatch that has nothing to do with the
+# content under test. Scoped to the whole fixtures tree, not just `.json`: the exposure is
+# "a test reads this file's raw bytes", which is true of any fixture format, not a property
+# of JSON specifically.
+tests/fixtures/** text eol=lf

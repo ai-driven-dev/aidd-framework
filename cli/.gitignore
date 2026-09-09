@@ -32,3 +32,9 @@ tmp/
 .aidd/manifest.json
 .aidd/marketplaces.json
 .aidd/cache/
+
+# Per-run e2e binaries (tests/e2e/global-setup.ts)
+.e2e-build/
+
+# A Claude Code session lock, pid and session id of whoever ran last. Never shared.
+.claude/scheduled_tasks.lock

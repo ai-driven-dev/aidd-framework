@@ -21,5 +21,5 @@ Resolve the latest version from the public npm registry dist-tags endpoint (`reg
 - Version resolution works for every user regardless of GitHub repo visibility or token, and stays correct after the repo goes public.
 - The registry is hardcoded to `registry.npmjs.org`; a user with a custom npm mirror is checked against npmjs.org even though their `pnpm/yarn/bun add -g` may pull from the mirror. Same content for a public package, but a corporate-mirror audience would need this revisited.
 - The changelog is now optional: tokenless users get an empty changelog until the repo is public.
-- Override hooks for tests: `AIDD_SELF_UPDATE_NPM_BASE` (npm base) and `AIDD_SELF_UPDATE_API_BASE` (GitHub base), wired in `deps.ts`.
+- Override hooks for tests: `AIDD_SELF_UPDATE_NPM_BASE` (npm base) and `AIDD_SELF_UPDATE_API_BASE` (GitHub base), wired in `runtime/wiring/framework.ts`.
 - See PR #316, issue #315.

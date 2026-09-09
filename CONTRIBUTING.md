@@ -46,11 +46,11 @@ make setup   # deps, git hooks, registers the marketplace, installs plugins into
 
 - **Follow the [Principles](#-principles).**
 - **Test locally** — run `make reload`, restart your session(s). Test in Claude *and* one other tool (e.g. Codex).
-- **Commit** — `<type>(<scope>): description`, one scope per commit → [convention](aidd_docs/memory/vcs.md#commit-convention).
+- **Commit** — `<type>(<scope>): description`, one scope per commit → [convention](aidd_docs/memory/vcs.md#commits).
 
 ## 🔀 Open a pull request
 
-- **Branch off `next`, target `next`** → [routing table](aidd_docs/memory/vcs.md#types).
+- **Branch off `next`, target `next`** → [routing table](aidd_docs/memory/vcs.md#branches).
 - **Fill the [PR template](.github/PULL_REQUEST_TEMPLATE.md)** — what changed, how you solved it.
 - **A Maintainer review gates every merge** → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions).
 

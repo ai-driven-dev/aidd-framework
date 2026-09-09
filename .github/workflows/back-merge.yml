@@ -1,11 +1,12 @@
 name: Back-merge
 
-# After a release on main, sync main back into next so its changelog, manifest,
-# and version bumps do not drift. When next holds no unreleased work, realign it
-# onto main's hashes (force-push, the App is an "always" bypass actor on next)
-# so the rebase-promote hash drift cannot accumulate. When next has real work,
-# keep the merge. Conflict -> open a PR for a human. Any other failure -> open a
-# tracking issue so the drift is never silent.
+# After a release on main, fold main's changelog, manifest and version bumps back into next.
+#
+# A plain merge, because promote.yml lands as a merge commit: main and next share a real
+# merge base, so only the release commit is left to reconcile. Conflict opens a PR instead.
+#
+# A release can publish several tags at once, firing this once per tag: the first run folds
+# main in, the rest find it already merged rather than each opening a duplicate PR.
 
 on:
   release:
@@ -37,39 +38,35 @@ jobs:
       - name: Merge main into next
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
+          set -euo pipefail
+
           git config user.name "aidd-bot[bot]"
           git config user.email "aidd-bot[bot]@users.noreply.github.com"
           git fetch origin main
-          if git merge --no-edit origin/main; then
-            # Promotes to main are rebase-merged, so main carries new commit
-            # hashes and next drifts even though the content matches. When the
-            # merge result is content-identical to main (next held no unreleased
-            # work), realign next onto main's clean hashes so the drift cannot
-            # accumulate into a giant conflicting promote later. Otherwise next
-            # has real unreleased work, so keep the merge and push normally.
-            if git diff --quiet origin/main HEAD; then
-              git push --force origin "origin/main:refs/heads/next"
-            else
-              git push origin next
-            fi
-          else
-            git merge --abort
-            BRANCH="back-merge/main-to-next-${{ github.run_id }}"
-            git checkout -b "$BRANCH" origin/main
-            git push origin "$BRANCH"
-            # promote.yml matches this exact title prefix to recognize a
-            # squash-merged conflict resolution as a sync boundary (this repo
-            # disallows merge-commit PRs, so this can't land as a real merge
-            # commit). Keep both in sync if you change it.
-            gh pr create --base next --head "$BRANCH" \
-              --title "chore: back-merge main into next (conflicts)" \
-              --body "Automated back-merge hit conflicts (CHANGELOG / manifest / version files). Resolve manually, then merge into next." \
-              --repo "${{ github.repository }}"
+
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "next already contains main; nothing to back-merge."
+            exit 0
           fi
 
-      # Never let a back-merge fail silently: a rejected push or any other error
-      # opens a tracking issue so a human resyncs main into next.
+          # `ci:` on purpose: the type is absent from release-please's changelog-sections,
+          # so this plumbing commit never surfaces in a changelog, and commitlint accepts it.
+          if git merge --no-ff -m "ci: back-merge main into next" origin/main; then
+            git push origin next
+          else
+            git merge --abort
+            BRANCH="back-merge/main-to-next-${RUN_ID}"
+            git checkout -b "$BRANCH" origin/main
+            git push origin "$BRANCH"
+            gh pr create --repo "$REPO" --base next --head "$BRANCH" \
+              --title "ci: back-merge main into next (conflicts)" \
+              --body "Automated back-merge hit conflicts. Resolve manually, then **merge with a merge commit, not a squash**: the second parent is what keeps a shared merge base between \`main\` and \`next\`, and a squash puts the next back-merge back into conflict."
+          fi
+
+      # A rejected push, or any other error, must not leave next drifting silently.
       - name: Open tracking issue on failure
         if: failure()
         env:

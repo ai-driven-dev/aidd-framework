@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AuthConfig } from "../../src/domain/models/auth.js";
-import { AuthStorage } from "../../src/infrastructure/auth/auth-storage.js";
+import type { AuthConfig } from "../../src/runtime/auth/auth.js";
+import { AuthStorage } from "../../src/runtime/auth/auth-storage.js";
 
 export async function makeTempAuthStorage(prefix: string): Promise<{
   tempDir: string;

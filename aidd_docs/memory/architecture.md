@@ -1,69 +1,45 @@
 # Architecture
 
-## Language/Framework
+The macro technical shape: the stack, how the pieces fit, and the decisions behind them. Point to the code, do not restate it.
 
-```json
-{
-  "runtime": "Node.js 20",
-  "primary_format": "Markdown (skills, agents, rules, memory)",
-  "package_manager": "pnpm",
-  "devDependencies": ["@commitlint/cli", "@commitlint/config-conventional", "lefthook"]
-}
-```
+> CLI internals (layers, domain models, install flows, adapters) live in [`cli/aidd_docs/memory/architecture.md`](../../cli/aidd_docs/memory/architecture.md).
 
-```mermaid
-flowchart LR
-    Marketplace[".claude-plugin/marketplace.json"] --> Plugins["plugins/"]
-    Plugins --> Context["aidd-context"]
-    Plugins --> Dev["aidd-dev"]
-    Plugins --> VCS["aidd-vcs"]
-    Plugins --> PM["aidd-pm"]
-    Plugins --> Refine["aidd-refine"]
-    Plugins --> Orchestrator["aidd-orchestrator"]
-    CLI["@ai-driven-dev/cli"] -- installs --> Plugins
-```
+## Stack
 
-### Naming Conventions
+| Part | What |
+| --- | --- |
+| Product | markdown — skills, agents, rules, templates. No framework runtime; an LLM interprets them. |
+| Delivery | Node `>=22.12`, pnpm. `cli/` is the `aidd` binary; `kanban/` is a private package. |
+| Manifest | `.claude-plugin/marketplace.json`, the plugin manifest: 8 plugins, no version among them. Versions are release-please's, in `deployment.md`. |
 
-- **Plugins**: `aidd-<domain>` — kebab-case
-- **Skills**: `NN-slug/SKILL.md` — numbered prefix + kebab-case slug
-- **Actions**: `NN-action-name.md` — numbered, kebab-case
-- **Agents**: `name.md` — flat, kebab-case
-- **Rules**: `N-name.md` — numbered, kebab-case
-- **Memory files**: `topic.md` — kebab-case noun
-
-## Plugin Structure
-
-Each plugin follows this layout:
-
-```mermaid
-flowchart TD
-    Plugin["plugins/aidd-X/"] --> ClaudePlugin[".claude-plugin/plugin.json"]
-    Plugin --> Skills["skills/NN-name/"]
-    Plugin --> Agents["agents/"]
-    Skills --> SkillMd["SKILL.md"]
-    Skills --> Actions["actions/NN-action.md"]
-    Skills --> Assets["assets/"]
-```
-
-## Services Communication
-
-### CLI to Marketplace
+## How it fits together
 
 ```mermaid
 flowchart LR
-    User["Developer"] -- "aidd plugin add" --> CLI["@ai-driven-dev/cli"]
-    CLI -- reads --> Marketplace[".claude-plugin/marketplace.json"]
-    CLI -- copies --> TargetRepo["target repo's AI tool dir"]
+    Manifest[".claude-plugin/marketplace.json"] -->|lists| Plugins["plugins/ · 8"]
+    Plugins -->|ships| Surfaces["skills · agents · commands · hooks · rules"]
+    CLI["cli/ · aidd"] -->|reads| Manifest
+    CLI -->|installs| Target["a project's AI tool dir"]
+    Editor["AI coding tool"] -->|invokes| Surfaces
 ```
 
-### External Services
+`cli/` and `kanban/` are self-contained projects with their own lockfiles, not pnpm workspace members — `pnpm-workspace.yaml` declares no `packages:` list on purpose, because membership would change how their dependencies resolve. Each installs on its own, and both are type-checked, linted and tested by this repository's CI. Only `cli/` is published.
 
-#### GitHub Package Registry
+## Key decisions
 
-```mermaid
-flowchart LR
-    CI["GitHub Actions"] -- publishes --> NPM["npm.pkg.github.com/@ai-driven-dev/cli"]
-    CI -- creates --> Release["GitHub Release + assets"]
-    BuildScript["scripts/build-dist.sh"] -- generates --> Dist["plugin dist archives"]
-```
+| Decision | Why |
+| --- | --- |
+| Knowledge and execution separated by a firewall | knowledge plugins produce artifacts you read, never write or run application source |
+| Concern decides placement, not existence | a missing capability goes to the plugin whose concern owns it; the caller delegates |
+| A skill is a router | `SKILL.md` dispatches to actions or protocols; the only place a capability is addressed by name |
+| Recipe skills discover providers at runtime | by description matching. Only agent permission lists and orchestration references name a provider |
+| Observation is its own layer | `aidd-telemetry` journals what a session did; it never reads or writes application source |
+| A launcher runs an external binary, never embeds it | `kanban` broke that and was unwired. Detail in the CLI bank |
+
+The concern-to-plugin taxonomy is canonical in [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md).
+
+## Gotchas
+
+- 8 plugins ship, 2 off the curated install path: `aidd-ui` is alpha, `aidd-telemetry` beta and opt-in.
+- A skill never links outside itself: the tree ships both flat and as a marketplace, so no relative path survives both.
+- Bundled hooks run Node. No `node` on `PATH`, no memory refresh and no run journal.

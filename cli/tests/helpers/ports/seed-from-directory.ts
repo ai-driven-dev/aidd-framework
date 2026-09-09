@@ -3,19 +3,14 @@ import { join, relative } from "node:path";
 import type { InMemoryFileAdapter } from "./in-memory-file-adapter.js";
 
 interface SeedOptions {
-  /**
-   * If true, use the absolute path as the key instead of the path relative to dirPath.
-   * Required when the use-case constructs paths via join(frameworkPath, relativePart).
-   */
+  /** Key by absolute path rather than one relative to dirPath — required when the use case
+   * constructs paths via join(frameworkPath, relativePart). */
   useAbsolutePaths?: boolean;
   /** Path prefix to prepend when useAbsolutePaths is false (default: ""). */
   prefix?: string;
 }
 
-/**
- * Seeds an InMemoryFileAdapter from a real directory on disk.
- * Used once at test setup to replicate fixture content — the use-case run itself stays I/O-free.
- */
+/** Runs once at setup, so the use-case run it seeds for stays I/O-free. */
 export async function seedFromDirectory(
   fs: InMemoryFileAdapter,
   dirPath: string,

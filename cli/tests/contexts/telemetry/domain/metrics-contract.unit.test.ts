@@ -1,0 +1,170 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
+// Side-effect imports: the use-case resolves every AI tool's local-read declaration from
+// the registry, so every tool must be registered for the worked example to run at all.
+import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import { ReadLocalCostUseCase } from "../../../../src/contexts/telemetry/application/read-local-cost-use-case.js";
+import type { LocalCostCandidateRecord } from "../../../../src/contexts/telemetry/domain/ports/session-cost-reader.js";
+import { NULL_PERSON_IDENTITY_READER } from "../../../helpers/ports/in-memory-person-identity-reader.js";
+import { NULL_RUN_JOURNAL_READER } from "../../../helpers/ports/in-memory-run-journal-reader.js";
+import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
+import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
+
+// Trusts no hand-maintained list of fields on either side: only the record's own interface
+// text and the document's own prose, both read fresh off disk.
+
+const RECORD_MODEL_URL = new URL(
+  "../../../../src/contexts/telemetry/domain/telemetry-sink-record.ts",
+  import.meta.url
+);
+const CONTRACT_DOC_URL = pathToFileURL(
+  join(REPOSITORY_ROOT, "aidd_docs", "product", "metrics-contract.md")
+);
+function readTextFile(url: URL): string {
+  return readFileSync(fileURLToPath(url), "utf8");
+}
+
+/** Every field name on `TelemetrySinkRecord`, read straight off the interface's own text,
+ * so an added or removed field is seen here without this file being told about it. */
+function recordFieldNames(): readonly string[] {
+  const source = readTextFile(RECORD_MODEL_URL);
+  const start = source.indexOf("export interface TelemetrySinkRecord {");
+  if (start === -1) throw new Error("TelemetrySinkRecord interface not found in source");
+  const end = source.indexOf("\n}", start);
+  const body = source.slice(start, end);
+  const fields = [...body.matchAll(/^\s*readonly\s+([a-zA-Z0-9_]+)\??:/gm)].map((m) => m[1]);
+  if (fields.length === 0)
+    throw new Error("no fields parsed from TelemetrySinkRecord — regex drifted");
+  return fields;
+}
+
+/** Every field name the "## Field reference" section documents, one heading per field (a
+ * heading may name more than one field, for the four token counters sharing one entry). */
+function documentedFieldNames(): readonly string[] {
+  const doc = readTextFile(CONTRACT_DOC_URL);
+  const sectionStart = doc.indexOf("## Field reference");
+  if (sectionStart === -1)
+    throw new Error('"## Field reference" section not found in the contract doc');
+  const nextSection = doc.indexOf("\n## ", sectionStart + 1);
+  const section =
+    nextSection === -1 ? doc.slice(sectionStart) : doc.slice(sectionStart, nextSection);
+  const headings = [...section.matchAll(/^####\s+(.+)$/gm)].map((m) => m[1]);
+  if (headings.length === 0) throw new Error("no #### field headings parsed from the contract doc");
+  const fields = headings.flatMap((heading) =>
+    [...heading.matchAll(/`([a-zA-Z0-9_]+)`/g)].map((m) => m[1])
+  );
+  if (fields.length === 0) throw new Error("no backticked field names parsed from #### headings");
+  return fields;
+}
+
+describe("metrics contract vs. TelemetrySinkRecord", () => {
+  it("documents every field the record actually has", () => {
+    const recordFields = new Set(recordFieldNames());
+    const documentedFields = new Set(documentedFieldNames());
+    const undocumented = [...recordFields].filter((f) => !documentedFields.has(f));
+    expect(
+      undocumented,
+      `record field(s) missing from the contract doc: ${undocumented.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("never documents a field the record no longer has", () => {
+    const recordFields = new Set(recordFieldNames());
+    const documentedFields = new Set(documentedFieldNames());
+    const stale = [...documentedFields].filter((f) => !recordFields.has(f));
+    expect(stale, `documented field(s) no longer on the record: ${stale.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("metrics contract worked example: a re-read appends unless matched", () => {
+  function docTokenFigures(): {
+    readonly input: number;
+    readonly output: number;
+    readonly stored: number;
+    readonly wouldHaveBeen: number;
+  } {
+    const doc = readTextFile(CONTRACT_DOC_URL);
+    const setup = doc.match(/carries (\d+) input tokens and (\d+) output tokens/);
+    if (!setup) throw new Error("worked-example token setup not found in doc");
+    const result = doc.match(/Stored total after the second read: (\d+) tokens, not\s+(\d+)\./);
+    if (!result) throw new Error("worked-example stored-total sentence not found in doc");
+    return {
+      input: Number(setup[1]),
+      output: Number(setup[2]),
+      stored: Number(result[1]),
+      wouldHaveBeen: Number(result[2]),
+    };
+  }
+
+  it("recomputes the matched-turn_id total via ReadLocalCostUseCase, and it matches the doc", async () => {
+    const { input, output, stored } = docTokenFigures();
+    const candidate: LocalCostCandidateRecord = {
+      kind: "request",
+      vendor_id: "s-doc-example",
+      vendor_field: "sessionId",
+      turn_id: "req_1",
+      turn_field: "requestId",
+      input_tokens: input,
+      output_tokens: output,
+    };
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", { read: async () => ({ records: [candidate], sessionFound: true }) }]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      new StubTelemetryEvidenceReader()
+    );
+
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example" });
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example" }); // the re-read
+
+    const storedRecords = [...sink.files.values()].flat();
+    const total = storedRecords.reduce(
+      (sum, r) => sum + (r.input_tokens ?? 0) + (r.output_tokens ?? 0),
+      0
+    );
+    expect(total).toBe(stored);
+  });
+
+  it("recomputes the unmatched (no turn_id) total, and it matches the doc's counterfactual", async () => {
+    const { input, output, wouldHaveBeen } = docTokenFigures();
+    const candidateWithNoTurnId: LocalCostCandidateRecord = {
+      kind: "request",
+      vendor_id: "s-doc-example-2",
+      vendor_field: "sessionId",
+      input_tokens: input,
+      output_tokens: output,
+    };
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        [
+          "claude",
+          { read: async () => ({ records: [candidateWithNoTurnId], sessionFound: true }) },
+        ],
+      ]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      new StubTelemetryEvidenceReader()
+    );
+
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example-2" });
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example-2" }); // the re-read, unmatched
+
+    const storedRecords = [...sink.files.values()].flat();
+    const total = storedRecords.reduce(
+      (sum, r) => sum + (r.input_tokens ?? 0) + (r.output_tokens ?? 0),
+      0
+    );
+    expect(total).toBe(wouldHaveBeen);
+  });
+});

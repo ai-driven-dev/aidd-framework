@@ -1,0 +1,9 @@
+{
+  "session_id": "019fff53-5842-75a0-a9f2-c6cbd8ba0e03",
+  "transcript_path": "/home/user/probe/codex-home/sessions/2026/08/14/rollout-2026-08-14T10-11-20-019fff53-5842-75a0-a9f2-c6cbd8ba0e03.jsonl",
+  "cwd": "/home/user/probe/project-codex",
+  "hook_event_name": "SessionStart",
+  "model": "probe-stub",
+  "permission_mode": "bypassPermissions",
+  "source": "startup"
+}

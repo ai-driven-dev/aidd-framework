@@ -11,7 +11,7 @@ Unify **engineering teams** around **standardized workflows** and **shared best 
 🧱 **IDE agnostic** · 🏗️ **Legacy systems** · 🌱 **Token-optimized** · 🇫🇷 **Made in France**
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end-->
+  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>50 skills</kbd> · <kbd>2 agents</kbd><!--counts:end-->
 </p>
 
 [![Open Source](https://img.shields.io/badge/Open_Source-Yes-yellow?logo=open-source-initiative&logoColor=white)](https://opensource.org/)
@@ -38,7 +38,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 ## ✅ Prerequisites
 
 - **An AI coding tool** — Claude Code (native), or Cursor / Copilot / Codex / OpenCode (see [Compatibility](#-compatibility)).
-- **[Node](https://nodejs.org)** on your `PATH` — for the plugin that ships hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
+- **[Node](https://nodejs.org) 22 or later** on your `PATH`, only for the plugin that ships hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)); the workflows themselves are markdown and need nothing.
 
 ## 🔌 Compatibility
 
@@ -57,7 +57,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 
 ### Claude Code
 
-Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha, install separately — see [Plugins](#-plugins)).
+Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha and `aidd-telemetry` 🧪 beta, install separately — see [Plugins](#-plugins)).
 
 **In the session** (slash commands)
 
@@ -69,7 +69,6 @@ Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha, install separately — s
 /plugin install aidd-vcs@aidd-framework
 /plugin install aidd-pm@aidd-framework
 /plugin install aidd-orchestrator@aidd-framework
-/plugin install aidd-ui@aidd-framework # 🚧 alpha, install separately
 ```
 
 
@@ -84,7 +83,6 @@ claude plugin install aidd-dev@aidd-framework
 claude plugin install aidd-vcs@aidd-framework
 claude plugin install aidd-pm@aidd-framework
 claude plugin install aidd-orchestrator@aidd-framework
-claude plugin install aidd-ui@aidd-framework # 🚧 alpha, install separately
 ```
 </details
 
@@ -231,7 +229,7 @@ learning only when it is durable enough to improve the next feature.
 
 ## 🧩 Plugins
 
-Seven plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` is 🚧 **alpha**, off the curated path.)
+Eight plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` is 🚧 **alpha** and `aidd-telemetry` 🧪 **beta** — both off the curated path.)
 
 <table>
 <tr>
@@ -302,7 +300,15 @@ Synchronous feature flow, async issue-to-PR automation, and product backlog.
 UI / UX design — smoke-test only, not ready for use.
 
 </td>
-<td width="33%" valign="top"></td>
+<td width="33%" valign="top">
+
+### 📈 [aidd-telemetry](plugins/aidd-telemetry/README.md) 🧪
+
+`3 skills` · **beta**
+
+Answers what a piece of work cost — tokens, models, and which skill spent them. The switch is git-tracked, so it applies to everyone who clones; opt out per person with `AIDD_TELEMETRY=0`. Nothing leaves your machine.
+
+</td>
 <td width="33%" valign="top"></td>
 </tr>
 </table>

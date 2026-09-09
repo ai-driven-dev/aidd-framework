@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# dev-setup.sh - confirm, then install every plugin into Claude and Codex by delegating to
-# dev-sync.sh (which builds this checkout into each tool's native tree, registers the
-# marketplace against it, and installs - current versions, no bump). This mutates your
-# GLOBAL (user-scope) config, so it asks to confirm first. Bypass with `-y` / `--yes` /
-# `YES=1`; a non-interactive shell skips rather than hangs. Called by `make setup`. For
-# iterating after edits use `make reload`.
+# Confirms, then delegates to dev-sync.sh. It mutates the GLOBAL (user-scope) Claude and
+# Codex config, so it asks first; `-y` / `--yes` / `YES=1` bypasses, and a non-interactive
+# shell skips rather than hangs.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +15,6 @@ if [ "$HAVE_CODEX" = 0 ] && [ "$HAVE_CLAUDE" = 0 ]; then
   echo "Neither CLI found - nothing to install."; exit 0
 fi
 
-# Confirm before touching the global config (skip with -y / --yes / YES=1).
 if [ "${YES:-}" != "1" ] && [ "${1:-}" != "-y" ] && [ "${1:-}" != "--yes" ]; then
   echo "About to register '$MKT' and install its plugins into your GLOBAL Claude/Codex config (user scope)."
   if [ -t 0 ]; then
@@ -32,5 +28,4 @@ if [ "${YES:-}" != "1" ] && [ "${1:-}" != "-y" ] && [ "${1:-}" != "--yes" ]; the
   fi
 fi
 
-# dev-sync builds each tool's native tree, registers the marketplace against it, and installs.
 exec "$SCRIPT_DIR/dev-sync.sh" all

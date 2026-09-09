@@ -1,0 +1,1 @@
+{"sink_schema_version": 2, "provenance": "local-read", "kind": "session", "tool": "copilot", "vendor_id": "s-copilot-1", "vendor_field": "sessionId", "turn_id": "sess-1", "turn_field": "id", "event_timestamp": "2026-01-07T08:00:00.000Z", "step_attribution": "unattributed", "input_tokens": 16, "output_tokens": 197, "cache_read_tokens": 1900, "cache_creation_tokens": 1000}

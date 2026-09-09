@@ -4,14 +4,14 @@
       "name": "dev",
       "source": { "kind": "local", "path": "./plugins/dev" },
       "description": "Dev plugin",
-      "recommended": true,
+      "metadata": { "recommended": true },
       "strict": true
     },
     {
       "name": "pm",
       "source": { "kind": "github", "repo": "ai-driven-dev/aidd-pm" },
       "description": "PM plugin",
-      "recommended": false,
+      "metadata": { "recommended": false },
       "strict": false
     }
   ]

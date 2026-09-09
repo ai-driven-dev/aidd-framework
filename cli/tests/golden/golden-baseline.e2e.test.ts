@@ -1,15 +1,5 @@
-/**
- * P1 Golden Baseline — behavior snapshot for the core command matrix.
- *
- * Each public CLI command is exercised against a hermetic fixture project.
- * The captured snapshot (stdout, stderr, exitCode, filesWritten, manifest)
- * is normalized (abs-paths → <ROOT>, version strings → <VERSION>) then
- * compared byte-for-byte against the stored baseline in snapshots/phase0/.
- *
- * USAGE:
- *   Capture: UPDATE_GOLDEN=1 pnpm test:e2e --reporter=verbose tests/golden/golden-baseline.e2e.test.ts
- *   Verify:  pnpm test:e2e tests/golden/golden-baseline.e2e.test.ts
- */
+/** Nothing here reaches the network or a prompt, so a capture never depends on a remote
+ * repository, a rate limit or a TTY. `translate` and `--help` have goldens of their own. */
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -22,10 +12,6 @@ const ROOT = resolve(fileURLToPath(import.meta.url), "../../..");
 const FRAMEWORK_FIXTURE = join(ROOT, "tests/fixtures/framework");
 const SNAPSHOT_FILE = join(ROOT, "tests/golden/snapshots/phase0/snapshot.json");
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface CommandEntry {
   command: string;
   exitCode: number;
@@ -33,29 +19,52 @@ interface CommandEntry {
   stderr: string;
   filesWritten: string[];
   manifest: unknown;
+  /** The shared machine-scope tree lives under the sandbox's fake $HOME, never under
+   * `projectDir`, so `filesWritten` cannot see it at all. */
+  userConfigFiles?: string[];
+  /** `userConfigFiles` names `manifest.json` by filename alone, never what it holds, so a
+   * `--scope user` run registering the wrong tool there would pass this snapshot unnoticed. */
+  userManifest?: unknown;
 }
 
-// ---------------------------------------------------------------------------
-// Normalization
-// ---------------------------------------------------------------------------
-
-/**
- * Replace non-deterministic tokens so two captures of the same run are
- * byte-identical regardless of machine, home dir, version, or timestamp.
- */
+/** Two captures of the same run must be byte-identical whatever the machine, home
+ * directory, version or timestamp. */
 function normalize(text: string): string {
   return (
     text
+      // Folds a Windows capture into the drive-less, "/"-only shape a POSIX one already has.
+      // The lookbehind spares a URL's scheme colon: only a colon not preceded by a letter is a drive.
+      .replace(/(?<![A-Za-z])[A-Za-z]:(?=[/\\])/g, "")
+      .replace(/\\/g, "/")
       // Absolute paths → placeholder. The built-cache path is the project temp dir,
       // which varies per run; strip it before the fixture/root rules.
       .replace(/\/[^\s",'\\]+\/\.aidd\/cache\/built/g, "<BUILT_CACHE>")
       .replace(/\/[^\s",'\\]+\/tests\/fixtures\/framework/g, "<FRAMEWORK_FIXTURE>")
       .replace(/\/[^\s",'\\]+\/aidd\/cli/g, "<ROOT>")
-      // Version strings like 4.5.0 or 4.10.2 in manifest / stdout
-      .replace(/\b\d+\.\d+\.\d+\b/g, "<VERSION>")
-      // Windows line endings
+      // The sandbox's `$HOME` is a fresh per-run temp directory that an `unanswerable`
+      // registration message names, so unnormalized it alone makes two captures differ.
+      .replace(/\/[^\s",'\\]+\/aidd-e2e-[^/\s",'\\]+\/home\b/g, "<HOME>")
+      // `(?<!\d)` rather than `\b`: "v" is a word character, so `\b\d` never matches the
+      // digits of a `v<semver>` cell, while both still refuse to clip "5.2.2" out of "15.2.2".
+      .replace(/(?<!\d)\d+\.\d+\.\d+\b/g, "<VERSION>")
       .replace(/\r\n/g, "\n")
   );
+}
+
+// Normalizes each parsed string, never the JSON text: a replace wide enough to fold both a
+// real "\" and its escaped pair would mangle every other escape (`\"`, `\n`) the same way.
+function normalizeManifest(value: unknown): unknown {
+  if (typeof value === "string") return normalize(value);
+  if (Array.isArray(value)) return value.map(normalizeManifest);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, v]) => [
+        key,
+        normalizeManifest(v),
+      ])
+    );
+  }
+  return value;
 }
 
 function normalizeEntry(entry: CommandEntry): CommandEntry {
@@ -65,18 +74,18 @@ function normalizeEntry(entry: CommandEntry): CommandEntry {
     stdout: normalize(entry.stdout),
     stderr: normalize(entry.stderr),
     filesWritten: entry.filesWritten.map(normalize).sort(),
-    manifest:
-      entry.manifest === null ? null : JSON.parse(normalize(JSON.stringify(entry.manifest))),
+    manifest: entry.manifest === null ? null : normalizeManifest(entry.manifest),
+    userConfigFiles: entry.userConfigFiles?.map(normalize).sort(),
+    userManifest:
+      entry.userManifest === null || entry.userManifest === undefined
+        ? entry.userManifest
+        : normalizeManifest(entry.userManifest),
   };
 }
 
 function normalizeSnapshot(entries: CommandEntry[]): CommandEntry[] {
   return entries.map(normalizeEntry);
 }
-
-// ---------------------------------------------------------------------------
-// Capture helpers
-// ---------------------------------------------------------------------------
 
 async function readManifest(projectDir: string): Promise<unknown> {
   const manifestPath = join(projectDir, ".aidd", "manifest.json");
@@ -88,13 +97,20 @@ async function readManifest(projectDir: string): Promise<unknown> {
   }
 }
 
-/**
- * Recompute manifest file hashes over normalized content so the snapshot is
- * machine-independent. The production code hashes raw file bytes (which may
- * contain an absolute path like extraKnownMarketplaces). We replace each hash
- * with MD5(normalize(fileContent)) so CI and local machines produce the same
- * hex digest.
- */
+/** Read directly, unlike the project manifest: a `--scope user` install records an empty
+ * file list per tool, so no per-file hash needs recomputing to stay machine-independent. */
+async function readUserManifest(fakeHome: string): Promise<unknown> {
+  const manifestPath = join(fakeHome, ".config", "aidd", "manifest.json");
+  try {
+    const raw = await readFile(manifestPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Production hashes raw bytes, which can hold an absolute path; rehashing over normalized
+ * content is what makes CI and a local machine produce the same digest. */
 async function normalizeManifestHashes(manifest: unknown, projectDir: string): Promise<unknown> {
   if (manifest === null || typeof manifest !== "object") return manifest;
 
@@ -127,18 +143,25 @@ async function recomputeFileHashes(files: unknown, projectDir: string): Promise<
       const e = entry as Record<string, unknown>;
       if (typeof e.relativePath !== "string") return entry;
       const content = await readFile(join(projectDir, e.relativePath), "utf-8").catch(() => "");
-      const normalizedContent = normalize(content);
+      const normalizedContent = normalizeFileContent(content, e.relativePath);
       const hash = createHash("md5").update(normalizedContent, "utf-8").digest("hex");
       return { ...e, hash };
     })
   );
 }
 
-/** Run a command and return a single CommandEntry (raw, not normalized). */
+// A .json file's bytes escape a path separator as two backslashes, so un-escape before
+// normalize(). Correct only while these files carry no other escape (`\"`, `\n`, ...).
+function normalizeFileContent(content: string, relativePath: string): string {
+  return normalize(relativePath.endsWith(".json") ? content.replace(/\\\\/g, "\\") : content);
+}
+
+/** Returns a raw entry, not a normalized one. */
 async function captureCommand(
   args: string[],
   projectDir: string,
-  fakeHome: string
+  fakeHome: string,
+  options?: { captureUserConfig?: boolean }
 ): Promise<CommandEntry> {
   const before = await listFiles(projectDir);
   const { stdout, stderr, exitCode } = await runCli(args, projectDir, fakeHome);
@@ -146,6 +169,10 @@ async function captureCommand(
   const filesWritten = after.filter((f) => !before.includes(f)).sort();
   const rawManifest = await readManifest(projectDir);
   const manifest = await normalizeManifestHashes(rawManifest, projectDir);
+  const userConfigFiles = options?.captureUserConfig
+    ? await listFiles(join(fakeHome, ".config", "aidd"))
+    : undefined;
+  const userManifest = options?.captureUserConfig ? await readUserManifest(fakeHome) : undefined;
 
   return {
     command: args.join(" "),
@@ -154,6 +181,8 @@ async function captureCommand(
     stderr,
     filesWritten,
     manifest,
+    userConfigFiles,
+    userManifest,
   };
 }
 
@@ -182,59 +211,172 @@ async function collectFiles(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Command matrix
-// ---------------------------------------------------------------------------
+/** Not a command, so it produces no entry: its effect shows in what follows. */
+async function drift(projectDir: string, relativePath: string): Promise<void> {
+  await writeFile(join(projectDir, relativePath), "{}\n", "utf-8");
+}
 
+/** One project, state accumulating in order: `clean --force` is terminal, so nothing may
+ * follow it but the post-clean read. */
 async function captureMatrix(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const entries: CommandEntry[] = [];
+  const capture = async (
+    args: string[],
+    options?: { captureUserConfig?: boolean }
+  ): Promise<void> => {
+    entries.push(await captureCommand(args, projectDir, fakeHome, options));
+  };
 
-  // 1. setup — initialize from local fixture, claude only, no plugins
-  entries.push(
-    await captureCommand(
-      [
-        "setup",
-        "--source",
-        "local",
-        "--path",
-        FRAMEWORK_FIXTURE,
-        "--ai",
-        "claude",
-        "--plugins",
-        "none",
-        "--yes",
-      ],
-      projectDir,
-      fakeHome
-    )
+  await capture([
+    "setup",
+    "--source",
+    "local",
+    "--path",
+    FRAMEWORK_FIXTURE,
+    "--ai",
+    "claude",
+    "--plugins",
+    "none",
+    "--yes",
+  ]);
+
+  // `filesWritten` must read `[]` here: a `--scope user` run registers machine-wide and
+  // writes nothing under the project. `captureUserConfig` shows the other half.
+  await capture(
+    [
+      "setup",
+      "--source",
+      "local",
+      "--path",
+      FRAMEWORK_FIXTURE,
+      "--ai",
+      "claude",
+      "--plugins",
+      "none",
+      "--yes",
+      "--scope",
+      "user",
+    ],
+    { captureUserConfig: true }
   );
+  await capture(["doctor", "--scope", "user"]);
 
-  // 2. status — after fresh setup, everything should be in sync
-  entries.push(await captureCommand(["status"], projectDir, fakeHome));
+  await capture(["doctor"]);
+  await capture(["marketplace", "list"]);
+  await capture(["plugin", "list"]);
 
-  // 3. restore --force — no-op since nothing modified
-  entries.push(await captureCommand(["restore", "--force"], projectDir, fakeHome));
+  // The fixture serves aidd-test from a local path, so this stays offline.
+  await capture(["plugin", "install", "aidd-test"]);
+  await capture(["plugin", "list"]);
 
-  // 4. clean --force — removes all AIDD files
-  entries.push(await captureCommand(["clean", "--force"], projectDir, fakeHome));
+  await capture(["framework", "install", "--tool", "cursor", "--force"]);
+  await capture(["doctor"]);
 
-  // 5. status after clean — warns about missing manifest
-  entries.push(await captureCommand(["status"], projectDir, fakeHome));
+  await drift(projectDir, join(".claude", "settings.json"));
+  await capture(["doctor"]);
+
+  await capture(["sync", "--force"]);
+  await capture(["doctor"]);
+
+  await capture(["plugin", "remove", "aidd-test"]);
+
+  // Only this step lists userConfigDir(), where what a project-scope `clean` leaves behind
+  // survives on record: the built cache, the marketplaces.json entry, the decremented reference.
+  await capture(["clean", "--force"], { captureUserConfig: true });
+  await capture(["doctor"]);
 
   return entries;
 }
 
-// ---------------------------------------------------------------------------
-// Test
-// ---------------------------------------------------------------------------
+/** A project of its own: a plain `setup` registers `aidd-framework` at user scope too, so
+ * purging it inside the main matrix would take the entry every later step depends on. */
+async function captureUserScopeClean(
+  projectDir: string,
+  fakeHome: string
+): Promise<CommandEntry[]> {
+  const entries: CommandEntry[] = [];
+  const capture = async (
+    args: string[],
+    options?: { captureUserConfig?: boolean }
+  ): Promise<void> => {
+    const entry = await captureCommand(args, projectDir, fakeHome, options);
+    entries.push({ ...entry, command: `[user-scope-clean] ${entry.command}` });
+  };
+
+  await capture(
+    [
+      "setup",
+      "--source",
+      "local",
+      "--path",
+      FRAMEWORK_FIXTURE,
+      "--ai",
+      "claude",
+      "--plugins",
+      "none",
+      "--yes",
+      "--scope",
+      "user",
+    ],
+    { captureUserConfig: true }
+  );
+  await capture(["clean", "--scope", "user", "--force"], { captureUserConfig: true });
+  await capture(["doctor", "--scope", "user"]);
+
+  return entries;
+}
+
+/** A project of their own because `clean --force` ends the main one. Each entry is prefixed
+ * so both scenarios share one snapshot file. */
+async function captureErrors(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
+  const entries: CommandEntry[] = [];
+  const capture = async (args: string[]): Promise<void> => {
+    const entry = await captureCommand(args, projectDir, fakeHome);
+    entries.push({ ...entry, command: `[errors] ${entry.command}` });
+  };
+
+  // A directory that was never set up.
+  await capture(["doctor"]);
+  await capture(["plugin", "list"]);
+
+  await capture(["plugin", "install", "does-not-exist"]);
+  await capture(["framework", "install", "--tool", "not-a-tool"]);
+  await capture(["definitely-not-a-command"]);
+
+  await capture([
+    "marketplace",
+    "add",
+    "malformed",
+    join(FRAMEWORK_FIXTURE, "marketplace-malformed"),
+  ]);
+
+  return entries;
+}
+
+async function captureAll(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
+  const main = await captureMatrix(projectDir, fakeHome);
+  const errorEnv = await createTestEnv("golden-errors");
+  const userScopeCleanEnv = await createTestEnv("golden-user-scope-clean");
+  try {
+    const errors = await captureErrors(errorEnv.projectDir, errorEnv.fakeHome);
+    const userScopeClean = await captureUserScopeClean(
+      userScopeCleanEnv.projectDir,
+      userScopeCleanEnv.fakeHome
+    );
+    return [...main, ...errors, ...userScopeClean];
+  } finally {
+    await errorEnv.cleanup();
+    await userScopeCleanEnv.cleanup();
+  }
+}
 
 describe.concurrent("Golden baseline — command matrix", () => {
   it("snapshot is deterministic (two captures are byte-identical)", async () => {
     const env1 = await createTestEnv("golden-det-1");
     const env2 = await createTestEnv("golden-det-2");
     try {
-      const capture1 = normalizeSnapshot(await captureMatrix(env1.projectDir, env1.fakeHome));
-      const capture2 = normalizeSnapshot(await captureMatrix(env2.projectDir, env2.fakeHome));
+      const capture1 = normalizeSnapshot(await captureAll(env1.projectDir, env1.fakeHome));
+      const capture2 = normalizeSnapshot(await captureAll(env2.projectDir, env2.fakeHome));
       expect(JSON.stringify(capture1, null, 2)).toStrictEqual(JSON.stringify(capture2, null, 2));
     } finally {
       await env1.cleanup();
@@ -245,7 +387,7 @@ describe.concurrent("Golden baseline — command matrix", () => {
   it("snapshot matches stored baseline (behavior-preserving gate)", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("golden-baseline");
     try {
-      const captured = normalizeSnapshot(await captureMatrix(projectDir, fakeHome));
+      const captured = normalizeSnapshot(await captureAll(projectDir, fakeHome));
 
       if (process.env.UPDATE_GOLDEN === "1") {
         await mkdir(join(ROOT, "tests/golden/snapshots/phase0"), { recursive: true });

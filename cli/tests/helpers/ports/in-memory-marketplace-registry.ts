@@ -1,10 +1,7 @@
-import type { Marketplace, MarketplaceScope } from "../../../src/domain/models/marketplace.js";
-import type { MarketplaceRegistry } from "../../../src/domain/ports/marketplace-registry.js";
+import type { Marketplace } from "../../../src/contexts/distribution/domain/marketplace.js";
+import type { MarketplaceRegistry } from "../../../src/contexts/distribution/domain/ports/marketplace-registry.js";
+import type { MarketplaceScope } from "../../../src/kernel/scope.js";
 
-/**
- * Pure in-memory MarketplaceRegistry.
- * Stores entries per (projectRoot, name) — no disk I/O.
- */
 export class InMemoryMarketplaceRegistry implements MarketplaceRegistry {
   private readonly project = new Map<string, Marketplace>();
   private readonly user = new Map<string, Marketplace>();
@@ -53,8 +50,6 @@ export class InMemoryMarketplaceRegistry implements MarketplaceRegistry {
       store.set(key, existing.withVersion(version));
     }
   }
-
-  // ── Inspection helpers ──────────────────────────────────────────────────────
 
   getAll(projectRoot: string): readonly Marketplace[] {
     return [...this.getProjectEntries(projectRoot), ...this.user.values()];

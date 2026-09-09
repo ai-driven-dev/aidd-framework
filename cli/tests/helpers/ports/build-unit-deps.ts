@@ -1,34 +1,36 @@
 import { resolve } from "node:path";
 // Register all tools so use-cases that call getToolConfig / getIdeToolConfig don't throw
-import "../../../src/domain/tools/ai/claude.js";
-import "../../../src/domain/tools/ai/codex.js";
-import "../../../src/domain/tools/ai/copilot.js";
-import "../../../src/domain/tools/ai/cursor.js";
-import "../../../src/domain/tools/ai/opencode.js";
-import "../../../src/domain/tools/ide/vscode.js";
-import { CLIOutput } from "../../../src/application/output.js";
-import { DoctorLayoutUseCase } from "../../../src/application/use-cases/doctor/doctor-layout-use-case.js";
-import { DoctorMergeFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-merge-files-use-case.js";
-import { DoctorPluginUseCase } from "../../../src/application/use-cases/doctor/doctor-plugin-use-case.js";
-import { DoctorReferencesUseCase } from "../../../src/application/use-cases/doctor/doctor-references-use-case.js";
-import { DoctorTrackedFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-tracked-files-use-case.js";
-import { DoctorUseCase } from "../../../src/application/use-cases/doctor/doctor-use-case.js";
-import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";
-import { InstallIdeConfigUseCase } from "../../../src/application/use-cases/install/install-ide-config-use-case.js";
-import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/install/install-runtime-config-use-case.js";
-import { MarketplaceSyncSettingsUseCase } from "../../../src/application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
-import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
-import { GitignoreUseCase } from "../../../src/application/use-cases/shared/gitignore-use-case.js";
-import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/shared/post-install-pipeline-use-case.js";
-import { ResolveUpdateDecisionUseCase } from "../../../src/application/use-cases/shared/resolve-update-decision-use-case.js";
-import { UpdateOneToolUseCase } from "../../../src/application/use-cases/shared/update-one-tool-use-case.js";
-import { SyncConflictResolverUseCase } from "../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
-import { Manifest } from "../../../src/domain/models/manifest.js";
-import { isIdeToolId, type ToolId } from "../../../src/domain/tools/registry.js";
-import { PluginCatalogRepositoryAdapter } from "../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
-import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
-import { SilentPrompterAdapter } from "../../../src/infrastructure/adapters/prompter-adapter.js";
-import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";
+import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import "../../../src/contexts/tools/domain/profiles/vscode/profile.js";
+import { PluginCatalogRepositoryAdapter } from "../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
+import { DoctorLayoutUseCase } from "../../../src/contexts/framework/application/doctor/doctor-layout-use-case.js";
+import { DoctorMergeFilesUseCase } from "../../../src/contexts/framework/application/doctor/doctor-merge-files-use-case.js";
+import { DoctorPluginUseCase } from "../../../src/contexts/framework/application/doctor/doctor-plugin-use-case.js";
+import { DoctorReferencesUseCase } from "../../../src/contexts/framework/application/doctor/doctor-references-use-case.js";
+import { DoctorRegistrationUseCase } from "../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
+import { DoctorTrackedFilesUseCase } from "../../../src/contexts/framework/application/doctor/doctor-tracked-files-use-case.js";
+import { DoctorUseCase } from "../../../src/contexts/framework/application/doctor/doctor-use-case.js";
+import { MarketplaceSyncSettingsUseCase } from "../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import { GitignoreUseCase } from "../../../src/contexts/framework/application/gitignore-use-case.js";
+import { ResolveUpdateDecisionUseCase } from "../../../src/contexts/framework/application/global/resolve-update-decision-use-case.js";
+import { UpdateOneToolUseCase } from "../../../src/contexts/framework/application/global/update-one-tool-use-case.js";
+import { InitUseCase } from "../../../src/contexts/framework/application/init-use-case.js";
+import { InstallIdeConfigUseCase } from "../../../src/contexts/framework/application/install/install-ide-config-use-case.js";
+import { InstallRuntimeConfigUseCase } from "../../../src/contexts/framework/application/install/install-runtime-config-use-case.js";
+import { PostInstallPipelineUseCase } from "../../../src/contexts/framework/application/install/post-install-pipeline-use-case.js";
+import { DetectPluginDriftUseCase } from "../../../src/contexts/framework/application/shared/detect-plugin-drift-use-case.js";
+import { Manifest } from "../../../src/contexts/framework/domain/manifest.js";
+import { PluginDistributionReaderAdapter } from "../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+import { isIdeToolId } from "../../../src/contexts/tools/domain/registry.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
+import { CLIOutput } from "../../../src/presentation/output.js";
+import { SyncConflictResolverUseCase } from "../../../src/presentation/prompts/sync-conflict-resolver-use-case.js";
+import { BundledAssetProviderAdapter } from "../../../src/runtime/assets/asset-loader.js";
+import { SilentPrompterAdapter } from "../../../src/runtime/prompter/prompter-adapter.js";
 import { DeterministicHasher } from "./deterministic-hasher.js";
 import { FakeCurrentVersion } from "./fake-current-version.js";
 import { fakeEnsureBuiltMarketplace } from "./fake-ensure-built-marketplace.js";
@@ -41,10 +43,8 @@ import { seedFromDirectory } from "./seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
 
-/**
- * Builds in-memory deps for use-case unit tests.
- * The InMemoryFileAdapter is pre-seeded with the framework fixture content (absolute paths).
- */
+/** Builds in-memory deps for use-case unit tests, the file adapter pre-seeded with the
+ * framework fixture content under absolute paths. */
 export async function buildUnitDeps(_projectRoot: string) {
   const hasher = new DeterministicHasher();
   const fs = new InMemoryFileAdapter({}, hasher);
@@ -53,7 +53,7 @@ export async function buildUnitDeps(_projectRoot: string) {
   const assetProvider = new BundledAssetProviderAdapter();
   const pluginFetcher = new FixturePluginFetcher();
   const pluginDistributionReader = new PluginDistributionReaderAdapter(fs);
-  const pluginCatalogRepository = new PluginCatalogRepositoryAdapter(fs);
+  const _pluginCatalogRepository = new PluginCatalogRepositoryAdapter(fs);
   const marketplaceRegistry = new InMemoryMarketplaceRegistry();
   const gitignoreUseCase = new GitignoreUseCase(fs);
   const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
@@ -75,18 +75,17 @@ export async function buildUnitDeps(_projectRoot: string) {
   const currentVersionProvider = new FakeCurrentVersion();
 
   const syncConflictResolver = new SyncConflictResolverUseCase(fs);
+  const nativePluginActivators = new Map([["codex", new FakeNativePluginActivator()]]);
   const marketplaceSyncSettings = new MarketplaceSyncSettingsUseCase(
     fs,
     manifestRepo,
     marketplaceRegistry,
-    pluginCatalogRepository,
     hasher,
     logger,
-    new Map([["codex", new FakeNativePluginActivator()]]),
+    nativePluginActivators,
     fakeEnsureBuiltMarketplace()
   );
 
-  // Seed the framework fixture content so the install use-case can read it
   await seedFromDirectory(fs, FIXTURE_DIR, { useAbsolutePaths: true });
 
   return {
@@ -97,9 +96,9 @@ export async function buildUnitDeps(_projectRoot: string) {
     assetProvider,
     pluginFetcher,
     pluginDistributionReader,
-    pluginCatalogRepository,
     marketplaceRegistry,
     marketplaceSyncSettings,
+    nativePluginActivators,
     installRuntimeConfigUseCase,
     installIdeConfigUseCase,
     gitignoreUseCase,
@@ -169,7 +168,8 @@ export function buildUpdateOneToolUseCase(
 
 export function buildDoctorUseCase(
   deps: Awaited<ReturnType<typeof buildUnitDeps>>,
-  authReader?: ConstructorParameters<typeof DoctorLayoutUseCase>[1]
+  authReader?: ConstructorParameters<typeof DoctorLayoutUseCase>[1],
+  hostRegistries?: ConstructorParameters<typeof DoctorRegistrationUseCase>[3]
 ): DoctorUseCase {
   return new DoctorUseCase(
     deps.manifestRepo,
@@ -177,7 +177,16 @@ export function buildDoctorUseCase(
     new DoctorMergeFilesUseCase(deps.fs, deps.hasher),
     new DoctorPluginUseCase(new DetectPluginDriftUseCase(deps.fs)),
     new DoctorReferencesUseCase(deps.fs),
-    new DoctorLayoutUseCase(deps.fs, authReader)
+    new DoctorLayoutUseCase(deps.fs, authReader),
+    new DoctorRegistrationUseCase(
+      deps.fs,
+      deps.marketplaceRegistry,
+      deps.nativePluginActivators,
+      hostRegistries,
+      new Map(),
+      () => "/user-cache",
+      { get: () => "1.0.0" }
+    )
   );
 }
 

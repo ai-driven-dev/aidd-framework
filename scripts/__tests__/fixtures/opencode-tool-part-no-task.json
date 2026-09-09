@@ -1,0 +1,30 @@
+{
+  "type": "message.part.updated",
+  "properties": {
+    "sessionID": "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "part": {
+      "id": "prt_cccccccccccccccccccccccc",
+      "messageID": "msg_bbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sessionID": "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "type": "tool",
+      "tool": "bash",
+      "callID": "call_cccccccccccccccccccccc",
+      "state": {
+        "status": "completed",
+        "input": {
+          "command": "ls -la",
+          "description": "List all files in current directory",
+          "workdir": "/home/user/probe/project-opencode-task"
+        },
+        "output": ".git/\n.opencode/\nnote.txt\n",
+        "metadata": {
+          "output": ".git/\n.opencode/\nnote.txt\n",
+          "description": "List all files in current directory"
+        },
+        "title": "List all files in current directory",
+        "time": { "start": 1788189156930, "end": 1788189156932 }
+      }
+    },
+    "time": 1788189156932
+  }
+}

@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# aidd-framework doctor
-#
-# Diagnostic preflight for users (install the marketplace) and contributors
-# (work on the marketplace). Prints OK / WARN / FAIL per check and a final
-# verdict.
+# Diagnostic preflight for users installing the marketplace and for contributors working
+# on it. Prints OK / WARN / FAIL per check, then a verdict.
 
 set -uo pipefail
 
@@ -15,8 +12,6 @@ FAIL=0
 MODE="${1:-all}"   # all | user | contributor
 
 print_section() { printf "\n\033[1m%s\033[0m\n" "$1"; }
-
-# --- user-mode checks --------------------------------------------------------
 
 if [ "$MODE" = "all" ] || [ "$MODE" = "user" ]; then
   print_section "Claude Code"
@@ -38,6 +33,11 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "user" ]; then
   else
     warn "gh CLI not found (https://cli.github.com/) - required for plugins that interact with GitHub"
   fi
+  if command -v jq >/dev/null 2>&1; then
+    ok "jq $(jq --version)"
+  else
+    warn "jq not found (brew install jq) - the skills that pipe gh output through it will fail"
+  fi
 
   print_section "Network"
   if curl -sf -o /dev/null --max-time 5 https://api.github.com; then
@@ -52,17 +52,19 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "user" ]; then
   fi
 fi
 
-# --- contributor-mode checks -------------------------------------------------
-
 if [ "$MODE" = "all" ] || [ "$MODE" = "contributor" ]; then
   print_section "Node + pnpm"
   if command -v node >/dev/null 2>&1; then
     nv=$(node --version | tr -d 'v')
     nv_major=${nv%%.*}
-    if [ "$nv_major" -ge 20 ]; then
-      ok "node v$nv (>= 20)"
+    nv_rest=${nv#*.}
+    nv_minor=${nv_rest%%.*}
+    # The floor every package.json in this repository declares (`engines.node: ">=22.12"`),
+    # minor included: 22.0 is a Node 22 that `pnpm install` still refuses.
+    if [ "$nv_major" -gt 22 ] || { [ "$nv_major" -eq 22 ] && [ "$nv_minor" -ge 12 ]; }; then
+      ok "node v$nv (>= 22.12)"
     else
-      fail "node v$nv (need >= 20)"
+      fail "node v$nv (need >= 22.12)"
     fi
   else
     fail "node not found (https://nodejs.org/)"
@@ -74,21 +76,6 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "contributor" ]; then
   fi
 
   print_section "Hook tooling"
-  if command -v jq >/dev/null 2>&1; then
-    ok "jq $(jq --version)"
-  else
-    fail "jq not found (brew install jq) - required by the json-validity hook"
-  fi
-  if command -v python3 >/dev/null 2>&1; then
-    ok "python3 $(python3 --version 2>&1 | awk '{print $2}')"
-  else
-    warn "python3 not found - yaml-validity hook will skip"
-  fi
-  if command -v pipx >/dev/null 2>&1; then
-    ok "pipx $(pipx --version)"
-  else
-    warn "pipx not found (brew install pipx) - JSON schema validation will be skipped"
-  fi
   if [ -f lefthook.yml ]; then
     if pnpm exec lefthook version >/dev/null 2>&1; then
       ok "lefthook installed via pnpm"
@@ -97,8 +84,6 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "contributor" ]; then
     fi
   fi
 fi
-
-# --- verdict ----------------------------------------------------------------
 
 print_section "Verdict"
 if [ "$FAIL" -eq 0 ]; then

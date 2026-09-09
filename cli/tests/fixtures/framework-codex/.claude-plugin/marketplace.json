@@ -11,7 +11,7 @@
       "source": "./plugins/aidd-codex-fixture",
       "description": "Fixture plugin for codex build target tests",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     }
   ]
 }

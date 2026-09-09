@@ -35,7 +35,7 @@ Set scope at install time via the `/plugin` UI, or edit `enabledPlugins` directl
 
 ## 🔖 Versioning & updates
 
-- Each plugin and the root marketplace version independently via `release-please` (tags `<plugin>-vX.Y.Z`, root `vX.Y.Z`). Tooling → [`vcs.md`](../aidd_docs/memory/vcs.md#release-management).
+- Each plugin and the root marketplace version independently via `release-please` (tags `<plugin>-vX.Y.Z`, root `vX.Y.Z`). Tooling → [`deployment.md`](../aidd_docs/memory/deployment.md).
 - Pull updates inside Claude Code: `/plugin marketplace update aidd-framework`.
 - Full history → [`CHANGELOG.md`](../CHANGELOG.md).
 

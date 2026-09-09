@@ -1,26 +1,28 @@
 ---
+description: Apply when a token is read, stored or checked; one GitHub token, resolved once, never checked eagerly.
 paths:
-  - "src/infrastructure/auth/**/*.ts"
-  - "src/application/use-cases/**/*.ts"
+  - "src/runtime/auth/**/*.ts"
+  - "src/contexts/*/application/**/*.ts"
 ---
 
 # Auth
 
-## Token resolution priority
+## Resolution
 
-1. `AIDD_TOKEN` env var
-2. Project `.aidd/auth.json`
-3. User `~/.config/aidd/auth.json`
-4. `gh auth token` — only when stored config uses `method: "gh"`
+- `AuthReaderAdapter.resolve()`: `AIDD_TOKEN`, project `.aidd/auth.json`, user `auth.json`.
+- First hit wins; memoized, so `gh` spawns at most once.
+- `method: "stored"` holds the token.
+- `method: "external"` runs `gh auth token` at read time, at its own level.
+- No `"gh"` method exists.
 
 ## Storage
 
-- Credentials stored with `chmod 600`
-- Two levels: `"project"` (`.aidd/`) and `"user"` (`~/.config/aidd/`)
-- Auth validated via GitHub API — token presence alone is not sufficient
+- Write a credential `0600` on POSIX, `icacls /inheritance:r` on win32.
+- Throw when the restriction fails.
 
-## Auth entry point
+## Not checked
 
-- `RequireAuthUseCase` — single source of auth validation
-- Never duplicate auth checks across commands or use-cases
-- Auth for local framework paths is never required
+- No command refuses for a missing token.
+- Authorization surfaces as `CatalogFetchAuthError` on a 401.
+- A local framework path needs no token.
+- Full contract: `aidd_docs/memory/auth.md`.

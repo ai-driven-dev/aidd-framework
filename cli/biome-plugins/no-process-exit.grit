@@ -1,0 +1,6 @@
+language js
+
+// Only the command edge turns a failure into an exit code; everything below it throws.
+`process.exit($args)` where {
+  register_diagnostic(span=$args, message="process.exit belongs to the command edge: throw a typed error from kernel/errors.ts and let errorHandler decide the exit code", severity="error")
+}

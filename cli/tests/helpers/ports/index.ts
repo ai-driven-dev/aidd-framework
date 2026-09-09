@@ -1,14 +1,17 @@
 export { CapturingLogger } from "./capturing-logger.js";
+export { CheckboxRecordingPrompter } from "./checkbox-recording-prompter.js";
 export { DeterministicHasher } from "./deterministic-hasher.js";
 export { FakeAuthReader } from "./fake-auth-reader.js";
 export { FakeCurrentVersion } from "./fake-current-version.js";
 export { FakeNativePluginActivator } from "./fake-native-plugin-activator.js";
 export { darwinPlatform, FakePlatform, linuxPlatform, win32Platform } from "./fake-platform.js";
 export { FixturePluginFetcher } from "./fixture-plugin-fetcher.js";
+export { InMemoryEnvironment } from "./in-memory-environment.js";
 export { InMemoryFileAdapter } from "./in-memory-file-adapter.js";
 export { InMemoryManifestRepository } from "./in-memory-manifest-repository.js";
 export { InMemoryMarketplaceCache } from "./in-memory-marketplace-cache.js";
 export { InMemoryMarketplaceRegistry } from "./in-memory-marketplace-registry.js";
 export { InMemoryMarketplaceTrustStore } from "./in-memory-marketplace-trust-store.js";
+export { RecordingPrompter } from "./recording-prompter.js";
 export { KeepPrompter, OverwritePrompter, ScriptedPrompter } from "./scripted-prompter.js";
 export { seedFromDirectory } from "./seed-from-directory.js";

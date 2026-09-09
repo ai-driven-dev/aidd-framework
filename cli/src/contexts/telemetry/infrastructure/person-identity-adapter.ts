@@ -1,0 +1,153 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { errorMessage } from "../../../kernel/describe-error.js";
+import { IdentityWriteError, UnreadableIdentityFileError } from "../../../kernel/errors.js";
+import { resolveAiddConfigDir } from "../../../kernel/reading/home-dir.js";
+import { asPlainObjectOrEmpty, isErrnoException } from "../../../kernel/reading/json-file.js";
+import {
+  withAlsoMeAdded,
+  withAlsoMeRemoved,
+  withPersonIdAdopted,
+} from "../domain/person-resolution.js";
+import type { PersonIdentity } from "../domain/ports/person-identity-reader.js";
+import type { PersonIdentityStore } from "../domain/ports/person-identity-store.js";
+
+const PRIVATE_FILE_MODE = 0o600;
+const PRIVATE_DIR_MODE = 0o700;
+
+// A file with no `origin` reads as `"minted"`: that is what the plugin's own deleted
+// `identity.cjs` wrote, and `origin` is knowable only when an identity is created or adopted.
+function parseIdentity(raw: string): PersonIdentity | null {
+  const parsed = asPlainObjectOrEmpty(JSON.parse(raw));
+  if (typeof parsed.person_id !== "string" || parsed.person_id === "") return null;
+  const identity: { personId: string; origin: "minted" | "adopted"; alsoMe: string[] } = {
+    personId: parsed.person_id,
+    origin: parsed.origin === "adopted" ? "adopted" : "minted",
+    alsoMe: Array.isArray(parsed.also_me)
+      ? parsed.also_me.filter((v) => typeof v === "string")
+      : [],
+  };
+  if (typeof parsed.display_name === "string" && parsed.display_name !== "") {
+    return { ...identity, displayName: parsed.display_name };
+  }
+  return identity;
+}
+
+// `also_me` is omitted when empty, like `display_name` when unset: the common case stays the
+// quietest shape on disk.
+function serializeIdentity(identity: PersonIdentity): string {
+  const record: {
+    person_id: string;
+    origin: "minted" | "adopted";
+    display_name?: string;
+    also_me?: readonly string[];
+  } = { person_id: identity.personId, origin: identity.origin };
+  if (identity.displayName !== undefined) record.display_name = identity.displayName;
+  if (identity.alsoMe.length > 0) record.also_me = identity.alsoMe;
+  return `${JSON.stringify(record, null, 2)}\n`;
+}
+
+/** Reads and writes only this machine's own user profile, never `AIDD_USER_CONFIG_DIR`: a
+ * team or CI can point that variable at a shared location, and an identity reachable that way
+ * would not be this person's own. `filePath` is resolved once, in the constructor, so a later
+ * relocation of `HOME` cannot change what this instance answers. */
+export class PersonIdentityAdapter implements PersonIdentityStore {
+  readonly filePath: string;
+
+  constructor() {
+    this.filePath = join(resolveAiddConfigDir(), "identity.json");
+  }
+
+  async read(): Promise<PersonIdentity | null> {
+    try {
+      return parseIdentity(await readFile(this.filePath, "utf8"));
+    } catch {
+      return null;
+    }
+  }
+
+  async readStrict(): Promise<PersonIdentity | null> {
+    const raw = await this.readFileOrNull();
+    if (raw === null) return null;
+    try {
+      return parseIdentity(raw);
+    } catch (error) {
+      throw new UnreadableIdentityFileError(this.filePath, errorMessage(error));
+    }
+  }
+
+  async mint(): Promise<PersonIdentity> {
+    const identity: PersonIdentity = { personId: randomUUID(), origin: "minted", alsoMe: [] };
+    await this.write(identity);
+    return identity;
+  }
+
+  async adopt(personId: string): Promise<PersonIdentity> {
+    const identity = withPersonIdAdopted(await this.readStrict(), personId);
+    await this.write(identity);
+    return identity;
+  }
+
+  async addAlsoMe(identity: string): Promise<PersonIdentity> {
+    const next = withAlsoMeAdded(await this.requireCurrent("add"), identity);
+    await this.write(next);
+    return next;
+  }
+
+  async removeAlsoMe(identity: string): Promise<PersonIdentity> {
+    const next = withAlsoMeRemoved(await this.requireCurrent("remove"), identity);
+    await this.write(next);
+    return next;
+  }
+
+  async setDisplayName(identity: PersonIdentity, displayName: string): Promise<PersonIdentity> {
+    const next: PersonIdentity = { ...identity, displayName };
+    await this.write(next);
+    return next;
+  }
+
+  // `recursive: true` so withdrawing works even where the damaged identity file is a
+  // directory; `force: true` deliberately not set, since "already gone" is the one case this
+  // must report back rather than fold into success. `path` is the caller's, never re-derived.
+  async forget(path: string): Promise<boolean> {
+    try {
+      await rm(path, { recursive: true });
+      return true;
+    } catch (error) {
+      if (isErrnoException(error) && error.code === "ENOENT") return false;
+      throw new IdentityWriteError(path, error, "remove");
+    }
+  }
+
+  // The calling use case already refuses "nobody opted in", so this is the defensive
+  // fallback for that contract, not a path a normal call takes.
+  private async requireCurrent(action: "add" | "remove"): Promise<PersonIdentity> {
+    const current = await this.readStrict();
+    if (current !== null) return current;
+    throw new IdentityWriteError(
+      this.filePath,
+      new Error(`no identity exists to ${action} an identifier onto`),
+      "write"
+    );
+  }
+
+  private async readFileOrNull(): Promise<string | null> {
+    try {
+      return await readFile(this.filePath, "utf8");
+    } catch (error) {
+      if (isErrnoException(error) && error.code === "ENOENT") return null;
+      throw new UnreadableIdentityFileError(this.filePath, errorMessage(error));
+    }
+  }
+
+  private async write(identity: PersonIdentity): Promise<void> {
+    const filePath = this.filePath;
+    try {
+      await mkdir(dirname(filePath), { recursive: true, mode: PRIVATE_DIR_MODE });
+      await writeFile(filePath, serializeIdentity(identity), { mode: PRIVATE_FILE_MODE });
+    } catch (error) {
+      throw new IdentityWriteError(filePath, error);
+    }
+  }
+}

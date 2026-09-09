@@ -3,24 +3,251 @@
     "command": "setup --source local --path <FRAMEWORK_FIXTURE> --ai claude --plugins none --yes",
     "exitCode": 0,
     "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\nInstalled claude (1 files)\n",
-    "stderr": "Warning: Skipping commands/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: Skipping rules/ in plugin 'aidd-test' (out of scope for MVP1).\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [".aidd/manifest.json", ".claude/settings.json", ".gitignore"],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "setup --source local --path <FRAMEWORK_FIXTURE> --ai claude --plugins none --yes --scope user",
+    "exitCode": 0,
+    "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    },
+    "userConfigFiles": [
+      "cache/built/<VERSION>/aidd-framework/claude/.build-version",
+      "cache/built/<VERSION>/aidd-framework/claude/.claude-plugin/marketplace.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.claude-plugin/plugin.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.mcp.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/agents/code-reviewer.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/check.sh",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/hooks.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/commit/SKILL.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/hello.md",
+      "manifest.json",
+      "marketplaces.json",
+      "references.json"
+    ],
+    "userManifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "doctor --scope user",
+    "exitCode": 0,
+    "stdout": "User-scope tools:\n  claude (v<VERSION>): expects activation in <HOME>/.claude/settings.json\n\nUser-scope installation is healthy\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "doctor",
+    "exitCode": 0,
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>): in sync\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nInstallation is healthy\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "marketplace list",
+    "exitCode": 0,
+    "stdout": "aidd-framework v<VERSION> [user]\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "plugin list",
+    "exitCode": 0,
+    "stdout": "No plugins installed.\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "plugin install aidd-test",
+    "exitCode": 0,
+    "stdout": "Installed 'aidd-test'.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "command": "plugin list",
+    "exitCode": 0,
+    "stdout": "claude:\n  aidd-test@<VERSION>\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "command": "framework install --tool cursor --force",
+    "exitCode": 0,
+    "stdout": "Installed cursor (1 files)\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [
-      ".aidd/cache/built/aidd-framework/claude/.build-version",
-      ".aidd/cache/built/aidd-framework/claude/.claude-plugin/marketplace.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/.claude-plugin/plugin.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/.mcp.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/agents/code-reviewer.md",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/hooks/check.sh",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/hooks/hooks.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/skills/commit/SKILL.md",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/skills/hello.md",
-      ".aidd/manifest.json",
-      ".aidd/marketplaces.json",
-      ".claude/settings.json",
-      ".gitignore"
+      ".cursor/hooks.json",
+      ".cursor/hooks/aidd-test/check.sh",
+      ".cursor/settings.json"
     ],
     "manifest": {
-      "version": 6,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -28,22 +255,67 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
-          "mergeFiles": []
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        },
+        "cursor": {
+          "toolId": "cursor",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".cursor/settings.json",
+              "hash": "07616ffa7dc41a282ca2179f6a2394d3"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {
+                "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
+                "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
+                "aidd-test/agents/code-reviewer.md": "3085f2108f7b9448d523f1555a802bb2",
+                "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
+                "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
+              },
+              "scope": "user",
+              "marketplace": "aidd-framework"
+            }
+          ]
         }
       }
     }
   },
   {
-    "command": "status",
+    "command": "doctor",
     "exitCode": 0,
-    "stdout": "All files are in sync\n",
-    "stderr": "",
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n  cursor (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>): in sync\n  cursor (v<VERSION>):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
+    "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -51,22 +323,67 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
-          "mergeFiles": []
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        },
+        "cursor": {
+          "toolId": "cursor",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".cursor/settings.json",
+              "hash": "07616ffa7dc41a282ca2179f6a2394d3"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {
+                "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
+                "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
+                "aidd-test/agents/code-reviewer.md": "3085f2108f7b9448d523f1555a802bb2",
+                "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
+                "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
+              },
+              "scope": "user",
+              "marketplace": "aidd-framework"
+            }
+          ]
         }
       }
     }
   },
   {
-    "command": "restore --force",
-    "exitCode": 0,
-    "stdout": "Checking claude for files to restore...\nNothing to restore — all files are unmodified.\n",
-    "stderr": "",
+    "command": "doctor",
+    "exitCode": 1,
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n  cursor (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>):\n    ~ .claude/settings.json\n  1 modified, 0 deleted, 0 added\n  cursor (v<VERSION>):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n",
+    "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\nWarning:   Modified tracked file: .claude/settings.json\n    Fix: Run `aidd sync --force` to revert to the framework version.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -74,7 +391,222 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "8a80554c91d9fca8acb82f023de02f11"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        },
+        "cursor": {
+          "toolId": "cursor",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".cursor/settings.json",
+              "hash": "07616ffa7dc41a282ca2179f6a2394d3"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": true,
+              "files": {
+                "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
+                "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
+                "aidd-test/agents/code-reviewer.md": "3085f2108f7b9448d523f1555a802bb2",
+                "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
+                "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
+              },
+              "scope": "user",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "command": "sync --force",
+    "exitCode": 0,
+    "stdout": "Checking claude for files to restore...\nChecking cursor for files to restore...\nRestored 1 file(s), kept 0 file(s)\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\nWarning: This project's own pre-migration framework cache kept: a requested tool's CLI was not on PATH this run, so its own registration may still point at it — run `aidd sync` again once every tool's CLI is on PATH.\nWarning: claude: the plugin will not load until the claude CLI has run.\n",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": false,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        },
+        "cursor": {
+          "toolId": "cursor",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".cursor/settings.json",
+              "hash": "07616ffa7dc41a282ca2179f6a2394d3"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": false,
+              "files": {
+                "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
+                "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
+                "aidd-test/agents/code-reviewer.md": "3085f2108f7b9448d523f1555a802bb2",
+                "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
+                "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
+              },
+              "scope": "user",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "command": "doctor",
+    "exitCode": 0,
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n  cursor (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>): in sync\n  cursor (v<VERSION>):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
+    "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": false,
+              "files": {},
+              "scope": "project",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        },
+        "cursor": {
+          "toolId": "cursor",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".cursor/settings.json",
+              "hash": "07616ffa7dc41a282ca2179f6a2394d3"
+            }
+          ],
+          "mergeFiles": [],
+          "plugins": [
+            {
+              "name": "aidd-test",
+              "source": {
+                "kind": "local",
+                "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
+              },
+              "version": "<VERSION>",
+              "strict": false,
+              "files": {
+                "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
+                "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
+                "aidd-test/agents/code-reviewer.md": "3085f2108f7b9448d523f1555a802bb2",
+                "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
+                "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
+              },
+              "scope": "user",
+              "marketplace": "aidd-framework"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "command": "plugin remove aidd-test",
+    "exitCode": 0,
+    "stdout": "Plugin 'aidd-test' removed.\n",
+    "stderr": "Warning: claude CLI not found on PATH — 'aidd-test@aidd-framework' was not uninstalled from claude's own plugin registry and may still be enabled there.\nWarning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
+            }
+          ],
+          "mergeFiles": []
+        },
+        "cursor": {
+          "toolId": "cursor",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".cursor/settings.json",
+              "hash": "07616ffa7dc41a282ca2179f6a2394d3"
             }
           ],
           "mergeFiles": []
@@ -85,16 +617,136 @@
   {
     "command": "clean --force",
     "exitCode": 0,
-    "stdout": "Removing claude files...\nCleaned all AIDD files (1 files removed)\n",
+    "stdout": "Removing claude files...\nRemoving cursor files...\nCleaned all AIDD files (2 files removed)\n",
     "stderr": "",
+    "filesWritten": [],
+    "manifest": null,
+    "userConfigFiles": [
+      "cache/built/<VERSION>/aidd-framework/claude/.build-version",
+      "cache/built/<VERSION>/aidd-framework/claude/.claude-plugin/marketplace.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.claude-plugin/plugin.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.mcp.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/agents/code-reviewer.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/check.sh",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/hooks.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/commit/SKILL.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/hello.md",
+      "cache/built/<VERSION>/aidd-framework/cursor/.build-version",
+      "cache/built/<VERSION>/aidd-framework/cursor/.cursor-plugin/marketplace.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/.cursor-plugin/plugin.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/.mcp.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/agents/code-reviewer.md",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/hooks/check.sh",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/hooks/hooks.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/skills/commit/SKILL.md",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/skills/hello.md",
+      "manifest.json",
+      "marketplaces.json",
+      "references.json"
+    ],
+    "userManifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "doctor",
+    "exitCode": 1,
+    "stdout": "\nDrift:\nAI tools:\n  (none installed)\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n",
+    "stderr": "Warning: [ai] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [ide] No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
     "filesWritten": [],
     "manifest": null
   },
   {
-    "command": "status",
-    "exitCode": 0,
-    "stdout": "\nAI tools:\n  (none installed)\n\nIDE tools:\n  (none installed)\n\nPlugins:\n  (all in sync)\n\nLegend: ~ modified  - deleted  + added\n",
+    "command": "[errors] doctor",
+    "exitCode": 1,
+    "stdout": "\nDrift:\nAI tools:\n  (none installed)\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n",
     "stderr": "Warning: [ai] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [ide] No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[errors] plugin list",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": "Error: No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[errors] plugin install does-not-exist",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": "Error: Plugin 'does-not-exist' was not found in any registered marketplace.\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[errors] framework install --tool not-a-tool",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": "Error: Unknown tool: not-a-tool. Valid tools: claude, cursor, copilot, opencode, codex, vscode\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[errors] definitely-not-a-command",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": "error: unknown command 'definitely-not-a-command'\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[errors] marketplace add malformed <FRAMEWORK_FIXTURE>/marketplace-malformed",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": "Error: Invalid plugin manifest: catalog at \"<FRAMEWORK_FIXTURE>/marketplace-malformed/.claude-plugin/marketplace.json\" is malformed (not valid JSON). Fix or re-create the marketplace catalog file.\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[user-scope-clean] setup --source local --path <FRAMEWORK_FIXTURE> --ai claude --plugins none --yes --scope user",
+    "exitCode": 0,
+    "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [],
+    "manifest": null,
+    "userConfigFiles": ["manifest.json", "marketplaces.json"],
+    "userManifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "[user-scope-clean] clean --scope user --force",
+    "exitCode": 0,
+    "stdout": "Cleaned the shared aidd-framework source for this machine\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": null,
+    "userConfigFiles": ["marketplaces.json"],
+    "userManifest": null
+  },
+  {
+    "command": "[user-scope-clean] doctor --scope user",
+    "exitCode": 0,
+    "stdout": "Nothing registered at user scope yet — run `aidd setup --scope user` first.\n",
+    "stderr": "",
     "filesWritten": [],
     "manifest": null
   }

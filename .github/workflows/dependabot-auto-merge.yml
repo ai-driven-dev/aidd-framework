@@ -1,10 +1,11 @@
 name: Dependabot auto-merge
 
-# Enables auto-merge on Dependabot PRs for non-major updates (patch + minor).
-# Major bumps are left for a human to review. The PR still merges only once its
-# required status checks pass (and any required review is satisfied).
+# Auto-merge for patch and minor Dependabot PRs; a major bump waits for a human. The PR
+# still merges only once its required checks pass.
 
-on: pull_request_target
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -26,9 +27,9 @@ jobs:
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
 
       - name: Approve non-major updates
-        # Required-review rulesets (e.g. on `next`) block auto-merge until a
-        # review approves. Dependabot never gets one, so the app approves here.
-        # The app identity differs from the PR author, so the approval counts.
+        # A required-review ruleset blocks auto-merge until a review approves, and
+        # Dependabot never gets one. The app identity differs from the pull request author,
+        # so its approval counts.
         if: steps.meta.outputs.update-type != 'version-update:semver-major'
         run: gh pr review --approve "${{ github.event.pull_request.html_url }}"
         env:

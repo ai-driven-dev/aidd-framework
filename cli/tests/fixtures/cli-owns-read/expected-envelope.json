@@ -1,0 +1,530 @@
+{
+  "cost_report_version": 15,
+  "period": {
+    "from_day": "2026-01-01",
+    "to_day": "2026-01-31"
+  },
+  "measurement_enabled": false,
+  "sessions": 4,
+  "totals": {
+    "requests": 4,
+    "input_tokens": 935,
+    "output_tokens": 590,
+    "cache_read_tokens": 14100,
+    "cache_creation_tokens": 1000
+  },
+  "by_step": [
+    {
+      "step": "demo:02-beta",
+      "attribution": "tool-stated",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 20,
+        "output_tokens": 300,
+        "cache_read_tokens": 7000,
+        "cache_creation_tokens": 0
+      }
+    },
+    {
+      "step": "demo:01-alpha",
+      "attribution": "tool-stated",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 10,
+        "output_tokens": 200,
+        "cache_read_tokens": 5000,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "step": "demo:01-alpha",
+      "attribution": "journal-interval",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
+      }
+    },
+    {
+      "attribution": "unattributed",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 5,
+        "output_tokens": 50,
+        "cache_read_tokens": 100,
+        "cache_creation_tokens": 0
+      }
+    }
+  ],
+  "by_flow": [
+    {
+      "attribution": "unattributed",
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ],
+  "by_agent": [
+    {
+      "attribution": "main-thread",
+      "totals": {
+        "requests": 3,
+        "input_tokens": 35,
+        "output_tokens": 550,
+        "cache_read_tokens": 12100,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "attribution": "not-stated",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
+      }
+    }
+  ],
+  "by_prompt": [
+    {
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ],
+  "by_model": [
+    {
+      "model": "claude-opus-5",
+      "totals": {
+        "requests": 3,
+        "input_tokens": 35,
+        "output_tokens": 550,
+        "cache_read_tokens": 12100,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "model": "gpt-5.4",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
+      }
+    }
+  ],
+  "by_tool": [
+    {
+      "tool": "claude",
+      "coverage": "covered",
+      "capability": {
+        "local_read": {
+          "token_counters": true,
+          "amount": false,
+          "tool_stated_step": true,
+          "agent_name": true
+        },
+        "export": null,
+        "journal_attributable": true,
+        "task_attributable": true
+      },
+      "totals": {
+        "requests": 3,
+        "input_tokens": 35,
+        "output_tokens": 550,
+        "cache_read_tokens": 12100,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "tool": "cursor",
+      "coverage": "not-covered",
+      "reason": "It writes no token count in any file it produces.",
+      "capability": {
+        "local_read": null,
+        "export": null,
+        "journal_attributable": true,
+        "task_attributable": true
+      },
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "tool": "copilot",
+      "coverage": "covered",
+      "reason": "Its own file names outputTokens per turn, but session.shutdown carries all four counters for the whole session \u2014 a session total, never a sum of requests. Its four counters are measured disjoint, cached prompt included.",
+      "capability": {
+        "local_read": {
+          "token_counters": true,
+          "amount": false,
+          "tool_stated_step": false,
+          "agent_name": false
+        },
+        "export": null,
+        "journal_attributable": true,
+        "task_attributable": true
+      },
+      "totals": {
+        "requests": 0
+      },
+      "session_totals": {
+        "requests": 0,
+        "input_tokens": 16,
+        "output_tokens": 197,
+        "cache_read_tokens": 1900,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "tool": "opencode",
+      "coverage": "covered",
+      "reason": "Its four counters are measured disjoint for the anthropic provider and for one OpenAI-compatible provider whose cache was exercised \u2014 not confirmed for a provider that reports prompt tokens inclusive of the cached ones, which none captured here does.",
+      "capability": {
+        "local_read": {
+          "token_counters": true,
+          "amount": false,
+          "tool_stated_step": false,
+          "agent_name": false
+        },
+        "export": null,
+        "journal_attributable": true,
+        "task_attributable": true
+      },
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "tool": "codex",
+      "coverage": "covered",
+      "capability": {
+        "local_read": {
+          "token_counters": true,
+          "amount": false,
+          "tool_stated_step": false,
+          "agent_name": false
+        },
+        "export": null,
+        "journal_attributable": true,
+        "task_attributable": true
+      },
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
+      }
+    }
+  ],
+  "by_project": [
+    {
+      "totals": {
+        "requests": 3,
+        "input_tokens": 35,
+        "output_tokens": 550,
+        "cache_read_tokens": 12100,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "project": "demo-project",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
+      }
+    }
+  ],
+  "by_task": [
+    {
+      "reason": "no-journal",
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ],
+  "by_day": [
+    {
+      "day": "2026-01-01",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-02",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-03",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-04",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-05",
+      "totals": {
+        "requests": 2,
+        "input_tokens": 30,
+        "output_tokens": 500,
+        "cache_read_tokens": 12000,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "day": "2026-01-06",
+      "totals": {
+        "requests": 2,
+        "input_tokens": 905,
+        "output_tokens": 90,
+        "cache_read_tokens": 2100,
+        "cache_creation_tokens": 0
+      }
+    },
+    {
+      "day": "2026-01-07",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-08",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-09",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-10",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-11",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-12",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-13",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-14",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-15",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-16",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-17",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-18",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-19",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-20",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-21",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-22",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-23",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-24",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-25",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-26",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-27",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-28",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-29",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-30",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "day": "2026-01-31",
+      "totals": {
+        "requests": 0
+      }
+    }
+  ],
+  "by_person": [
+    {
+      "resolution": "none",
+      "identities": [],
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ],
+  "attribution": [
+    {
+      "attribution": "tool-stated",
+      "totals": {
+        "requests": 2,
+        "input_tokens": 30,
+        "output_tokens": 500,
+        "cache_read_tokens": 12000,
+        "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "attribution": "prompt-matched",
+      "totals": {
+        "requests": 0
+      }
+    },
+    {
+      "attribution": "journal-interval",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
+      }
+    },
+    {
+      "attribution": "unattributed",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 5,
+        "output_tokens": 50,
+        "cache_read_tokens": 100,
+        "cache_creation_tokens": 0
+      }
+    }
+  ],
+  "read": {
+    "undated_records": 0,
+    "unreadable_lines": 0,
+    "identity_unusable": "absent"
+  },
+  "by_backlog": [
+    {
+      "reason": "no-journal",
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ]
+}

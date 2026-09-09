@@ -1,27 +1,31 @@
 ---
+description: Apply when a command or use case needs a collaborator; every dependency is built once, in the composition root.
 paths:
-  - "src/application/commands/**/*.ts"
+  - "src/presentation/commands/**/*.ts"
   - "src/cli.ts"
-  - "src/infrastructure/deps.ts"
+  - "src/runtime/wiring/**/*.ts"
 ---
 
 # Dependency Wiring
 
 ## Factories
 
-- `createDeps` — full dep graph, command actions only
-- `createMenuDeps` — `ManifestRepository` + `Prompter`, pre-parse only
-- Never instantiate adapters directly in `cli.ts`
+- `createDeps(projectRoot, options, output)` builds the full graph.
+- Call it from a command action, never before `program.parse()`.
+- `createMenuDeps(projectRoot)` serves the menu: a `ManifestRepository`, a `Prompter`.
+- Extend that factory for a pre-parse need.
+- Never instantiate an adapter in `cli.ts`.
+- One wiring module per context under `runtime/wiring/`.
+- `runtime/wiring/framework.ts` composes them.
+- `cli.ts` builds two things: the version reader, the `CLIOutput`.
 
-## Memoization
+## Once
 
-- `createDeps` is memoized by `projectRoot`
-- `preAction` hook always first caller per project root
-- Commands reuse cached instance, no extra I/O
-- No second cache layer in command files
+- `createDeps` memoizes on `projectRoot`.
+- The `preAction` hook warms it for `process.cwd()`.
+- `AIDD_SKIP_UPDATE_CHECK` short-circuits that hook.
+- No second cache in a command file.
 
-## cli.ts body rules
+## Not an area
 
-- `createMenuDeps` only before `program.parse()`
-- Never call `createDeps` before `program.parse()`
-- Extend `createMenuDeps` if pre-parse needs grow
+- The composition root never counts as a caller (`0-shared-modules.md`).

@@ -9,6 +9,7 @@ The exhaustive list of AIDD plugins, skills, and actions. Skills are invoked thr
 - [aidd-vcs](#-aidd-vcs) - version control workflows
 - [aidd-orchestrator](#-aidd-orchestrator) - async orchestration (optional)
 - [aidd-ui](#-aidd-ui) - UI / UX (🚧 alpha, not ready)
+- [aidd-telemetry](#-aidd-telemetry) - measurement, hooks and skills (🧪 beta, off the curated path)
 
 ---
 
@@ -107,3 +108,16 @@ Runs synchronous feature delivery, optional async issue automation, and the prod
 | Skill      | Role                                      | Actions    |
 | ---------- | ----------------------------------------- | ---------- |
 | `01-hello` | Smoke-test that confirms the plugin loads | `01-greet` |
+
+## 📈 aidd-telemetry
+
+🧪 **Beta — usable, and being proven.** Measurement: bundled hooks journal every session so a unit of work can be tied to what it cost, and three skills turn that on, read it back, and check it is actually recording. Off the curated install path while it is tested in the open; every tool's coverage and every known gap is named in the plugin's own README.
+
+Recording needs nothing installed; turning it on and reading it back both need the `aidd`
+CLI, and each skill says so before doing anything else if it is missing.
+
+| Skill      | Role                                                          | Actions                          |
+| ---------- | -------------------------------------------------------------- | --------------------------------- |
+| `00-init`  | Turn measurement on for a project and prove it is recording    | `01-check`, `02-enable`, `03-verify` |
+| `01-cost`  | Answer what a period or one task cost, by step, model and tool | `01-locate`, `02-collect`, `03-report` |
+| `02-check` | Answer whether measurement is actually recording, line by line | `01-locate`, `02-diagnose`        |

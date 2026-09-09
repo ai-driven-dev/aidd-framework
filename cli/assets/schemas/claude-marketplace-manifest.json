@@ -50,8 +50,13 @@
           "strict": {
             "type": "boolean"
           },
-          "recommended": {
-            "type": "boolean"
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "recommended": {
+                "type": "boolean"
+              }
+            }
           }
         }
       }

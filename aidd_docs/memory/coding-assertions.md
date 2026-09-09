@@ -1,21 +1,50 @@
-# Coding Guidelines
+# Coding Assertions
 
-> Those rules must be minimal because they MUST be checked after EVERY CODE GENERATION.
+The checks that must pass for code to count as done. Minimal, run after every change.
 
-## Requirements to complete a feature
+## Before the code
 
-**A feature is really completed if ALL of the above are satisfied: if not, iterate to fix all until all are green.**
+**Write the test first, and watch it fail for the reason it names.** A test written after the
+code it covers confirms what was built; only one that failed first can tell you it is
+checking anything at all.
 
-## Commands to run
+Two consequences, both learned by paying for them:
 
-### Before commit
+- **A guard ships with the mutation that proves it.** Break the thing the test is named for
+  and watch that test — not another — go red. A guard nothing fails for is not a guard, and
+  it is indistinguishable from a comment.
+- **After any scripted edit, read the file back before running anything.** A replacement
+  whose anchor drifted applies to nothing and reports nothing, which is how a field can be
+  declared in a type, believed by a display and produced by no code. An inconsistent state is
+  worse than a missing feature: nobody designed it, so nobody can reason about it.
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec commitlint --edit` | Validate commit message against conventional commit spec |
+Never state in a commit message or a report anything not just observed in output.
 
-### Before push
+> CLI-specific completion criteria: [`cli/aidd_docs/memory/coding-assertions.md`](../../cli/aidd_docs/memory/coding-assertions.md).
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec lefthook run pre-push` | Run parent repo hooks (delegates to parent lefthook.yml) |
+## Before commit
+
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, `scripts/` tests, skill frontmatter and argument hints, context imports and reference form, markdown links, the paths the prose names and a sentence written in two documents (`scripts/check-doc-duplication.js`); `cli` lint, architecture, typecheck and type honesty when `cli/` changed. `cli` knip and the full `cli` suite are pre-push, not pre-commit — see below |
+| 2 | `pnpm exec commitlint --edit` | the message against `commitlint.config.cjs` |
+
+Same hook regenerates each plugin's `CATALOG.md`, the README counts and `docs/prompts-documentation.md`, and stages them.
+
+Every `cli` job is globbed on `cli/**`. A change under `kanban/` alone fires no local job; run `cd kanban && pnpm test` by hand. CI does cover it — `cli-ci.yml`'s `kanban-checks`, see `deployment.md`.
+
+- `context-reference-form` reads only the three files `update_memory.js`'s `TARGET_FILES` names: root `CLAUDE.md`, root `AGENTS.md`, the `copilot-instructions.md` under `.github/` (absent here). It never walks the tree, so `cli/CLAUDE.md`'s memory block is outside it.
+- `context-imports` walks the whole tree (`scripts/check-context-imports.js`'s `collectContextFiles`).
+- `context-reference-form` also globs `plugins/aidd-context/hooks/update_memory.js`, whose table is its source of truth.
+
+## Before push
+
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-push` | `cli knip`, then the full `cli` suite, when `cli/` changed |
+
+`--no-verify` buys nothing: `validate.yml` re-runs the whole pre-commit over the whole tree on every push and pull request.
+
+## Behavior
+
+Done means every gate green. On failure, one agent per failing assertion — typecheck, tests, rules — not one agent for all.
