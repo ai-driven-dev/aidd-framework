@@ -1,12 +1,19 @@
 {
-  "$comment": "The one declaration of what mutation testing covers and the floor each scope must hold. scripts/run-mutation.mjs runs a scope by name and fails below its break; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps, that every scope declares a floor, and that package.json has a script per scope. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated. A floor is raised to the measured score after a run, never lowered without the reason here. A scope's mutate is one glob or a list where a leading ! excludes; tools is split at its profiles, whose static declarations rerun every loading test per mutant and made the one scope run longer than every other combined.",
+  "$comment": "The one declaration of what mutation testing covers and the floor each scope must hold. scripts/run-mutation.mjs runs a scope by name and fails below its break; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps, that every scope declares a floor, and that package.json has a script per scope. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated. A floor is raised to the measured score after a run, never lowered without the reason here. A scope's mutate is one glob or a list where a leading ! excludes; tools is split one scope per tool profile: a profile is a static declaration whose every mutant reruns each test that loads it, and the five together outlasted every other scope on a two-core runner; vscode's single file stays with the rest.",
   "scopes": {
     "kernel": {
       "mutate": "src/kernel/**/*.ts",
       "break": 71
     },
     "tools": {
-      "mutate": ["src/contexts/tools/**/*.ts", "!src/contexts/tools/domain/profiles/**/*.ts"],
+      "mutate": [
+        "src/contexts/tools/**/*.ts",
+        "!src/contexts/tools/domain/profiles/claude/**/*.ts",
+        "!src/contexts/tools/domain/profiles/codex/**/*.ts",
+        "!src/contexts/tools/domain/profiles/copilot/**/*.ts",
+        "!src/contexts/tools/domain/profiles/cursor/**/*.ts",
+        "!src/contexts/tools/domain/profiles/opencode/**/*.ts"
+      ],
       "break": 76
     },
     "telemetry": {
@@ -33,9 +40,25 @@
       "mutate": "src/runtime/**/*.ts",
       "break": 67
     },
-    "tools-profiles": {
-      "mutate": "src/contexts/tools/domain/profiles/**/*.ts",
-      "break": 57
+    "tools-claude": {
+      "mutate": "src/contexts/tools/domain/profiles/claude/**/*.ts",
+      "break": 56
+    },
+    "tools-codex": {
+      "mutate": "src/contexts/tools/domain/profiles/codex/**/*.ts",
+      "break": 53
+    },
+    "tools-copilot": {
+      "mutate": "src/contexts/tools/domain/profiles/copilot/**/*.ts",
+      "break": 63
+    },
+    "tools-cursor": {
+      "mutate": "src/contexts/tools/domain/profiles/cursor/**/*.ts",
+      "break": 44
+    },
+    "tools-opencode": {
+      "mutate": "src/contexts/tools/domain/profiles/opencode/**/*.ts",
+      "break": 65
     }
   },
   "excluded": {
