@@ -4,7 +4,11 @@ import {
   mergeCodexConfigToml,
   stripCodexSkillFrontmatter,
 } from "../../../../../src/contexts/tools/domain/profiles/codex/build.js";
-import { codex } from "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import {
+  codex,
+  mergeCodexHooksJson,
+  rewriteCodexContent,
+} from "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { getToolConfig } from "../../../../../src/contexts/tools/domain/registry.js";
 import { serializeFrontmatter } from "../../../../../src/kernel/markdown.js";
 
@@ -45,6 +49,15 @@ describe("codex", () => {
       const path = codex.capabilities.skills.buildInstallPath("my-skill.md");
       expect(path).toBe(".agents/skills/aidd-my-skill/SKILL.md");
     });
+
+    it("keeps a skill name that carries no extension at all", () => {
+      const path = codex.capabilities.skills.buildInstallPath("my-skill");
+      expect(path).toBe(".agents/skills/aidd-my-skill/SKILL.md");
+    });
+  });
+
+  it("names the one config file Codex reads, and where it goes", () => {
+    expect(codex.configOutputPaths).toStrictEqual({ "config.toml": ".codex/config.toml" });
   });
 
   describe("capabilities.agents.buildInstallPath()", () => {
@@ -69,6 +82,10 @@ describe("codex", () => {
 
     it("uses mcp_servers as entry section", () => {
       expect(codex.capabilities.mcp.params.entrySection).toBe("mcp_servers");
+    });
+
+    it("writes its config in TOML", () => {
+      expect(codex.capabilities.mcp.params.format).toBe("toml");
     });
   });
 
@@ -184,6 +201,77 @@ describe("codex", () => {
     it("keeps the marketplace translation mode", () => {
       expect(codex.capabilities.plugins.translationMode).toBe("marketplace");
     });
+
+    it("warns that Codex runs no hook it has not been told to trust, and how to tell it", () => {
+      expect(codex.capabilities.plugins.hooksTrustNotice).toBe(
+        "Codex will not run this plugin's hooks until each one is trusted — approve the prompt " +
+          "once in an interactive session, or pass --dangerously-bypass-hook-trust to codex exec " +
+          "for a headless run. Until then, a session leaves no run journal and nothing says why."
+      );
+    });
+  });
+});
+
+describe("rewriteCodexContent()", () => {
+  it("sends a skill reference to the agents directory Codex scans, under its aidd- prefix", () => {
+    expect(rewriteCodexContent("Read .codex/skills/01-plan/SKILL.md\n")).toBe(
+      "Read .agents/skills/aidd-01-plan/SKILL.md\n"
+    );
+  });
+
+  it("routes a numbered command folder under commands/aidd/<phase>/, with or without the @ prefix", () => {
+    expect(
+      rewriteCodexContent(
+        "Run .codex/commands/04_code/implement.md, then @.codex/commands/02-plan/plan.md.\n"
+      )
+    ).toBe("Run .codex/commands/aidd/04/implement.md, then @.codex/commands/aidd/02/plan.md.\n");
+  });
+});
+
+describe("mergeCodexHooksJson()", () => {
+  const AIDD_ENTRY = {
+    matcher: "startup|resume",
+    hooks: [
+      {
+        type: "command",
+        command: "node .aidd/scripts/update_memory.cjs",
+        statusMessage: "Syncing AIDD memory...",
+        timeout: 30,
+      },
+    ],
+  };
+
+  it("subscribes the memory refresh to a fresh session, on startup and on resume", () => {
+    expect(mergeCodexHooksJson("")).toBe(JSON.stringify({ SessionStart: [AIDD_ENTRY] }, null, 2));
+  });
+
+  it("keeps a user's own hooks and appends the memory refresh after them", () => {
+    const existing = JSON.stringify({
+      PreToolUse: [{ hooks: [{ type: "command", command: "user.sh" }] }],
+      SessionStart: [{ hooks: [{ type: "command", command: "user-start.sh" }] }],
+    });
+
+    expect(mergeCodexHooksJson(existing)).toBe(
+      JSON.stringify(
+        {
+          PreToolUse: [{ hooks: [{ type: "command", command: "user.sh" }] }],
+          SessionStart: [{ hooks: [{ type: "command", command: "user-start.sh" }] }, AIDD_ENTRY],
+        },
+        null,
+        2
+      )
+    );
+  });
+
+  it("adds nothing on a second run over its own output", () => {
+    const once = mergeCodexHooksJson("");
+    expect(mergeCodexHooksJson(once)).toBe(once);
+  });
+
+  it("starts over from a file it cannot read rather than failing the install", () => {
+    expect(mergeCodexHooksJson("{ not json")).toBe(
+      JSON.stringify({ SessionStart: [AIDD_ENTRY] }, null, 2)
+    );
   });
 });
 

@@ -51,6 +51,40 @@ describe("claude", () => {
       const result = claude.capabilities.rules?.convertFrontmatter(fm);
       expect(result).toEqual({ description: "Apply when editing command files." });
     });
+
+    it("returns empty frontmatter for a rule whose paths list is empty", () => {
+      const result = claude.capabilities.rules?.convertFrontmatter({ paths: [] });
+      expect(result).toStrictEqual({});
+    });
+
+    it("returns empty frontmatter for a rule that opts out of always-apply and names no description", () => {
+      const result = claude.capabilities.rules?.convertFrontmatter({ alwaysApply: false });
+      expect(result).toStrictEqual({});
+    });
+  });
+
+  describe("capabilities.skills.buildInstallPath()", () => {
+    it("builds path under .claude/skills/ without the tool suffix", () => {
+      expect(claude.capabilities.skills.buildInstallPath("commit.claude.md")).toBe(
+        ".claude/skills/commit.md"
+      );
+    });
+  });
+
+  it("names the one config file Claude reads, and where it goes", () => {
+    expect(claude.configOutputPaths).toStrictEqual({ "settings.json": ".claude/settings.json" });
+  });
+
+  describe("rewriteContent()", () => {
+    it("routes a numbered command folder under commands/aidd/<phase>/, with or without the @ prefix", () => {
+      expect(
+        claude.rewriteContent?.(
+          "Run .claude/commands/04_code/implement.md, then @.claude/commands/02_context/plan.md.\n"
+        )
+      ).toBe(
+        "Run .claude/commands/aidd/04/implement.md, then @.claude/commands/aidd/02/plan.md.\n"
+      );
+    });
   });
 
   describe("capabilities.agents.convertFrontmatter()", () => {
@@ -145,6 +179,42 @@ describe("claude", () => {
       expect(activation?.userSettingsPath?.("/home/tester", () => undefined)).toBe(
         join("/home/tester", ".claude", "settings.json")
       );
+    });
+
+    it("drives the claude binary at local scope, with the verbs claude uses and nothing else", () => {
+      // Exhaustive, not `toMatchObject`: a field added by mistake must fail here.
+      expect(claude.capabilities.plugins.nativeActivation).toStrictEqual({
+        binary: "claude",
+        scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },
+        enableVerb: "install",
+        disableVerb: "uninstall",
+        upgradeVerb: "update",
+        pluginArgs: ["--yes"],
+        marketplaceRegistry: expect.any(Function),
+        pluginCacheDir: expect.any(Function),
+        userSettingsPath: expect.any(Function),
+      });
+    });
+
+    it("registers a marketplace in the file claude writes itself, and enables plugins in the tracked one", () => {
+      const settings = claude.capabilities.plugins.marketplaceSettings;
+
+      expect({
+        settingsPath: settings?.settingsPath,
+        settingsKey: settings?.settingsKey,
+        marketplacesSettingsPath: settings?.marketplacesSettingsPath,
+        enabledPluginsKey: settings?.enabledPluginsKey,
+        entryKey: settings?.toEntryKey?.({
+          name: "aidd-framework",
+          source: { kind: "local", path: "/abs/cache" },
+        }),
+      }).toStrictEqual({
+        settingsPath: ".claude/settings.json",
+        settingsKey: "extraKnownMarketplaces",
+        marketplacesSettingsPath: ".claude/settings.local.json",
+        enabledPluginsKey: "enabledPlugins",
+        entryKey: "aidd-framework",
+      });
     });
   });
 });

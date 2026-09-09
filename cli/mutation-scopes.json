@@ -42,23 +42,23 @@
     },
     "tools-claude": {
       "mutate": "src/contexts/tools/domain/profiles/claude/**/*.ts",
-      "break": 56
+      "break": 92
     },
     "tools-codex": {
       "mutate": "src/contexts/tools/domain/profiles/codex/**/*.ts",
-      "break": 53
+      "break": 87
     },
     "tools-copilot": {
       "mutate": "src/contexts/tools/domain/profiles/copilot/**/*.ts",
-      "break": 63
+      "break": 80
     },
     "tools-cursor": {
       "mutate": "src/contexts/tools/domain/profiles/cursor/**/*.ts",
-      "break": 44
+      "break": 94
     },
     "tools-opencode": {
       "mutate": "src/contexts/tools/domain/profiles/opencode/**/*.ts",
-      "break": 65
+      "break": 81
     }
   },
   "excluded": {

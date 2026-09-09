@@ -4,11 +4,26 @@ import { cursor } from "../../../../../src/contexts/tools/domain/profiles/cursor
 
 describe("cursor", () => {
   describe("capabilities.rules.convertFrontmatter()", () => {
-    it("converts paths: to globs: as JSON inline string and adds alwaysApply: false", () => {
+    it("converts paths: to globs: as a JSON inline string and adds alwaysApply: false", () => {
       const result = cursor.capabilities.rules?.convertFrontmatter({
+        paths: ["src/**/*.ts", "tests/**/*.ts"],
+      });
+      expect(result).toStrictEqual({
+        globs: '["src/**/*.ts", "tests/**/*.ts"]',
+        alwaysApply: false,
+      });
+    });
+
+    it("keeps the description ahead of the globs it applies to", () => {
+      const result = cursor.capabilities.rules?.convertFrontmatter({
+        description: "Apply when editing sources.",
         paths: ["src/**/*.ts"],
       });
-      expect(result).toEqual({ globs: '["src/**/*.ts"]', alwaysApply: false });
+      expect(result).toStrictEqual({
+        description: "Apply when editing sources.",
+        globs: '["src/**/*.ts"]',
+        alwaysApply: false,
+      });
     });
 
     it("returns empty frontmatter for rules without paths (always apply)", () => {
@@ -16,7 +31,17 @@ describe("cursor", () => {
         description: "desc",
         alwaysApply: true,
       });
-      expect(result).toEqual({});
+      expect(result).toStrictEqual({});
+    });
+
+    it("returns empty frontmatter for a rule whose paths list is empty", () => {
+      const result = cursor.capabilities.rules?.convertFrontmatter({ paths: [] });
+      expect(result).toStrictEqual({});
+    });
+
+    it("returns empty frontmatter for a rule that opts out of always-apply and names no description", () => {
+      const result = cursor.capabilities.rules?.convertFrontmatter({ alwaysApply: false });
+      expect(result).toStrictEqual({});
     });
 
     it("keeps description and alwaysApply false when no globs are specified", () => {
@@ -63,6 +88,27 @@ describe("cursor", () => {
     it("builds path for rules section with .mdc extension", () => {
       const path = cursor.capabilities.rules?.buildInstallPath("01-standards/naming.md");
       expect(path).toBe(".cursor/rules/01-standards/naming.mdc");
+    });
+
+    it("leaves a rule already written in Cursor's own extension untouched", () => {
+      const path = cursor.capabilities.rules?.buildInstallPath("01-standards/naming.mdc");
+      expect(path).toBe(".cursor/rules/01-standards/naming.mdc");
+    });
+  });
+
+  describe("rewriteContent()", () => {
+    it("routes a numbered command folder under commands/aidd/<phase>/, with or without the @ prefix", () => {
+      const rewritten = cursor.rewriteContent?.(
+        "Run .cursor/commands/04_code/implement.md, then @.cursor/commands/02-plan/plan.md.\n"
+      );
+      expect(rewritten).toBe(
+        "Run .cursor/commands/aidd/04/implement.md, then @.cursor/commands/aidd/02/plan.md.\n"
+      );
+    });
+
+    it("gives a referenced rule Cursor's .mdc extension", () => {
+      const rewritten = cursor.rewriteContent?.("Read @.cursor/rules/01-standards/naming.md\n");
+      expect(rewritten).toBe("Read @.cursor/rules/01-standards/naming.mdc\n");
     });
   });
 
