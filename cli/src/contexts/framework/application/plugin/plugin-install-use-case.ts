@@ -11,7 +11,6 @@ import type { PluginPick } from "../../../../presentation/prompts/plugin-pick-us
 import type { MarketplaceTrustStore } from "../../../distribution/domain/ports/marketplace-trust-store.js";
 import { assertToolSupportsScope, type InstallScope } from "../../domain/install-scope.js";
 import { parsePluginSpec } from "../../domain/plugins/installed-plugin.js";
-import type { Environment } from "../../domain/ports/environment.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginAdd } from "./plugin-add-use-case.js";
 import type { PluginInstallFromMarketplace } from "./plugin-install-from-marketplace-use-case.js";
@@ -22,7 +21,6 @@ export interface PluginInstallOptions {
   projectRoot: string;
   interactive: boolean;
   fromMarketplace?: string;
-  token?: string;
   yes?: boolean;
   scope?: InstallScope;
 }
@@ -39,8 +37,7 @@ export class PluginInstallUseCase {
     private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace,
     private readonly manifestRepo: ManifestRepository,
     private readonly trustStore: MarketplaceTrustStore,
-    private readonly prompter: Prompter,
-    private readonly environment: Environment
+    private readonly prompter: Prompter
   ) {}
 
   async execute(options: PluginInstallOptions): Promise<PluginInstallResult> {
@@ -109,7 +106,6 @@ export class PluginInstallUseCase {
 
   private async executeMarketplace(options: PluginInstallOptions): Promise<PluginInstallResult> {
     const { name, version } = parsePluginSpec(options.pluginArg as string);
-    if (options.token) this.environment.set("AIDD_TOKEN", options.token);
     const result = await this.pluginInstallFromMarketplaceUseCase.execute({
       pluginName: name,
       version,

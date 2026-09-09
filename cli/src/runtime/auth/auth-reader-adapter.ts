@@ -19,7 +19,9 @@ export class AuthReaderAdapter implements TokenProvider {
     private readonly storage: AuthStorage,
     private readonly projectRoot: string,
     private readonly logger?: Logger,
-    private readonly externalProvider: TokenResolver = noopExternalProvider
+    private readonly externalProvider: TokenResolver = noopExternalProvider,
+    /** A token the command line carried: composed in, never published to the environment. */
+    private readonly explicitToken?: string
   ) {}
 
   resolve(): Promise<string | null> {
@@ -28,6 +30,10 @@ export class AuthReaderAdapter implements TokenProvider {
   }
 
   private async resolveUncached(): Promise<string | null> {
+    if (this.explicitToken) {
+      this.logger?.debug("Token given on the command line");
+      return this.explicitToken;
+    }
     const envToken = process.env.AIDD_TOKEN;
     if (envToken) {
       this.logger?.debug("Token resolved from AIDD_TOKEN env");

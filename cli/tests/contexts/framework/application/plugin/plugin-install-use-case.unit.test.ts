@@ -13,7 +13,6 @@ import {
 } from "../../../../../src/kernel/errors.js";
 import type { Prompter } from "../../../../../src/kernel/ports/prompter.js";
 import type { PluginPick } from "../../../../../src/presentation/prompts/plugin-pick-use-case.js";
-import { InMemoryEnvironment } from "../../../../helpers/ports/in-memory-environment.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
@@ -43,7 +42,6 @@ function makeUseCases(overrides?: {
   marketplaceExecute?: ReturnType<typeof vi.fn>;
   trustStore?: MarketplaceTrustStore;
   prompter?: Prompter;
-  environment?: InMemoryEnvironment;
 }) {
   const pickExecute = overrides?.pickExecute ?? vi.fn();
   const addExecute = overrides?.addExecute ?? vi.fn();
@@ -56,7 +54,6 @@ function makeUseCases(overrides?: {
   const manifestRepo = new InMemoryManifestRepository();
   const trustStore = overrides?.trustStore ?? makeAlwaysTrustStore();
   const prompter = overrides?.prompter ?? makeSilentPrompter();
-  const environment = overrides?.environment ?? new InMemoryEnvironment();
   return {
     pluginPickUseCase,
     pluginAddUseCase,
@@ -64,7 +61,6 @@ function makeUseCases(overrides?: {
     manifestRepo,
     trustStore,
     prompter,
-    environment,
     pickExecute,
     addExecute,
     marketplaceExecute,
@@ -79,7 +75,6 @@ function makeUseCase(overrides?: Parameters<typeof makeUseCases>[0]): PluginInst
     manifestRepo,
     trustStore,
     prompter,
-    environment,
   } = makeUseCases(overrides);
   return new PluginInstallUseCase(
     pluginPickUseCase,
@@ -87,8 +82,7 @@ function makeUseCase(overrides?: Parameters<typeof makeUseCases>[0]): PluginInst
     pluginInstallFromMarketplaceUseCase,
     manifestRepo,
     trustStore,
-    prompter,
-    environment
+    prompter
   );
 }
 
@@ -282,37 +276,6 @@ describe("PluginInstallUseCase", () => {
       });
 
       expect(trustStore.isTrusted).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("token publication", () => {
-    it("publishes --token through the environment, for a fetcher built before the flag arrived", async () => {
-      const environment = new InMemoryEnvironment();
-      const marketplaceExecute = vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
-
-      await makeUseCase({ marketplaceExecute, environment }).execute({
-        pluginArg: "my-plugin",
-        toolIds: "all",
-        projectRoot: PROJECT_ROOT,
-        interactive: false,
-        token: "ghp_from_flag",
-      });
-
-      expect(environment.get("AIDD_TOKEN")).toBe("ghp_from_flag");
-    });
-
-    it("publishes nothing when no token is passed", async () => {
-      const environment = new InMemoryEnvironment();
-      const marketplaceExecute = vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
-
-      await makeUseCase({ marketplaceExecute, environment }).execute({
-        pluginArg: "my-plugin",
-        toolIds: "all",
-        projectRoot: PROJECT_ROOT,
-        interactive: false,
-      });
-
-      expect(environment.get("AIDD_TOKEN")).toBeUndefined();
     });
   });
 });
