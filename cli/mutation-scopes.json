@@ -34,7 +34,7 @@
     },
     "presentation": {
       "mutate": "src/presentation/**/*.ts",
-      "break": 28
+      "break": 72
     },
     "runtime": {
       "mutate": "src/runtime/**/*.ts",
