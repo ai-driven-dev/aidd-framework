@@ -78,7 +78,8 @@ for (const dir of await skillDirs()) {
   const content = await readFile(skillPath, "utf8").catch(() => null);
   if (content === null) continue;
 
-  const relative = path.relative(ROOT, skillPath);
+  // Named the way the contract and every other guard name a path, whatever the host separator.
+  const relative = path.relative(ROOT, skillPath).split(path.sep).join("/");
   const hint = argumentHint(content);
   const actionFiles = await collectMarkdownFiles(path.join(dir, "actions"));
 

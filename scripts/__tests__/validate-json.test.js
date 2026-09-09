@@ -3,12 +3,15 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const { describe, it } = require("node:test");
 
 const script = path.resolve(__dirname, "../validate-json.mjs");
+// A bare absolute path is not an import specifier on Windows, where it reads as a `d:` scheme.
+const scriptUrl = pathToFileURL(script).href;
 
 async function validator(root, loadSchema) {
-  const { createValidator } = await import(script);
+  const { createValidator } = await import(scriptUrl);
   return createValidator({ root, loadSchema });
 }
 
@@ -39,7 +42,7 @@ const manifest = (skills) => ({
 
 describe("validate-json", () => {
   it("routes a plugin manifest, a marketplace and a settings file to their schema, and a plain file to none", async () => {
-    const { schemaFor } = await import(script);
+    const { schemaFor } = await import(scriptUrl);
     assert.equal(schemaFor("plugins/x/.claude-plugin/plugin.json").type, "pluginManifest");
     assert.equal(schemaFor(".claude-plugin/marketplace.json").type, "marketplace");
     assert.equal(schemaFor(".claude/settings.local.json").type, "claudeSettings");
