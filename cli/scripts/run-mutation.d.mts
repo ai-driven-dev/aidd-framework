@@ -1,5 +1,5 @@
 export interface MutationScope {
-  readonly mutate: string;
+  readonly mutate: string | readonly string[];
   readonly break: number;
 }
 

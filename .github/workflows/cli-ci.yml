@@ -11,6 +11,10 @@ on:
   push:
     branches: [main, next]
   pull_request:
+  schedule:
+    # Weekly, every mutant of every scope from scratch: the incremental files PRs restore
+    # only replay what a change touched, so drift through a dependency is caught here.
+    - cron: "0 3 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -459,7 +463,7 @@ jobs:
           path: cli/reports/mutation/${{ matrix.scope }}/incremental.json
           key: mutation-${{ matrix.scope }}-${{ github.run_id }}
           restore-keys: mutation-${{ matrix.scope }}-
-      - run: cd cli && node scripts/run-mutation.mjs "${{ matrix.scope }}"
+      - run: cd cli && node scripts/run-mutation.mjs "${{ matrix.scope }}" ${{ github.event_name == 'schedule' && '--force' || '' }}
       - name: Save this scope's incremental file
         if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

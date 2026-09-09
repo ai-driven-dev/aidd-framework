@@ -24,7 +24,7 @@ export function strykerArgs(scope, scopes, { force = false } = {}) {
   const args = [
     "run",
     "--mutate",
-    declared.mutate,
+    [declared.mutate].flat().join(","),
     "--incremental",
     "--incrementalFile",
     `reports/mutation/${scope}/incremental.json`,
@@ -33,18 +33,18 @@ export function strykerArgs(scope, scopes, { force = false } = {}) {
   return args;
 }
 
-/** Stryker's own score: killed and timed-out mutants over every mutant a test could reach,
- * ignored ones left out. A report with no mutant scores nothing rather than 100. */
+/** Stryker's own score: detected (killed, timed out) over detected plus undetected (survived,
+ * uncovered); an ignored or errored mutant counts on neither side. No mutant scores zero. */
 export function scoreOf(report) {
   let detected = 0;
-  let total = 0;
+  let undetected = 0;
   for (const file of Object.values(report.files ?? {})) {
     for (const mutant of file.mutants) {
-      if (mutant.status === "Ignored") continue;
-      total += 1;
       if (mutant.status === "Killed" || mutant.status === "Timeout") detected += 1;
+      else if (mutant.status === "Survived" || mutant.status === "NoCoverage") undetected += 1;
     }
   }
+  const total = detected + undetected;
   return total === 0 ? 0 : (100 * detected) / total;
 }
 

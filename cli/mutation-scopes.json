@@ -1,13 +1,13 @@
 {
-  "$comment": "The one declaration of what mutation testing covers and the floor each scope must hold. scripts/run-mutation.mjs runs a scope by name and fails below its break; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps, that every scope declares a floor, and that package.json has a script per scope. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated. A floor is raised to the measured score after a run, never lowered without the reason here.",
+  "$comment": "The one declaration of what mutation testing covers and the floor each scope must hold. scripts/run-mutation.mjs runs a scope by name and fails below its break; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps, that every scope declares a floor, and that package.json has a script per scope. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated. A floor is raised to the measured score after a run, never lowered without the reason here. A scope's mutate is one glob or a list where a leading ! excludes; tools is split at its profiles, whose static declarations rerun every loading test per mutant and made the one scope run longer than every other combined.",
   "scopes": {
     "kernel": {
       "mutate": "src/kernel/**/*.ts",
       "break": 71
     },
     "tools": {
-      "mutate": "src/contexts/tools/**/*.ts",
-      "break": 67
+      "mutate": ["src/contexts/tools/**/*.ts", "!src/contexts/tools/domain/profiles/**/*.ts"],
+      "break": 76
     },
     "telemetry": {
       "mutate": "src/contexts/telemetry/**/*.ts",
@@ -32,6 +32,10 @@
     "runtime": {
       "mutate": "src/runtime/**/*.ts",
       "break": 67
+    },
+    "tools-profiles": {
+      "mutate": "src/contexts/tools/domain/profiles/**/*.ts",
+      "break": 57
     }
   },
   "excluded": {

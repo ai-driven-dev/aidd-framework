@@ -23,13 +23,16 @@ export function scopesToRun(changed, scopes, { all = false } = {}) {
   const everything =
     all || changed.some((file) => HARNESS.includes(file) || file.startsWith("cli/tests/helpers/"));
   return Object.entries(scopes)
-    .filter(([, { mutate }]) => {
-      const source = `cli/${mutate.slice(0, mutate.indexOf("/**"))}/`;
-      const tests = source.replace("cli/src/", "cli/tests/");
-      return (
-        everything || changed.some((file) => file.startsWith(source) || file.startsWith(tests))
-      );
-    })
+    .filter(([, { mutate }]) =>
+      [mutate].flat().some((glob) => {
+        if (glob.startsWith("!")) return false;
+        const source = `cli/${glob.slice(0, glob.indexOf("/**"))}/`;
+        const tests = source.replace("cli/src/", "cli/tests/");
+        return (
+          everything || changed.some((file) => file.startsWith(source) || file.startsWith(tests))
+        );
+      })
+    )
     .map(([name]) => name);
 }
 

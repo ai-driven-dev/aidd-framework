@@ -61,6 +61,7 @@
     "test:mutation": "node scripts/run-mutation.mjs",
     "test:mutation:kernel": "node scripts/run-mutation.mjs kernel",
     "test:mutation:tools": "node scripts/run-mutation.mjs tools",
+    "test:mutation:tools-profiles": "node scripts/run-mutation.mjs tools-profiles",
     "test:mutation:telemetry": "node scripts/run-mutation.mjs telemetry",
     "test:mutation:translate": "node scripts/run-mutation.mjs translate",
     "test:mutation:distribution": "node scripts/run-mutation.mjs distribution",

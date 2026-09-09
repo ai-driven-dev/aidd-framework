@@ -11,7 +11,7 @@ import { breakVerdict, scoreOf, strykerArgs } from "../../scripts/run-mutation.m
 import { matchesGlob, REPO_ROOT, read, sourceFiles } from "./helpers.js";
 
 interface Scope {
-  readonly mutate: string;
+  readonly mutate: string | readonly string[];
   readonly break: number;
 }
 
@@ -24,9 +24,19 @@ function declaration(): ScopeDeclaration {
   return JSON.parse(read("mutation-scopes.json")) as ScopeDeclaration;
 }
 
+function scopeMatches(mutate: Scope["mutate"], path: string): boolean {
+  const globs = [mutate].flat();
+  return (
+    globs.some((glob) => !glob.startsWith("!") && matchesGlob(glob, path)) &&
+    !globs.some((glob) => glob.startsWith("!") && matchesGlob(glob.slice(1), path))
+  );
+}
+
 function isCovered(path: string, { scopes, excluded }: ScopeDeclaration): boolean {
-  const globs = [...Object.values(scopes).map((scope) => scope.mutate), ...Object.keys(excluded)];
-  return globs.some((glob) => matchesGlob(glob, path));
+  return (
+    Object.values(scopes).some((scope) => scopeMatches(scope.mutate, path)) ||
+    Object.keys(excluded).some((glob) => matchesGlob(glob, path))
+  );
 }
 
 describe("mutation covers every source file", () => {
@@ -53,10 +63,18 @@ describe("mutation covers every source file", () => {
     }
     for (const [name, { mutate }] of Object.entries(scopes)) {
       expect(
-        files.some((file) => matchesGlob(mutate, file)),
+        files.some((file) => scopeMatches(mutate, file)),
         `scope "${name}" (${mutate}) matches no file — it would score an empty set`
       ).toBe(true);
     }
+  });
+
+  it("no source file is mutated by two scopes, so a mutant is measured once", () => {
+    const { scopes } = declaration();
+    const twice = sourceFiles().filter(
+      (file) => Object.values(scopes).filter((scope) => scopeMatches(scope.mutate, file)).length > 1
+    );
+    expect(twice, "narrow one scope with a ! glob").toEqual([]);
   });
 
   it("every scope declares the floor its score must hold", () => {
@@ -97,6 +115,29 @@ describe("the guard itself", () => {
     expect(matchesGlob("src/cli.ts", "src/clints.ts")).toBe(false);
   });
 
+  it("lets a ! glob carve a file out of a scope, and joins a list for stryker", () => {
+    const split = {
+      tools: {
+        mutate: ["src/contexts/tools/**/*.ts", "!src/contexts/tools/domain/profiles/**/*.ts"],
+        break: 1,
+      },
+      profiles: { mutate: "src/contexts/tools/domain/profiles/**/*.ts", break: 1 },
+    };
+    expect(scopeMatches(split.tools.mutate, "src/contexts/tools/domain/registry.ts")).toBe(true);
+    expect(
+      scopeMatches(split.tools.mutate, "src/contexts/tools/domain/profiles/claude/profile.ts")
+    ).toBe(false);
+    expect(
+      scopeMatches(split.profiles.mutate, "src/contexts/tools/domain/profiles/claude/profile.ts")
+    ).toBe(true);
+    expect(strykerArgs("tools", split)).toContain(
+      "src/contexts/tools/**/*.ts,!src/contexts/tools/domain/profiles/**/*.ts"
+    );
+    expect(
+      scopesToRun(["cli/src/contexts/tools/domain/profiles/claude/profile.ts"], split).sort()
+    ).toEqual(["profiles", "tools"]);
+  });
+
   it("reports a file no scope and no exclusion names, and clears one a scope covers", () => {
     const declared = { scopes, excluded: { "src/cli.ts": "the entry point" } };
     expect(isCovered("src/kernel/paths.ts", declared)).toBe(true);
@@ -117,7 +158,7 @@ describe("the guard itself", () => {
     expect(() => strykerArgs("nowhere", scopes)).toThrow('Unknown scope "nowhere"');
   });
 
-  it("scores killed and timed-out mutants over everything but the ignored, and an empty report as zero", () => {
+  it("scores detected over detected plus undetected, leaves ignored and errored aside, and an empty report as zero", () => {
     const report = {
       files: {
         "a.ts": {
@@ -127,6 +168,8 @@ describe("the guard itself", () => {
             { status: "Survived" },
             { status: "NoCoverage" },
             { status: "Ignored" },
+            { status: "RuntimeError" },
+            { status: "CompileError" },
           ],
         },
       },
