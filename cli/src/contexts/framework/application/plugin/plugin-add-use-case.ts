@@ -158,8 +158,9 @@ export class PluginAddUseCase implements PluginAdd {
     source: PluginSource,
     projectRoot: string
   ): Promise<void> {
-    const { marketplace, requiredVersion, replace } = options;
-    const dist = await this.readDistribution(source, projectRoot);
+    const { marketplace, requiredVersion, replace, pluginMetadata } = options;
+    const read = await this.readDistribution(source, projectRoot);
+    const dist = pluginMetadata === undefined ? read : read.withStrict(pluginMetadata.strict);
     const pluginName = dist.manifest.name;
     this.assertPluginVersionMatches(pluginName, dist.manifest.version, requiredVersion);
     const { prevMcpMap } = this.prepareForInstall(pluginName, resolvedToolIds, manifest, replace);

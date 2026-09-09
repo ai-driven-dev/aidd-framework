@@ -219,6 +219,40 @@ describe("PluginAddUseCase", () => {
 
     const PLUGIN_METADATA = { name: "sample-plugin", version: "1.0.0", strict: false };
 
+    describe("the catalog's strict", () => {
+      it("lands on every installed entry, whatever the plugin's own manifest says", async () => {
+        const deps = await buildUnitDeps(PROJECT_ROOT);
+        await initAndInstall(deps, PROJECT_ROOT, "opencode");
+        deps.fs.setFile(
+          "/built/opencode/.opencode/skills/sample-plugin/demo/SKILL.md",
+          "# Demo skill"
+        );
+        await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+        deps.pluginFetcher.register(GIT_SUBDIR_SOURCE, PLUGIN_FIXTURE);
+        const useCase = new PluginAddUseCase(
+          deps.fs,
+          deps.manifestRepo,
+          deps.pluginFetcher,
+          new PluginDistributionReaderAdapter(deps.fs),
+          deps.hasher,
+          deps.logger,
+          await makeGithubRegistry(PROJECT_ROOT),
+          fakeEnsureBuiltMarketplace()
+        );
+        await useCase.execute({
+          source: GIT_SUBDIR_SOURCE,
+          toolIds: ["opencode"],
+          projectRoot: PROJECT_ROOT,
+          marketplace: "aidd-framework",
+          interactive: false,
+          pluginMetadata: { ...PLUGIN_METADATA, strict: true },
+        });
+        const manifest = await deps.manifestRepo.load();
+        const installed = manifest?.getPlugins("opencode").find((p) => p.name === "sample-plugin");
+        expect(installed?.strict).toBe(true);
+      });
+    });
+
     describe("opencode", () => {
       it("fetches and materializes flat files", async () => {
         const deps = await buildUnitDeps(PROJECT_ROOT);

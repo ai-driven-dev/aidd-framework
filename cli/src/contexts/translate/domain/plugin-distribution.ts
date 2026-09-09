@@ -39,4 +39,13 @@ export class PluginDistribution {
     this.files = params.files;
     this.components = params.components;
   }
+
+  withStrict(strict: boolean): PluginDistribution {
+    return new PluginDistribution({
+      manifest: { ...this.manifest, strict },
+      format: this.format,
+      files: this.files,
+      components: this.components,
+    });
+  }
 }

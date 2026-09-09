@@ -141,6 +141,23 @@ describe("PluginDistributionReaderAdapter", () => {
     });
   });
 
+  describe("a manifest carrying a strict field", () => {
+    it("is read without it: strict belongs to the catalog entry, not to the plugin", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "aidd-plugin-strict-"));
+      try {
+        await mkdir(join(dir, ".claude-plugin"), { recursive: true });
+        await writeFile(
+          join(dir, ".claude-plugin", "plugin.json"),
+          JSON.stringify({ name: "sample", version: "1.0.0", strict: true })
+        );
+        const dist = await makeAdapter().read(dir);
+        expect(dist.manifest.strict).toBeUndefined();
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("non-existent directory", () => {
     it("throws InvalidPluginManifestError when directory has no plugin.json", async () => {
       const adapter = makeAdapter();

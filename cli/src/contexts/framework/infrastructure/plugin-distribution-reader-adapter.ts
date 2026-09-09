@@ -113,7 +113,6 @@ function validateManifest(raw: unknown): PluginManifestFields {
   const result: PluginManifestFields = { name, version };
 
   if (typeof obj.description === "string") result.description = obj.description;
-  if (typeof obj.strict === "boolean") result.strict = obj.strict;
   if (obj.author !== null && typeof obj.author === "object" && !Array.isArray(obj.author)) {
     const a = obj.author as Record<string, unknown>;
     if (typeof a.name === "string") {
