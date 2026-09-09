@@ -10,7 +10,7 @@ async function seedManifest(projectDir: string): Promise<void> {
   await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
   await writeFile(
     join(projectDir, AIDD_DIR, "manifest.json"),
-    JSON.stringify({ version: 5, tools: {}, marketplaces: {} }),
+    JSON.stringify({ version: 8, tools: {} }),
     "utf-8"
   );
 }
@@ -41,7 +41,7 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-dry-run");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       // runCli runs non-TTY (child process without TTY), so dry-run shows Would remove
       const { stdout, exitCode } = await runCli(["clean"], projectDir, fakeHome);
@@ -58,7 +58,7 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-force");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
 
@@ -75,7 +75,7 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-preview");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean"], projectDir, fakeHome);
 
@@ -92,7 +92,7 @@ describe.concurrent("E2E: aidd clean", () => {
     try {
       await seedManifest(projectDir);
       await seedTelemetryConfig(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
 
@@ -110,8 +110,8 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-multi");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
-      await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "cursor"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
       expect(exitCode).toBe(0);
@@ -125,9 +125,27 @@ describe.concurrent("E2E: aidd clean", () => {
     }
   });
 
+  it("removes .claude/settings.local.json, a file install writes outside the manifest", async () => {
+    // The file is machine-local and never tracked, so a clean rejoining only the manifest
+    // leaves it behind.
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-settings-local");
+    try {
+      await seedManifest(projectDir);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
+      const settingsLocalPath = join(projectDir, ".claude", "settings.local.json");
+      await writeFile(settingsLocalPath, "{}", "utf-8");
+
+      const { exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
+
+      expect(exitCode).toBe(0);
+      expect(existsSync(settingsLocalPath)).toBe(false);
+      expect(existsSync(join(projectDir, ".claude"))).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("leaves no .aidd behind when a marketplace was registered", async () => {
-    // The state the CLI wrote itself. Left behind, `.aidd` survived a run that had just
-    // printed that it cleaned all AIDD files.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-registry");
     try {
       await seedManifest(projectDir);

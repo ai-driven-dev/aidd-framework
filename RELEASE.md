@@ -16,7 +16,7 @@ How ships, and what to follow when you open a change. Weekly rolling releases, w
 
 - Almost everything flows through `next` and ships in the weekly release.
 - Only an urgent production fix takes the fast lane straight to `main`.
-- The branch prefix decides the target; the canonical prefix → target table lives in [`aidd_docs/memory/vcs.md`](aidd_docs/memory/vcs.md#types).
+- The branch prefix decides the target; the canonical prefix → target table lives in [`aidd_docs/memory/vcs.md`](aidd_docs/memory/vcs.md#branches).
 
 ```mermaid
 flowchart LR

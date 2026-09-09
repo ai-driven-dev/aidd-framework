@@ -11,8 +11,7 @@ const path = require("node:path");
 const { findRunFileByVendorId, appendLine, buildFileWrittenLine, nowIso } = require("./record.cjs");
 
 // Unanchored pre-filter, tested before any git shellout. A task is a folder of files or a
-// single .md file - both shapes exist side by side, so matching only the folder would
-// leave real tasks unattachable.
+// single .md file, and both shapes exist side by side.
 const TASK_SEGMENT_PATTERN = /aidd_docs\/tasks\/\d{4}_\d{2}\/[^/]+(\/|\.md$)/u;
 
 function looksLikeTaskPath(rawPath) {
@@ -33,10 +32,9 @@ function taskFolderRelativePath(repoRoot, rawPath) {
   return TASK_PATH_ANCHOR_PATTERN.test(relative) ? relative : null;
 }
 
-// The written-path field differs per tool, and Codex has no path field at all - it is
-// inside an apply_patch command string. Each host's own hooks/lib/tools/<host>.cjs states
-// its extractor, or null; gathered here for a caller that wants every host covered rather
-// than one at a time (see cli/tests/helpers/telemetry-journal-hook.ts).
+// The written-path field differs per tool, and Codex has no path field at all - it is inside
+// an apply_patch command string. Each host's own tools file states its extractor, or null;
+// gathered here for a caller that wants every host at once.
 const WRITTEN_PATH_EXTRACTOR_BY_HOST = Object.freeze(
   Object.fromEntries(
     Object.entries(TOOLS_BY_HOST)
@@ -46,32 +44,20 @@ const WRITTEN_PATH_EXTRACTOR_BY_HOST = Object.freeze(
 );
 
 const TASKS_DIR = "aidd_docs/tasks";
-// A task folder holds documents. A scan that walked node_modules would cost more than the
-// git shellout this hook already pays on every event.
-//
-// Measured 2026-08-22 against a synthetic tree: reaching 2000 entries costs ~13.5ms p95,
-// well inside the 200ms p95 the whole turn-end handler already budgets for
-// (aidd-telemetry-journal.test.js) while spending ~9ms of it on git shellouts and
-// everything else - see measurements.md (aidd_docs/tasks/2026_08/2026_08_21_telemetry-v1-close/)
-// for the full numbers, including this repository's own tree, which uses 172 of the 2000.
+// A task folder holds documents, and a scan that walked node_modules would cost more than
+// the git shellout this hook already pays on every event. Reaching this cap measures ~13.5ms
+// p95, well inside the 200ms p95 the turn-end handler is held to.
 const MAX_SCAN_ENTRIES = 2000;
 
 /**
  * Every file under the task tree modified since `sinceMs`, repository-relative and
  * "/"-separated. This is what makes a task attributable on a tool that never says what it
- * wrote: a write made through a shell command, an apply_patch, or an editor leaves the
- * same trace on disk as one made through a file tool, and the disk is the one thing every
- * host shares. Scoped to the task tree rather than the repository, so a build touching a
- * thousand files is never walked.
+ * wrote: the disk is the one thing every host shares. Scoped to the task tree, so a build
+ * touching a thousand files is never walked.
  *
- * `truncated` is true whenever the budget ran out before the tree was fully read - either a
- * directory's own listing was cut short (a wide directory, still processing when the cap
- * hit) or a directory was queued but never opened at all (`pending` non-empty at the end).
- * Checking `pending` alone misses the first case: a listing cut off mid-read can still
- * leave `pending` empty, and reading that as "nothing left" is exactly the silent
- * truncation this exists to catch. `scanned` is exactly how many entries were looked at,
- * never one more: the entry that would have crossed the cap is left unopened rather than
- * counted and dropped.
+ * `truncated` covers both ways the budget can run out - a listing cut short mid-read, or a
+ * directory queued and never opened. Checking `pending` alone misses the first, which is
+ * exactly the silent truncation this exists to catch.
  */
 function taskFilesModifiedSince(repoRoot, sinceMs) {
   const root = path.join(repoRoot, ...TASKS_DIR.split("/"));
@@ -112,9 +98,8 @@ function modifiedSince(filePath, sinceMs) {
   }
 }
 
-// Guards ordered cheapest-first: the tool-name whitelist and the unanchored path regex
-// both run with zero git shellouts. This fires on every tool call, so a tool that wrote
-// nothing must be rejected before anything is spawned or walked.
+// Cheapest-first: this fires on every tool call, so a tool that wrote nothing must be
+// rejected before anything is spawned or walked.
 function handleFileWritten(payload, host, sessionId) {
   const stated = statedRawPath(payload, host);
   if (!stated) return;
@@ -125,25 +110,20 @@ function handleFileWritten(payload, host, sessionId) {
   const relativePath = taskFolderRelativePath(target.repoRoot, realPathOf(stated));
   if (!relativePath) return;
 
-  // The session id arrives already read behind the host's own declaration (journal.cjs), the
-  // same one the session_start line was named with. Reading payload.session_id here instead
-  // would be one host's spelling promoted to a rule - and on Codex it is the spelling that
+  // The session id arrives already read behind the host's own declaration. Reading
+  // payload.session_id here would be one host's spelling promoted to a rule, and on Codex it
   // names the parent of a resumed session, so the lookup would find another session's file.
   const filePath = findRunFileByVendorId(target.dir, sessionId);
   if (filePath) appendFileWritten(filePath, relativePath, "tool-stated");
 }
 
 /**
- * Everything in the task tree that changed during this turn, whoever wrote it.
+ * Everything in the task tree that changed during this turn, whoever wrote it. At turn end,
+ * not at every tool call: a turn ends once per prompt while tools fire dozens of times, and
+ * this is what catches a write no payload names.
  *
- * At turn end, not at every tool call. A turn ends once per prompt while tools fire dozens
- * of times, so this costs one walk per turn rather than one per call - and it catches a
- * write made through a shell command, an apply_patch, or anything else no payload names,
- * which is what makes a task attributable on a host that never says what it wrote.
- *
- * The moment recorded is the end of the turn rather than the write itself. That is honest:
- * nothing here observed *when* the file changed, only that it had, and a task is derived
- * from the path rather than from the moment.
+ * The moment recorded is the end of the turn rather than the write itself, because nothing
+ * here observed when the file changed, only that it had.
  */
 function handleTaskFilesObserved(payload, host, sessionId) {
   const target = resolveRunsDir(readCwd(host, payload));
@@ -152,9 +132,8 @@ function handleTaskFilesObserved(payload, host, sessionId) {
   const filePath = findRunFileByVendorId(target.dir, sessionId);
   if (!filePath) return;
 
-  // The run file's own mtime is the moment this session last wrote a line, so anything in
-  // the task tree newer than it changed since. No state to keep, and appending moves the
-  // mark forward on its own.
+  // The run file's own mtime is the moment this session last wrote a line, so no state has
+  // to be kept: appending moves the mark forward on its own.
   const since = lastWriteMs(filePath);
   const { found, truncated, scanned } = taskFilesModifiedSince(target.repoRoot, since);
   const alreadyStated = new Set();
@@ -163,9 +142,8 @@ function handleTaskFilesObserved(payload, host, sessionId) {
     alreadyStated.add(observed);
     appendFileWritten(filePath, observed, "observed");
   }
-  // Silent truncation would read as complete coverage - the one failure mode this layer
-  // exists to remove. A reader of the run file must be able to tell "nothing else changed"
-  // from "the walk gave up before it could tell."
+  // Silent truncation would read as complete coverage: a reader must be able to tell
+  // "nothing else changed" from "the walk gave up before it could tell".
   if (truncated) {
     appendLine(filePath, buildScanTruncatedLine({ at: nowIso(), cap: MAX_SCAN_ENTRIES, scanned }));
   }
@@ -175,9 +153,8 @@ function appendFileWritten(filePath, relativePath, source) {
   appendLine(filePath, buildFileWrittenLine({ at: nowIso(), path: relativePath, source }));
 }
 
-// Not a record.cjs builder: record.cjs owns session_start/turn_end/file_written/step_start
-// alone, and readJournalFile there already ignores any type it does not name, so this new
-// one is inert to every existing reader rather than breaking one.
+// Not a record.cjs builder: a reader ignores any type it does not name, so this one is inert
+// to every existing reader rather than breaking one.
 function buildScanTruncatedLine({ at, cap, scanned }) {
   return { type: "scan_truncated", at, cap, scanned };
 }
@@ -190,14 +167,10 @@ function lastWriteMs(filePath) {
   }
 }
 
-// git resolves symlinks in --show-toplevel; the tool's file_path may not have (macOS's
-// /tmp -> /private/tmp). `.native` rather than the plain JS realpath: on Windows the JS
-// implementation only walks symlinks and leaves an 8.3 short-name alias (what the CI
-// runner's own temp dir resolves through) untouched, so it never matches getRepoRoot's
-// git-derived, already-canonical path - `.native` calls GetFinalPathNameByHandle, which
-// resolves both symlinks and short-name aliases the same way git itself does.
-// Falls back to the raw path so a file deleted between write and hook does not silently
-// drop a real observation.
+// git resolves symlinks in --show-toplevel and the tool's own path may not have. `.native`
+// rather than the plain JS realpath: on Windows the JS one leaves an 8.3 short-name alias
+// untouched, so it never matches git's already-canonical answer. Falls back to the raw path,
+// so a file deleted between write and hook does not silently drop a real observation.
 function realPathOf(rawPath) {
   try {
     return fs.realpathSync.native(rawPath);

@@ -1,10 +1,6 @@
 #!/usr/bin/env node
-// Checks SKILL.md frontmatter against R4 of the skill contract:
-// argument-hint names what the user brings, never the action slugs, always present.
-// The contract lives in
-// plugins/aidd-context/skills/04-skill-generate/references/skill-authoring.md
-// Usage:
-//   node scripts/check-skill-argument-hints.mjs   # exit 1 on any breach
+// R4 of the skill contract: argument-hint names what the user brings, never the action
+// slugs, and is always present.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -82,7 +78,8 @@ for (const dir of await skillDirs()) {
   const content = await readFile(skillPath, "utf8").catch(() => null);
   if (content === null) continue;
 
-  const relative = path.relative(ROOT, skillPath);
+  // Named the way the contract and every other guard name a path, whatever the host separator.
+  const relative = path.relative(ROOT, skillPath).split(path.sep).join("/");
   const hint = argumentHint(content);
   const actionFiles = await collectMarkdownFiles(path.join(dir, "actions"));
 

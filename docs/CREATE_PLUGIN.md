@@ -11,7 +11,7 @@ flowchart LR
 
 ## 🏗️ Scaffold
 
-Pick a name (lowercase, `aidd-<x>`). For the directory shape, `plugin.json`, and `SKILL.md`/action format, follow [Anatomy of a plugin](ARCHITECTURE.md#-anatomy-of-a-plugin). Minimum: `.claude-plugin/plugin.json` + `skills/<NN>-<name>/` (with `SKILL.md` + `actions/`).
+Pick a name (lowercase, `aidd-<x>`). For the directory shape, `plugin.json`, and `SKILL.md`/action format, follow [Anatomy of a plugin](ARCHITECTURE.md#-anatomy-of-a-plugin). Minimum: `<plugin>/.claude-plugin/plugin.json` + `skills/<NN>-<name>/` (with `SKILL.md` + `actions/`).
 
 ## 📝 Register
 

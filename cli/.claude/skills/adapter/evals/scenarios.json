@@ -1,8 +1,0 @@
-[
-  { "prompt": "Create a port interface for fetching plugins from GitHub", "expect_action": "define-port" },
-  { "prompt": "Implement the GhCliAdapter for the TokenProvider port", "expect_action": "implement-adapter" },
-  { "prompt": "Register the new PluginFetcherAdapter in createDeps", "expect_action": "wire-deps" },
-  { "prompt": "Write integration tests for the FileAdapter error handling", "expect_action": "test" },
-  { "prompt": "Add a use-case that orchestrates plugin installation", "expect_action": null },
-  { "prompt": "Add a value object for plugin source with kind discriminant", "expect_action": null }
-]

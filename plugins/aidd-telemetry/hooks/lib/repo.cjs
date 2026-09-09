@@ -19,7 +19,11 @@ function gitEnv() {
 function getRepoRoot(cwd) {
   if (typeof cwd !== "string" || !cwd) return null;
   try {
-    const result = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", env: gitEnv() });
+    const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf8",
+      env: gitEnv(),
+    });
     if (result.status !== 0) return null;
     const root = result.stdout.trim();
     return root || null;
@@ -32,30 +36,21 @@ function getRepoRoot(cwd) {
 const WORKTREES_SEGMENT = "worktrees";
 const GIT_DIR_NAME = ".git";
 
-// The worktree a session ran in, named so two worktrees of one repository can be
-// told apart in a journal - taken from git, never from an agent runner's own variable,
-// which names that runner's concept rather than the repository's.
+// Taken from git, never from an agent runner's own variable, which names that runner's
+// concept rather than the repository's.
 //
-// A plain checkout gets NEITHER field: absent, never null and never "". An absent value is
-// the only one a reader cannot mistake for a worktree that happens to be called something;
-// an empty string would gather every plain checkout on earth into one group as though they
-// were the same worktree. That is the error `cost-report.ts`'s `NO_KNOWN_PROJECT` symbol
-// exists to prevent for a record naming no project, and it is prevented here the same way -
-// by the field not being there at all.
+// A plain checkout gets NEITHER field: absent, never null and never "" - an empty string
+// would gather every plain checkout into one group as though they were the same worktree.
 //
 // The layout is the test, never a comparison of the two directories: two spellings of one
-// path (a Windows drive letter cased differently in each) would compare unequal and write
-// a worktree field on a plain checkout. `path.basename` reads "/" and "\" alike on Windows,
-// and `path.resolve` is applied first because `git rev-parse` prints these two relative to
-// the cwd it ran in for a plain checkout and absolute for a linked worktree.
+// path would compare unequal and write a worktree field on a plain checkout. `path.resolve`
+// comes first because `git rev-parse` prints these relative for a plain checkout.
 function worktreeFields(cwd, commonDir, gitDir) {
   if (!commonDir || !gitDir) return {};
   const resolvedGitDir = path.resolve(cwd, gitDir);
-  // A plain checkout's git directory is always the literal `.git` inside the working tree,
-  // whatever that tree is called - so a repository that happens to live in a directory
-  // named `worktrees` would otherwise pass the layout test below and be recorded as a
-  // worktree named ".git". The linked worktree's git directory is named for the worktree
-  // and is never `.git`.
+  // A plain checkout's git directory is the literal `.git`, so a repository living in a
+  // directory named `worktrees` would otherwise pass the layout test below. A linked
+  // worktree's git directory is named for the worktree and is never `.git`.
   if (path.basename(resolvedGitDir) === GIT_DIR_NAME) return {};
   if (path.basename(path.dirname(resolvedGitDir)) !== WORKTREES_SEGMENT) return {};
   const repoName = repositoryNameFromCommonDir(path.resolve(cwd, commonDir));
@@ -65,12 +60,9 @@ function worktreeFields(cwd, commonDir, gitDir) {
   };
 }
 
-// The repository every worktree of one clone shares, named from the directory that holds
-// it: `<repo>/.git` and a bare `<repo>.git` both answer `<repo>`. Recorded beside the
-// worktree rather than left to `project_id`, which falls back to the *worktree's* own
-// directory name when a clone has no remote - so two worktrees of a remote-less clone
-// carry two different `project_id` values and nothing else on the line would say they
-// belong together.
+// `<repo>/.git` and a bare `<repo>.git` both answer `<repo>`. Recorded beside the worktree
+// rather than left to `project_id`, which falls back to the worktree's own directory name
+// when a clone has no remote - so two worktrees of one clone would look unrelated.
 function repositoryNameFromCommonDir(commonDir) {
   const base = path.basename(commonDir);
   const name =
@@ -78,19 +70,11 @@ function repositoryNameFromCommonDir(commonDir) {
   return name === "" || name === "." || name === ".." ? null : sanitizePathSegment(name);
 }
 
-// One `git rev-parse` in the ordinary case, and never more than two.
-//
-// The fourth option, `--git-path hooks`, is what finds the directory git will actually run a
-// hook from: it honours `core.hooksPath`, which joining `.git/hooks` by hand does not, and
-// from a linked worktree it answers the common hooks directory, which is where git looks.
-//
-// It cannot simply be added to the list, and that is a measured constraint rather than a
-// stylistic one. `rev-parse` fails atomically — a git that does not understand one option
-// answers non-zero for all of them — and this call returning null makes `resolveWriteTarget`
-// return null, which makes the journal write nothing at all. Against a git stubbed to reject
-// `--git-path`, the hook exited 0 and recorded no session. So the four-option form is asked
-// first and the three-option form is the fallback: every git pays one call, and only one too
-// old to answer the fourth pays a second and simply goes without the hooks directory.
+// One `git rev-parse` in the ordinary case, and never more than two. `--git-path hooks`
+// honours `core.hooksPath`, which joining `.git/hooks` by hand does not, but `rev-parse`
+// fails atomically: a git that does not understand one option answers non-zero for all of
+// them, and a null here makes the journal write nothing at all. So the four-option form is
+// asked first, and an older git pays a second call and goes without the hooks directory.
 function getRepoLocation(cwd) {
   if (typeof cwd !== "string" || !cwd) return null;
   try {
@@ -102,15 +86,12 @@ function getRepoLocation(cwd) {
     return {
       repoRoot: root,
       // Carried so the trailer repair can tell a hooks directory inside the git directory
-      // from one `core.hooksPath` points at inside the working tree - the second being
-      // version-controlled content nothing here writes to unasked.
+      // from one inside the working tree, which is version-controlled content.
       ...(commonDir ? { gitDir: path.resolve(cwd, commonDir) } : {}),
       ...worktreeFields(cwd, commonDir, gitDir),
-      // Resolved against `cwd`, never against the repository root: `git rev-parse` prints
-      // this relative to the directory it ran in, exactly as `worktreeFields` above says of
-      // its own two outputs. Resolving against the root instead sent a session started in
-      // `sub/deep` two levels ABOVE the repository - measured, `../../.git/hooks` became a
-      // path outside the checkout entirely, which is where the repair then wrote.
+      // Against `cwd`, never against the repository root: `git rev-parse` prints this
+      // relative to the directory it ran in, so resolving against the root sends a session
+      // started in `sub/deep` two levels above the checkout, which is where repair writes.
       ...(hooksDir ? { hooksDir: path.resolve(cwd, hooksDir) } : {}),
     };
   } catch {
@@ -120,9 +101,8 @@ function getRepoLocation(cwd) {
 
 const LOCATION_OPTIONS = ["--show-toplevel", "--git-common-dir", "--git-dir"];
 
-/** The trimmed words `rev-parse` printed, or `null` when it refused. A git too old for one
- * of the options refuses all of them, which is why the caller has a shorter form to fall
- * back to rather than a shorter reading of this one. */
+/** `null` when `rev-parse` refused. A git too old for one option refuses all of them, which
+ * is why the caller falls back to a shorter form rather than a shorter reading of this. */
 function revParse(cwd, options) {
   const result = spawnSync("git", ["rev-parse", ...options], {
     cwd,
@@ -130,11 +110,12 @@ function revParse(cwd, options) {
     env: gitEnv(),
   });
   if (result.status !== 0) return null;
-  return String(result.stdout).split("\n").map((part) => part.trim());
+  return String(result.stdout)
+    .split("\n")
+    .map((part) => part.trim());
 }
 
-// `aidd framework build` copies hooks/ verbatim with no install step, so JSON.parse is
-// the only parser available.
+// hooks/ is copied verbatim with no install step, so JSON.parse is the only parser here.
 function readTelemetryConfig(repoRoot) {
   try {
     return JSON.parse(fs.readFileSync(path.join(repoRoot, ".aidd", "config.json"), "utf8"));
@@ -143,26 +124,20 @@ function readTelemetryConfig(repoRoot) {
   }
 }
 
-// The only refusal available at a person's own scope. Not a second config file: state for
-// "is this measured" already lives in .aidd/config.json (the project's tracked decision),
-// and a file at the person's scope would be a third place the same fact could live, in a
-// change whose point is that there are too many already. An environment variable is
-// refusable per shell, per session and per machine, and needs nothing to be created.
+// The only refusal at a person's own scope, and a variable rather than a second config file:
+// it is refusable per shell, per session and per machine, and needs nothing created.
 //
-// Only the literal string "0" counts as a refusal. Unset or empty is not a choice this
-// variable can express - it never turns measurement on by itself, and it never overrides an
-// enabled project. `cli/src/domain/models/telemetry-switch.ts`'s `personRefusesTelemetry`
-// mirrors this exactly, so the hook and the CLI can never disagree about whether a person
-// has refused.
+// Only the literal "0" is a refusal - unset or empty is not a choice this can express, and it
+// never turns measurement on by itself. The CLI's own `personRefusesTelemetry` mirrors this
+// exactly, so the two can never disagree about whether a person has refused.
 const TELEMETRY_REFUSAL_VARIABLE = "AIDD_TELEMETRY";
 
 function personRefusesTelemetry() {
   return process.env[TELEMETRY_REFUSAL_VARIABLE] === "0";
 }
 
-// Strict `=== true`, not truthy: a half-written config must read as off, not on. The
-// person's own refusal is read before the project's file, and wins over it unconditionally -
-// a project that turns measurement on can never out-rank the person running it.
+// Strict `=== true`, not truthy: a half-written config must read as off. The person's refusal
+// is read first and wins unconditionally - no project out-ranks the person running it.
 function telemetryEnabled(repoRoot) {
   if (personRefusesTelemetry()) return false;
   const config = readTelemetryConfig(repoRoot);
@@ -209,11 +184,7 @@ function sanitizePathSegment(segment) {
 }
 
 function sanitizeProjectId(projectId) {
-  return projectId
-    .split("/")
-    .filter(Boolean)
-    .map(sanitizePathSegment)
-    .join("/");
+  return projectId.split("/").filter(Boolean).map(sanitizePathSegment).join("/");
 }
 
 // Split from deriveProjectId so a caller holding remoteUrl pays one git shellout, not two.
@@ -234,18 +205,14 @@ function runsDir(repoRoot) {
   return process.env.AIDD_RUNS_DIR || path.join(repoRoot, "aidd_docs", "runs");
 }
 
-// What this hook writes is who-worked-on-what-for-how-long, so it is not left
-// world-readable. Windows accepts this mode on mkdirSync/appendFileSync/chmodSync
-// without error, but does nothing with it - the directory and every file in it land at
-// 0666 regardless (measured on a real windows-latest runner). Privacy there comes
-// from restrictToCurrentUser below, not from this constant.
+// What this hook writes is who-worked-on-what-for-how-long, so it is not left world-readable.
+// Windows accepts this mode without error and does nothing with it - everything lands at 0666
+// regardless - so privacy there comes from restrictToCurrentUser below instead.
 const PRIVATE_DIR_MODE = 0o700;
 
-// `mkdirSync`'s `mode` applies only to a directory it creates, so a checked-out
-// `aidd_docs/runs/` needs this chmod - and, on Windows, needs it reset again on every
-// write, since anything (a checkout, an admin, another tool) could have widened it since
-// the last one. Never applied to a user-named AIDD_RUNS_DIR - a user who names their own
-// runs directory keeps responsibility for its permissions.
+// `mkdirSync`'s `mode` applies only to a directory it creates, so a checked-out runs
+// directory needs this chmod - and on Windows needs it reset on every write, since anything
+// could have widened it since. Never on a user-named AIDD_RUNS_DIR: that is theirs to set.
 function tightenOwnedDir(dir) {
   if (process.env.AIDD_RUNS_DIR) return;
   if (process.platform === "win32") return restrictToCurrentUser(dir, { inheritable: true });
@@ -256,28 +223,19 @@ function tightenOwnedDir(dir) {
   }
 }
 
-// POSIX needs no second pass: `appendFileSync`'s own `mode` already set 0600 at the
-// moment it created the file. On Windows this is the direct, non-recursive reset every
-// file this code writes gets on its own.
+// POSIX needs no second pass: `appendFileSync`'s own `mode` set 0600 as it created the file.
 function tightenOwnedFile(filePath) {
   if (process.env.AIDD_RUNS_DIR) return;
   if (process.platform === "win32") restrictToCurrentUser(filePath);
 }
 
 // The real mechanism on Windows: reset the target's NTFS ACL to inherit nothing and grant
-// Full Control to the current user alone. `inheritable` adds the container-inherit flags
-// `(OI)(CI)` so a directory's own future children pick up the same grant; a file gets
-// neither, since a file has no children to inherit anything. Never `/T`: measured on a
-// real windows-latest runner, `/T` walked into files this code does not own - a
-// checked-out `.gitkeep` among them - and left at least one with no usable ACE of its
-// own, so an ordinary `git add -A` right after got "Permission denied" opening it. It
-// bought nothing here anyway: a file this code creates gets its own tightenOwnedFile
-// pass, and `(OI)(CI)` alone makes the directory's own grant apply to anything created
-// in it afterward - so this now only ever touches the target's own ACL entry, never a
-// file already sitting inside a directory it is applied to. `icacls` shelled out to the
-// same way `git` already is above; `/C` keeps it going past one bad entry instead of
-// aborting the whole reset, and its own exit code is not trusted as proof of anything -
-// only a caller reading the ACL back can say whether it worked.
+// Full Control to the current user alone. `inheritable` adds `(OI)(CI)` so a directory's
+// future children pick up the grant; a file has no children to inherit anything.
+//
+// Never `/T`: it walks into files this code does not own and can leave one with no usable
+// ACE, so an ordinary `git add -A` then fails with "Permission denied". `/C` keeps icacls
+// going past one bad entry, and its exit code is not trusted as proof of anything.
 function restrictToCurrentUser(target, { inheritable = false } = {}) {
   try {
     const owner = process.env.USERDOMAIN
@@ -292,30 +250,21 @@ function restrictToCurrentUser(target, { inheritable = false } = {}) {
   }
 }
 
-// Decision, not an inherited default: a worktree keeps its own journal.
-// `getRepoRoot` resolves `--show-toplevel`, the worktree's own root - never
-// `--git-common-dir`'s shared repository, which this deliberately does not read.
+// A decision, not an inherited default: a worktree keeps its own journal, at the worktree's
+// own root and never at `--git-common-dir`'s shared repository.
 //
-// Two reasons hold it there. First, the layout an agent runner actually gives each agent
-// - Orca sets ORCA_WORKTREE_ID and does exactly this - is a bare clone plus worktrees,
-// which has no main working tree to write into at all: `--git-common-dir` there names the
-// bare `.git`, whose parent is not a checkout. Second, even where a main worktree does
-// exist, writing into it from worktree B would dirty a checkout on a different branch,
-// possibly with uncommitted work of its own, whose `.gitignore` was never asked to carry
-// the entry `aidd telemetry on` added when B turned measurement on.
-//
-// Cross-worktree joining - so a report can still see every worktree's sessions together -
-// `worktreeFields` above names the worktree on `session_start`, and the write
-// target stays exactly where this function has always put it.
+// A bare clone plus worktrees has no main working tree to write into at all, and even where
+// one exists, writing into it from another worktree dirties a checkout on a different branch
+// whose `.gitignore` was never asked to carry the entry. Cross-worktree joining is served by
+// `worktreeFields` naming the worktree on `session_start` instead.
 function resolveRunsDir(cwd) {
   const location = getRepoLocation(cwd);
   if (!location || !telemetryEnabled(location.repoRoot)) return null;
   return { ...location, dir: runsDir(location.repoRoot) };
 }
 
-// A token-authenticated clone leaves a live credential in the remote's userinfo
-// (`https://ghp_xxx@host/o/r`), and the journal is meant to be read and shipped. Only
-// scheme-bearing URLs have userinfo; scp-style `git@host:owner/repo` is left whole.
+// A token-authenticated clone leaves a live credential in the remote's userinfo, and the
+// journal is meant to be read and shipped. Only a scheme-bearing URL has userinfo.
 function remoteWithoutCredentials(remoteUrl) {
   if (typeof remoteUrl !== "string") return null;
   return remoteUrl.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/]*@/u, "$1");

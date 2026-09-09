@@ -1,23 +1,11 @@
 #!/usr/bin/env node
 /**
- * check-context-reference-form.js - Fails when a context file's memory block
- * carries a reference in a form its own tool cannot resolve.
+ * Fails when a context file's memory block carries a reference its own tool cannot resolve:
+ * `CLAUDE.md` takes `@aidd_docs/…` imports, while `AGENTS.md` and the copilot instructions
+ * take markdown links, where an `@` line is inert text that loads nothing and reports nothing.
  *
- * `CLAUDE.md` takes `@aidd_docs/…` because Claude Code resolves that import.
- * `AGENTS.md`, and the copilot instructions file, take markdown links because the
- * tools reading them do not: an `@` line there is inert text that loads nothing
- * and reports nothing.
- *
- * `plugins/aidd-context/hooks/update_memory.js` already writes the right form.
- * What was missing is anything that notices a file drifting back to the wrong
- * one — through an older copy of that hook still cached on a machine, or a stale
- * edit swept into an unrelated commit. Both have happened.
- *
- * The expected form is read from the hook's own `TARGET_FILES`, never restated
+ * The expected form is read from `update_memory.js`'s own `TARGET_FILES`, never restated
  * here: a second copy of that table could disagree with the one that writes.
- *
- * Usage:
- *   node scripts/check-context-reference-form.js
  */
 
 const fs = require("node:fs");
@@ -33,10 +21,8 @@ const TARGET_ENTRY = /\{\s*path:\s*"([^"]+)"\s*,\s*syntax:\s*"(at|link)"\s*\}/gu
 const AT_REFERENCE = /^@(\S+)$/u;
 const LINK_REFERENCE = /^\[[^\]]+\]\([^)]+\)$/u;
 
-/** The hook's own table of which file takes which form. Throws rather than
- * returning nothing: a table that cannot be read makes every comparison below
- * vacuous, and a check that passes because it compared against nothing is worse
- * than no check. */
+/** Throws rather than returning nothing: a check that passes because it compared against
+ * nothing is worse than no check. */
 function readDeclaredTargets(hookSource) {
   const targets = [...hookSource.matchAll(TARGET_ENTRY)].map(([, file, syntax]) => ({
     path: file,
@@ -51,19 +37,17 @@ function readDeclaredTargets(hookSource) {
   return targets;
 }
 
-/** The form of one line, or `null` when the line is not a reference at all —
- * prose, an html comment and the read-on-demand list all share the block. */
+/** `null` when the line is not a reference at all — prose, an html comment and the
+ * read-on-demand list all share the block. */
 function referenceForm(line) {
   if (AT_REFERENCE.test(line)) return "at";
   if (LINK_REFERENCE.test(line)) return "link";
   return null;
 }
 
-/** Every reference in the memory block whose form is not the declared one.
- *
- * A file with no block, and one whose markers are unpaired, both yield nothing:
- * `update_memory.js` reports the unpaired case itself, and two voices for one
- * fault help nobody. */
+/** A file with no block, and one whose markers are unpaired, both yield nothing:
+ * `update_memory.js` reports the unpaired case itself, and two voices for one fault
+ * help nobody. */
 function referenceFormProblems(content, expected) {
   const lines = content.split("\n");
   const opensAt = lines.findIndex((line) => line.includes(BLOCK_OPEN));
@@ -86,8 +70,8 @@ function readFileIfPresent(relPath) {
   return fs.existsSync(full) ? fs.readFileSync(full, "utf8") : null;
 }
 
-/** A declared file the repository does not have is skipped: the hook writes to
- * whichever of them exist, and a project carrying only one is a normal state. */
+/** A declared file the repository does not have is skipped: the hook writes to whichever
+ * of them exist, and a project carrying only one is a normal state. */
 function checkFiles(targets, io = { readFileIfPresent }) {
   const problems = [];
   for (const target of targets) {

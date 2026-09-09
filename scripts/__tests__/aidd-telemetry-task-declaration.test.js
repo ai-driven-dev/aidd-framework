@@ -1,15 +1,7 @@
-// The task-declaration reader (declaredTaskPath, in hooks/lib/task-declared.cjs) was tested
-// only against hand-written payloads until now (aidd-telemetry-journal.test.js's own
-// readTaskPayload()), which proves the reader agrees with itself, not with anything a host
-// actually sends - the weakest cell the six-questions audit named. This file replaces that
-// with one real, live capture per host that can declare, for four of the five - Codex
-// included, now that codex-cli is runnable in this environment - and, for OpenCode, the
-// call `hooks/opencode-plugin.js` builds from a genuinely captured event, now that a
-// genuine `opencode 1.14.20` capture (2026-08-31) settled the question a bounded
-// measurement was run to answer: a completed tool part's own arguments do reach the
-// plugin's `event` hook, and that hook joins one into a declaration the same way every
-// other host's hook already does. See fixtures/README.md's "The task-declaration payloads"
-// for exactly what each fixture rests on.
+// One real, live capture per host that can declare a task, rather than a hand-written payload
+// - which would only prove the reader agrees with itself, never with anything a host sends.
+// For OpenCode it is the call `opencode-plugin.js` builds from a genuinely captured event.
+// See fixtures/README.md for exactly what each fixture rests on.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -61,21 +53,21 @@ for (const [host, fixtureName] of Object.entries(SKILL_FIXTURE_BY_HOST)) {
   });
 }
 
-// Mutation proof, per host: declaredTaskPath reads only `payload.tool_input`, falling back
-// to `payload.toolArgs` - renaming a key *inside* that object proves nothing, since
-// firstTaskPathIn walks every string value regardless of its key. The shape drift that
-// actually matters is the wrapper itself: if a host ever renamed tool_input (or Copilot's
-// canonical toolArgs), the reader would stop finding anything in it - so that is the key
-// this proof renames. All four captures here carry the path inside `tool_input`; none uses
-// Copilot's canonical `toolArgs` string (see fixtures/README.md on why a live capture
-// against this plugin's own hooks.json cannot land on that shape).
+// Mutation proof, per host: renaming a key *inside* the arguments proves nothing, since
+// firstTaskPathIn walks every string value regardless of its key. The drift that matters is
+// the wrapper itself - a host renaming `tool_input` would leave the reader finding nothing -
+// so that is the key this proof renames.
 const WRAPPER_KEY = "tool_input";
 const RENAMED_WRAPPER_CASE_BY_HOST = Object.keys(TASK_DECLARED_FIXTURE_BY_HOST);
 
 for (const host of RENAMED_WRAPPER_CASE_BY_HOST) {
   test(`${host}: renaming the ${WRAPPER_KEY} wrapper the path lives in turns the declaration reader red`, () => {
     const payload = loadFixture(TASK_DECLARED_FIXTURE_BY_HOST[host]);
-    assert.equal(declaredTaskPath(payload), TASK_RELATIVE_PATH, "sanity: the un-mutated fixture still declares");
+    assert.equal(
+      declaredTaskPath(payload),
+      TASK_RELATIVE_PATH,
+      "sanity: the un-mutated fixture still declares"
+    );
 
     payload.arguments = payload[WRAPPER_KEY];
     delete payload[WRAPPER_KEY];
@@ -84,12 +76,3 @@ for (const host of RENAMED_WRAPPER_CASE_BY_HOST) {
   });
 }
 
-// OpenCode declares a task now: a bounded, three-further-session measurement (opencode
-// 1.14.20, 2026-08-31) found a completed tool part's own arguments do reach the plugin's
-// `event` hook - see fixtures/README.md's "OpenCode's tool part" for what was run, what
-// arrived, and what did not. hooks/opencode-plugin.js's `declaredTaskCallFor` joins one the
-// same way every other host's hook already does, asserted above through
-// TASK_DECLARED_FIXTURE_BY_HOST like every other host. cli/src/domain/tools/ai/opencode.ts's
-// telemetryTaskAttributable flips to true for the same reason, and
-// registry-conformance.unit.test.ts keeps it tied to the journal hook's own tool-used
-// dispatch rather than typed in twice by hand.

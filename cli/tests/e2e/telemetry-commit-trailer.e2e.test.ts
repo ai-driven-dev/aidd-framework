@@ -4,31 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { SESSION_TRAILER_TOKEN } from "../../src/domain/formats/commit-session-trailer.js";
-import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { CLI_PATH, pathWithoutAidd } from "./helpers.js";
+import { SESSION_TRAILER_TOKEN } from "../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
+import { environmentWithoutGitVariables } from "../../src/runtime/git/git-environment.js";
+import { cliPath, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 
 /**
- * The last link of the chain, held to a real commit.
- *
- * Every other test of this feature reads a string the CLI produced. None of them prove git
- * runs the hook — which is the entire question, and the one an install written to a
- * directory git ignores answers wrongly while reporting success. So this makes actual
- * commits and reads their actual messages back with `git log`.
- *
- * The identifier a commit carries is the one a record already carries:
- * `CLAUDE_CODE_SESSION_ID` is the transcript filename the local reader resolves a Claude
- * Code session by, and `telemetry-claim.ts`'s own `firedForSession` has compared the two as
- * equal since the "hook fired" claim existed.
+ * Real commits, read back with `git log`: an install written to a directory git ignores
+ * reports success while the hook never runs, and only git itself can tell the two apart.
  */
 const SESSION = "33333333-3333-4333-8333-333333333333";
 const OTHER_SESSION = "44444444-4444-4444-8444-444444444444";
 
-/** Every variable `session-anchor.ts` reads, removed. A test that means "no session made
- * this commit" has to say so to the process it spawns, not merely refrain from mentioning
- * it: the runner's own environment already carries one. */
+/** Every variable `session-anchor.ts` reads, removed: the runner's own environment already
+ * carries one, so "no session made this commit" has to be stated to the spawned process. */
 function withoutSessionVariables(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const { CODEX_THREAD_ID, CLAUDE_CODE_SESSION_ID, ...rest } = env;
   return rest;
@@ -36,18 +26,15 @@ function withoutSessionVariables(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 
 interface Repo {
   readonly dir: string;
-  /** `aidd`, run from the repository, with a sandboxed home and no `aidd` on PATH. */
   readonly aidd: (args: readonly string[]) => Promise<{ stdout: string }>;
-  /** One real commit, carrying whatever session variables are passed — including none,
-   * which is how a commit nobody's session made gets written. */
+  /** Passing no session variables is how a commit nobody's session made gets written. */
   readonly commit: (message: string, sessionEnv?: NodeJS.ProcessEnv) => Promise<void>;
   readonly git: (args: readonly string[], sessionEnv?: NodeJS.ProcessEnv) => Promise<string>;
   readonly messageOf: (ref: string) => Promise<string>;
 }
 
-/** A repository of its own per test, torn down in `finally`. Each test owns its directory
- * rather than sharing one through a hook: these run concurrently, and shared state here
- * meant one test's cleanup pulling the ground out from under another. */
+/** A repository per test rather than one shared through a hook: these run concurrently, and
+ * one test's cleanup would pull the ground out from under another. */
 async function withRepo(use: (repo: Repo) => Promise<void>): Promise<void> {
   const tempDir = await mkdtemp(join(tmpdir(), "aidd-commit-trailer-"));
   const dir = join(tempDir, "project");
@@ -56,14 +43,8 @@ async function withRepo(use: (repo: Repo) => Promise<void>): Promise<void> {
       env: environmentWithoutGitVariables(process.env),
     });
 
-    // No `aidd` on PATH: the hook has to stand on a shell and git alone, which is what it
-    // promises. `HOME` and the config dir are sandboxed, so nothing here reaches the
-    // machine's own profile.
-    //
-    // Both session variables are stripped before anything is added back. This suite runs
-    // inside a real Claude Code session, so a bare `process.env` carries a real
-    // `CLAUDE_CODE_SESSION_ID` — and the case that matters most here, a commit no session
-    // made, passed a trailer straight through while appearing to prove the opposite.
+    // No `aidd` on PATH: the hook stands on a shell and git alone. Both session variables are
+    // stripped first, since this suite may itself run inside a real session of its own.
     const env = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
       ...withoutSessionVariables(environmentWithoutGitVariables(process.env)),
       PATH: pathWithoutAidd(),
@@ -84,7 +65,7 @@ async function withRepo(use: (repo: Repo) => Promise<void>): Promise<void> {
     await use({
       dir,
       aidd: (args) =>
-        execFileAsync(process.execPath, [CLI_PATH, ...args], { cwd: dir, env: env() }),
+        execFileAsync(process.execPath, [cliPath(), ...args], { cwd: dir, env: env() }),
       commit: async (message, sessionEnv = {}) => {
         await writeFile(join(dir, `${message}.txt`), `${message}\n`);
         await git(["add", "-A"], sessionEnv);
@@ -184,10 +165,8 @@ describe.concurrent("a commit names the session that made it", () => {
     await withRepo(async (repo) => {
       const hook = join(repo.dir, ".git", "hooks", "prepare-commit-msg");
       await writeFile(hook, '#!/bin/sh\necho "theirs ran" >> "$(dirname "$1")/theirs.log"\n');
-      // `fs.chmod`, never a spawned `chmod`: that binary is Git for Windows' own, reached
-      // only if its `usr/bin` happens to be on PATH, and this test has no business depending
-      // on that. Node's own call is a no-op for the execute bit on Windows, which is right —
-      // git runs a hook there through the shell it ships, not through the file's mode.
+      // `fs.chmod`, never a spawned `chmod`: on Windows that binary is Git's own and may be
+      // off PATH, while git runs a hook there through its shell, not through the file's mode.
       await chmod(hook, 0o755);
       await repo.aidd(["telemetry", "on", "--yes"]);
 

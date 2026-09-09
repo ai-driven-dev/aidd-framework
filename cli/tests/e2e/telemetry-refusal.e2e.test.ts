@@ -3,19 +3,14 @@ import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
+import { environmentWithoutGitVariables } from "../../src/runtime/git/git-environment.js";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const JOURNAL_HOOK = resolve(REPO_ROOT, "plugins/aidd-telemetry/hooks/journal.cjs");
 
-/**
- * Phase 1 of "one route, and every sentence about it true": a person can refuse
- * measurement without touching a tracked file, the refusal wins over a project that turned
- * measurement on, and turning measurement on for a whole repository needs the same explicit
- * confirmation `endpoint --scope project` already demands.
- */
 describe("a person's own refusal, without touching a tracked file", () => {
   function hookEnv(fakeHome: string, extra?: Record<string, string>): NodeJS.ProcessEnv {
     return { ...environmentWithoutGitVariables(process.env), HOME: fakeHome, ...extra };

@@ -1,8 +1,0 @@
-[
-  { "prompt": "Add a new CLI command called aidd doctor with --verbose flag", "expect_action": "declare-surface" },
-  { "prompt": "Write the action handler for the framework build command", "expect_action": "write-handler" },
-  { "prompt": "Register the new restore command in cli.ts", "expect_action": "register" },
-  { "prompt": "Change the --force flag from optional to required on the install command", "expect_action": "declare-surface" },
-  { "prompt": "Implement business logic for installing AI tools", "expect_action": null },
-  { "prompt": "Create a port interface for fetching plugins", "expect_action": null }
-]

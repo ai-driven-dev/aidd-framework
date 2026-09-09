@@ -38,11 +38,9 @@ function resolveEventName(argvEvent, payload) {
   return HOOK_EVENT_NAME_TO_CANONICAL[payload && payload.hook_event_name] || null;
 }
 
-// Only on session-start or turn-end - never tool-used, which fires on every tool call and
-// would otherwise pay handleUnrecognisedPayload's git shellout once per call for the life
-// of the session. Every declared host fires session-start at least once (see hooks.json),
-// so an undeclared one wired the same way is caught at parity with a declared host's own
-// per-session cost, not worse; one that fires tool-used alone would go untraced.
+// Never tool-used, which fires on every tool call and would pay handleUnrecognisedPayload's
+// git shellout once per call. Every declared host fires session-start at least once, so an
+// undeclared one wired the same way costs no more than a declared one.
 function maybeRecordUnrecognisedPayload(payload, event) {
   if (!payload || typeof payload !== "object") return;
   const resolvedEvent = resolveEventName(event, payload);
@@ -72,9 +70,8 @@ function processPayload(payload, event) {
     fileWrites.handleTaskFilesObserved(payload, host, sessionId);
     record.handleTurnEnd(payload, host, sessionId);
   } else if (resolvedEvent === "tool-used") {
-    // One event, three readings of it, sharing nothing else: handleFileWritten returns early
-    // unless the path looks like a task folder, a skill call has no task path, and a task
-    // declaration reads the call's own arguments rather than a named field.
+    // One event, three readings of it, sharing nothing else: each returns early on the
+    // shapes the others are looking for.
     fileWrites.handleFileWritten(payload, host, sessionId);
     stepStarts.handleStepStart(payload, host, sessionId);
     stepEnds.handleStepEnd(payload, host, sessionId);

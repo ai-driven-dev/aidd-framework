@@ -1,0 +1,167 @@
+import { join } from "node:path";
+import { AgentsCapability } from "../../capabilities/agents-capability.js";
+import { CommandsCapability } from "../../capabilities/commands-capability.js";
+import { CONFIG_MCP } from "../../capabilities/config-refs.js";
+import { McpCapability } from "../../capabilities/mcp-capability.js";
+import { PluginsCapability } from "../../capabilities/plugins-capability.js";
+import { RulesCapability } from "../../capabilities/rules-capability.js";
+import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import type {
+  AiTool,
+  HasAgents,
+  HasCommands,
+  HasMcp,
+  HasPlugins,
+  HasRules,
+  HasSkills,
+} from "../../contracts.js";
+import { convertCommandFrontmatter, stripToolSuffix } from "../../formats/command.js";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
+import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
+import { registerTool } from "../../registry.js";
+import { buildClaudeContract, buildClaudeFlatContract } from "./build.js";
+import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "./claude-transcript-location.js";
+
+const DIRECTORY = ".claude/";
+const TOOL_SUFFIX = ".claude.md";
+
+function commandsDir(phase: string): string {
+  return `${DIRECTORY}commands/aidd/${phase}/`;
+}
+
+export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & HasMcp & HasPlugins> =
+  {
+    kind: "ai",
+    toolId: "claude",
+    distributionProbes: {
+      manifest: [".claude-plugin/plugin.json"],
+      marketplace: [".claude-plugin/marketplace.json"],
+    },
+    directory: DIRECTORY,
+    toolSuffix: TOOL_SUFFIX,
+    displayName: "Claude Code",
+    telemetryLocalRead: {
+      kind: "declared",
+      transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION,
+      // The mirror image of the export: the transcript names the running skill exactly, on
+      // the same line as the counters, and carries no amount at all.
+      supplies: { tokenCounters: true, amount: false, toolStatedStep: true, agentName: true },
+    },
+    telemetryTaskAttributable: true,
+    telemetryJournalHost: "claude-code",
+    signalDir: ".claude/commands",
+    configOutputPaths: { "settings.json": ".claude/settings.json" },
+    buildContracts: { marketplace: buildClaudeContract, flat: buildClaudeFlatContract },
+
+    capabilities: {
+      agents: new AgentsCapability({
+        directory: DIRECTORY,
+        toolSuffix: TOOL_SUFFIX,
+        format: "markdown",
+      }),
+      skills: new SkillsCapability({
+        directory: DIRECTORY,
+        toolSuffix: TOOL_SUFFIX,
+        buildInstallPath: (fileName) =>
+          `${DIRECTORY}skills/${stripToolSuffix(TOOL_SUFFIX, fileName)}`,
+        convertFrontmatter: (fm) => fm,
+      }),
+      commands: new CommandsCapability({
+        directory: DIRECTORY,
+        toolSuffix: TOOL_SUFFIX,
+        buildInstallPath: (fileName) => {
+          const slashIdx = fileName.indexOf("/");
+          if (slashIdx !== -1) {
+            const phaseDir = fileName.slice(0, slashIdx);
+            const rest = fileName.slice(slashIdx + 1);
+            const phase = phaseDir.match(/^(\d+)/)?.[1];
+            if (phase) return `${commandsDir(phase)}${rest}`;
+          }
+          return `${DIRECTORY}commands/${stripToolSuffix(TOOL_SUFFIX, fileName)}`;
+        },
+        convertFrontmatter: (fm, relativeFileName) =>
+          convertCommandFrontmatter(fm, relativeFileName),
+      }),
+      rules: new RulesCapability({
+        directory: DIRECTORY,
+        toolSuffix: TOOL_SUFFIX,
+        buildInstallPath: (fileName) =>
+          `${DIRECTORY}rules/${stripToolSuffix(TOOL_SUFFIX, fileName)}`,
+        convertFrontmatter: (fm) => {
+          if ("paths" in fm) {
+            const paths = fm.paths;
+            if (Array.isArray(paths) && paths.length === 0) return {};
+            return { paths };
+          }
+          if ("globs" in fm) return { paths: fm.globs };
+          if ("alwaysApply" in fm) {
+            if (fm.alwaysApply === false && fm.description !== undefined) {
+              return { description: fm.description };
+            }
+            return {};
+          }
+          return {};
+        },
+      }),
+      mcp: new McpCapability({
+        outputPath: ".mcp.json",
+        format: "json",
+        entrySection: "mcpServers",
+        consumes: [CONFIG_MCP],
+      }),
+      plugins: new PluginsCapability({
+        mode: "native",
+        pluginsDir: ".claude/plugins/",
+        pluginManifestRelativePath: "plugin.json",
+        acceptsHooks: true,
+        pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
+        acceptsMcp: true,
+        translationMode: "marketplace",
+        // Claude registers its own marketplaces and enables its own plugins, both driven here.
+        // At project scope the command rewrites `.claude/settings.json` after this CLI hashed
+        // it — two writers, one recorder, and `status` reporting drift forever. `--scope local`
+        // writes `.claude/settings.local.json` instead, a file this CLI neither writes nor
+        // tracks, which is what makes the verbs below safe to declare.
+        nativeActivation: {
+          binary: "claude",
+          scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },
+          enableVerb: "install",
+          disableVerb: "uninstall",
+          upgradeVerb: "update",
+          // `--yes` gates a prune confirmation these calls never request, but a headless
+          // stdin has no terminal to answer any prompt at all.
+          pluginArgs: ["--yes"],
+          // Root of claude's own marketplace registry, read by the sync guard that refuses a
+          // name-stealing re-add before driving `marketplace add` at all. Declared here alone,
+          // which is what keeps that guard claude-only by declaration.
+          marketplaceRegistry: (h) => join(h, ".claude", "plugins", "known_marketplaces.json"),
+          // Root of claude's own plugin cache. `clean` composes `<root>/<hostName>` and purges
+          // only once a fresh read of `marketplaceRegistry` above no longer names it — claude
+          // marks an orphaned tree `.orphaned_at` but never deletes it itself.
+          pluginCacheDir: (h) => join(h, ".claude", "plugins", "cache"),
+          // Where a `--scope user` install or marketplace add lands, measured against the real
+          // binary. Never written by aidd; named here for a diagnostic alone.
+          userSettingsPath: (h) => join(h, ".claude", "settings.json"),
+        },
+        marketplaceSettings: {
+          settingsPath: ".claude/settings.json",
+          settingsKey: "extraKnownMarketplaces",
+          // The registered marketplace is the tree this CLI builds under `.aidd/cache/`, named
+          // by absolute path, so the entry describes one machine and must not be committed. It
+          // is the file `claude plugin marketplace add --scope local` writes itself.
+          marketplacesSettingsPath: ".claude/settings.local.json",
+          enabledPluginsKey: "enabledPlugins",
+          toEntryKey: claudeStyleMarketplaceKey,
+        },
+      }),
+    },
+
+    rewriteContent(content: string): string {
+      return content.replace(
+        /(@?)\.claude\/commands\/(\d+)[_][^/]+\//g,
+        (_, at, phase) => `${at}${commandsDir(phase)}`
+      );
+    },
+  };
+
+registerTool(claude);

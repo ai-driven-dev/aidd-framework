@@ -1,0 +1,203 @@
+/**
+ * Opencode's build contract: flat only — opencode has no marketplace mode.
+ * `transformMcpToOpencode` lives here because the flat contract's config-artifact step needs it
+ * as much as the installed-content mcp capability does; the profile imports it back.
+ */
+
+import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
+import {
+  flatHooksPathWithLoaderEntry,
+  flatMcpKeyPrefix,
+  genericFlatAgentPath,
+  genericFlatSkillTreePath,
+} from "../../../../../kernel/materialization/flat-paths.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/materialization/relative-link-rewrite.js";
+import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
+import type { ArtifactContract, ToolBuildContract } from "../../build-contract.js";
+import { buildOpencodeFlatConfig } from "../../formats/opencode-mcp-merge.js";
+import { generateOpencodeHooksBridge } from "./opencode-hooks-bridge.js";
+import {
+  makeOpencodeHooksBridgePath,
+  OPENCODE_FLAT_HOOKS_DIR,
+  OPENCODE_HOOKS_DIR,
+  OPENCODE_PLUGIN_ENTRY_BASENAME,
+} from "./opencode-paths.js";
+
+type FsType = FileReader & FileWriter;
+
+type RawServer =
+  | { command: string; args?: string[]; env?: Record<string, string>; disabled?: boolean }
+  | { url: string; disabled?: boolean };
+
+interface OpencodeMcpLocalServer {
+  type: "local";
+  command: string[];
+  enabled: boolean;
+  environment?: Record<string, string>;
+}
+
+interface OpencodeMcpRemoteServer {
+  type: "remote";
+  url: string;
+  enabled: boolean;
+}
+
+type OpencodeMcpServer = OpencodeMcpLocalServer | OpencodeMcpRemoteServer;
+
+function convertRawServer(name: string, server: RawServer): OpencodeMcpServer {
+  const enabled = server.disabled !== true;
+  if ("command" in server) {
+    const { command, args = [], env } = server;
+    const local: OpencodeMcpLocalServer = { type: "local", command: [command, ...args], enabled };
+    if (env && Object.keys(env).length > 0) local.environment = env;
+    return local;
+  }
+  if ("url" in server) {
+    return { type: "remote", url: server.url, enabled };
+  }
+  throw new InvalidMcpServerConfigError(name);
+}
+
+export function transformMcpToOpencode(content: string): string {
+  let parsed: { mcpServers?: Record<string, RawServer> };
+  try {
+    parsed = JSON.parse(content) as typeof parsed;
+  } catch (err) {
+    throw new McpConfigError(
+      `Cannot parse MCP config: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new McpConfigError("MCP config must be a JSON object");
+  }
+  const mcp: Record<string, OpencodeMcpServer> = {};
+  for (const [name, server] of Object.entries(parsed.mcpServers ?? {})) {
+    mcp[name] = convertRawServer(name, server);
+  }
+  return JSON.stringify({ mcp }, null, 2);
+}
+
+function opencodeFlatAgentPath(plugin: string, rel: string): string {
+  return genericFlatAgentPath(".opencode/agents/", plugin, rel.replace(/^agents\//, ""), ".md");
+}
+
+function opencodeFlatSkillPath(plugin: string, rel: string): string {
+  return genericFlatSkillTreePath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
+}
+
+/** OpenCode's loader scans one flat directory for its own plugin modules, never a "hooks"
+ * family, so a plugin's hook scripts are namespaced under `OPENCODE_HOOKS_DIR` instead. The one
+ * exception is a script named `OPENCODE_PLUGIN_ENTRY_BASENAME`: that loader's own module,
+ * delivered flat and renamed to the plugin's own name. */
+function makeOpencodeFlatHooksPath(): (plugin: string, rel: string) => string {
+  return (plugin, rel) =>
+    flatHooksPathWithLoaderEntry(
+      OPENCODE_HOOKS_DIR,
+      { dir: OPENCODE_FLAT_HOOKS_DIR, baseName: OPENCODE_PLUGIN_ENTRY_BASENAME },
+      plugin,
+      rel
+    );
+}
+
+/** Supported exactly when the profile names a directory to deliver into — the same
+ * declaration `acceptsHooks` is paired with, read once rather than restated here. */
+function buildOpencodeFlatHooksArtifact(): ArtifactContract {
+  return {
+    supported: true,
+    source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
+    path: makeOpencodeFlatHooksPath(),
+    skipHooksJson: true,
+    hooksBridge: {
+      generate: generateOpencodeHooksBridge,
+      path: makeOpencodeHooksBridgePath,
+      skipIfSourceHas: OPENCODE_PLUGIN_ENTRY_BASENAME,
+    },
+  };
+}
+
+function opencodeFlatResolveTarget(plugin: string, rel: string): string {
+  if (rel.startsWith("agents/")) return opencodeFlatAgentPath(plugin, rel);
+  if (rel.startsWith("skills/")) return opencodeFlatSkillPath(plugin, rel);
+  return rel;
+}
+
+function transformOpencodeFlatAgent(content: string, plugin: string, outName: string): string {
+  const { frontmatter, body } = parseFrontmatter(content);
+  const flatRelPath = opencodeFlatAgentPath(plugin, `agents/${outName}`);
+  const rewrittenBody = rewriteRelativeLinks(body, {
+    currentFilePluginRelative: flatRelPath,
+    resolveTargetPath: (rel) => opencodeFlatResolveTarget(plugin, rel),
+  });
+  const prefixedName = `${plugin}-${outName.replace(/\.md$/, "")}`;
+  // mode: subagent ensures opencode treats copied agents as subagents, not primary agents.
+  return serializeFrontmatter(
+    { ...frontmatter, name: prefixedName, mode: "subagent" },
+    rewrittenBody
+  );
+}
+
+async function resolveOpencodeJsonPath(outDir: string, fs: FsType): Promise<string> {
+  const jsoncExists = await fs.fileExists(`${outDir}/opencode.jsonc`);
+  if (jsoncExists) return `${outDir}/opencode.jsonc`;
+  return `${outDir}/opencode.json`;
+}
+
+async function collectOpencodeMcp(
+  builtPlugins: readonly string[],
+  sourceDir: string,
+  fs: FsType
+): Promise<Record<string, unknown>> {
+  const incoming: Record<string, unknown> = {};
+  for (const plugin of builtPlugins) {
+    const mcpSrc = `${sourceDir}/plugins/${plugin}/.mcp.json`;
+    if (!(await fs.fileExists(mcpSrc))) continue;
+    const raw = await fs.readFile(mcpSrc);
+    const transformed = JSON.parse(transformMcpToOpencode(raw)) as {
+      mcp?: Record<string, unknown>;
+    };
+    const prefix = flatMcpKeyPrefix(plugin);
+    for (const [k, v] of Object.entries(transformed.mcp ?? {})) {
+      incoming[`${prefix}${k}`] = v;
+    }
+  }
+  return incoming;
+}
+
+export function buildOpencodeFlatContract(): ToolBuildContract {
+  return {
+    manifestFileRelative: null,
+    synthesizeManifest: null,
+    manifestSchemaName: null,
+    artifacts: {
+      skills: {
+        supported: true,
+        source: { kind: "fullTree", srcDir: "skills" },
+        path: opencodeFlatSkillPath,
+        rewriteSkillName: true,
+      },
+      agents: {
+        supported: true,
+        source: { kind: "filteredTree", srcDir: "agents", inputExt: ".md" },
+        path: opencodeFlatAgentPath,
+        transform: transformOpencodeFlatAgent,
+      },
+      mcp: { supported: false }, // handled by emitConfigArtifact (opencode.json mcp)
+      hooks: buildOpencodeFlatHooksArtifact(),
+      rules: { supported: false },
+      commands: { supported: false },
+    },
+    buildMarketplaceCatalog: null,
+    buildMarketplaceEntry: null,
+    emitConfigArtifact: async (builtPlugins, outDir, sourceDir, fs, _validator, assetProvider) => {
+      const configPath = await resolveOpencodeJsonPath(outDir, fs);
+      const existing = (await fs.fileExists(configPath)) ? await fs.readFile(configPath) : null;
+      const incoming = await collectOpencodeMcp(builtPlugins, sourceDir, fs);
+      const baseAsset = assetProvider.loadConfigAsset("opencode", "opencode.json");
+      const base = typeof baseAsset === "string" ? baseAsset : JSON.stringify(baseAsset);
+      await fs.writeFile(configPath, buildOpencodeFlatConfig(base, existing, incoming));
+      return 1;
+    },
+  };
+}

@@ -45,11 +45,18 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 @aidd_docs/memory/codebase-map.md
 @aidd_docs/memory/coding-assertions.md
 @aidd_docs/memory/deployment.md
+@aidd_docs/memory/ecosystem.md
 @aidd_docs/memory/project-brief.md
+@aidd_docs/memory/telemetry.md
 @aidd_docs/memory/testing.md
 @aidd_docs/memory/vcs.md
 
 <!-- read on demand, not auto-loaded -->
+- aidd_docs/memory/internal/smoke-real.md
+- aidd_docs/memory/internal/decisions/clean-drives-the-host-cli.md
+- aidd_docs/memory/internal/decisions/framework-source-is-machine-scope.md
+- aidd_docs/memory/internal/decisions/marketplace-identity-is-name-plus-plugins.md
+- aidd_docs/memory/internal/decisions/plugin-enablement-carries-its-scope.md
 - aidd_docs/memory/internal/decisions/self-update-version-source-npm.md
 
 <!-- aidd_project_memory:end -->

@@ -22,17 +22,23 @@ pre-commit:
         fi
         node scripts/validate-yaml.mjs {files}
     scripts-tests:
-      glob: "{scripts,plugins/aidd-context/hooks}/**"
+      glob: "{scripts,plugins,cli/src}/**"
       run: |
         if ! command -v node >/dev/null 2>&1; then
           echo "ℹ️  node not available; skipping scripts-tests"
           exit 0
         fi
-        # Wrapped, because a suite that writes into this repository's own .git/hooks passes
-        # every assertion and destroys an install nothing can restore — `.git` is in no
-        # history. The wrapper passes the suite's own exit code through untouched.
+        # `node --test <dir>` fails on a directory, so a glob is required — and a glob
+        # matching nothing exits 0 in silence, so a renamed folder must be caught by a count.
+        found=$(ls scripts/__tests__/*.test.js 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$found" -eq 0 ]; then
+          echo "❌ no test files under scripts/__tests__/; the runner is not wired"
+          exit 1
+        fi
+        # Wrapped: a suite writing into this repository's own .git/hooks passes every
+        # assertion and destroys an install nothing can restore — `.git` is in no history.
         node scripts/check-tests-leave-git-alone.js -- \
-          node --test 'scripts/__tests__/*.test.js'
+          node --test 'scripts/__tests__/**/*.test.js'
     skill-frontmatter:
       glob: "plugins/*/skills/*/SKILL.md"
       run: |
@@ -56,8 +62,7 @@ pre-commit:
         fi
         node scripts/check-skill-argument-hints.mjs
     context-imports:
-      # Two patterns, because "**/" needs a literal slash and so never matches
-      # a file at the repository root.
+      # Two patterns: "**/" needs a literal slash, so it never matches a repository-root file.
       glob:
         - "{CLAUDE,AGENTS,copilot-instructions}.md"
         - "**/{CLAUDE,AGENTS,copilot-instructions}.md"
@@ -68,9 +73,8 @@ pre-commit:
         fi
         node scripts/check-context-imports.js
     context-reference-form:
-      # The whole repository's answer, not the staged files': the hook rewrites
-      # every target at once, so a partial view could call one file clean while
-      # its sibling drifted in the same session.
+      # The whole repository, not the staged files: the hook rewrites every target at once,
+      # so a partial view could call one file clean while its sibling drifted.
       glob:
         - "{CLAUDE,AGENTS,copilot-instructions}.md"
         - "**/{CLAUDE,AGENTS,copilot-instructions}.md"
@@ -81,6 +85,24 @@ pre-commit:
           exit 0
         fi
         node scripts/check-context-reference-form.js
+    referenced-paths:
+      glob: "{*.md,docs/**,aidd_docs/memory/**}"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping referenced-paths"
+          exit 0
+        fi
+        node scripts/check-referenced-paths.js
+
+    doc-duplication:
+      glob: "**/*.md"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping doc-duplication"
+          exit 0
+        fi
+        node scripts/check-doc-duplication.js
+
     markdown-links:
       glob: "**/*.md"
       run: |
@@ -88,13 +110,8 @@ pre-commit:
           echo "ℹ️  node not available; skipping markdown-links"
           exit 0
         fi
-        # TEMPORARY (aidd-cli -> framework migration, phase 1): cli's own
-        # historical archives were never link-checked before landing here —
-        # 704 pre-existing, unrelated broken "links" (test fixtures with
-        # intentionally fake paths, old task docs using @src/foo.ts as an
-        # agent-mention shorthand, not a markdown link). See the migration
-        # plan's final phase for the follow-up that fixes the real links and
-        # removes these two --ignore flags.
+        # Both ignored trees hold deliberately unresolvable targets — fixture paths and
+        # `@src/foo.ts` agent mentions — not links a reader is meant to follow.
         node scripts/check-markdown-links.js --ignore cli/tests/fixtures --ignore cli/aidd_docs/tasks
     summarize-plugin-catalogs:
       run: |
@@ -132,55 +149,33 @@ pre-commit:
         fi
         node scripts/sync-readme-counts.mjs >/dev/null
         git add README.md 2>/dev/null || true
-    scripts-test:
-      glob: "{scripts,plugins}/**"
-      run: |
-        if ! command -v node >/dev/null 2>&1; then
-          echo "ℹ️  node not available; skipping scripts-test"
-          exit 0
-        fi
-        # `node --test <dir>` treats the directory as a module path and fails, so
-        # the glob is required. A glob that matches nothing exits 0 in silence,
-        # which would make a renamed folder read as a green run — count first.
-        found=$(ls scripts/__tests__/*.test.js 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$found" -eq 0 ]; then
-          echo "❌ no test files under scripts/__tests__/; the runner is not wired"
-          exit 1
-        fi
-        node --test "scripts/__tests__/**/*.test.js"
     cli-biome:
       glob: "cli/**"
       run: cd cli && pnpm lint
-    cli-layering:
-      # The two invariants biome cannot express: dependencies point inward, and no type is
-      # widened through `unknown` or `never`. Measured, not assumed — a noRestrictedImports
-      # rule written against "../../infrastructure" never fired on a violation planted in
-      # src/domain. The glob covers `cli/**`, not `cli/src/**`: the cast half of the check
-      # reads `cli/tests` too, and a test-only commit must not slip past it.
-      glob: "cli/**"
-      run: node scripts/check-cli-layering.mjs
+    cli-architecture:
+      # The suite reads source as text only, and reads well beyond cli/src: narrower globs
+      # kept going stale, so this one is the whole surface plus the automation files.
+      glob: "{cli/**,lefthook.yml,.github/workflows/**}"
+      run: cd cli && pnpm test:arch
     cli-typecheck:
-      # The CLI type-checks `kanban/` too, so that folder's dependencies must be
-      # resolvable. Install them only when they are missing, to keep the hook fast.
-      #
-      # `--ignore-workspace` was here so pnpm would not resolve kanban to the
-      # repository root, find it lists no members, report "Already up to date" and
-      # install nothing. `kanban/pnpm-workspace.yaml` now stops that upward search on
-      # its own — that is the whole reason the file exists — and the flag had turned
-      # harmful: it discards that same file, and with it the `allowBuilds` entry pnpm
-      # needs to run esbuild's install script. Measured in the real layout under
-      # pnpm 12.3.4, a root workspace above and kanban's own file present: without the
-      # flag the install exits 0, with it, ERR_PNPM_IGNORED_BUILDS.
-      glob: "{cli,kanban}/**"
+      glob: "cli/**"
+      run: cd cli && pnpm typecheck
+    cli-type-honesty:
+      # Type honesty only; dependency direction between layers belongs to biome
+      # (cli/biome.json's noRestrictedImports overrides), not here.
+      glob: "{cli/src/**,cli/tests/**}"
       run: |
-        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile)
-        cd cli && pnpm typecheck
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping cli-type-honesty"
+          exit 0
+        fi
+        node scripts/check-cli-type-honesty.mjs
 
 pre-push:
   commands:
     cli-knip:
       glob: "cli/**"
-      run: cd cli && pnpm knip:production
+      run: cd cli && pnpm knip
     cli-test:
       glob: "cli/**"
       run: cd cli && pnpm test
@@ -189,3 +184,12 @@ commit-msg:
   commands:
     commitlint:
       run: pnpm exec commitlint --edit {1}
+
+# lefthook owns prepare-commit-msg here and regenerates it on install, so `aidd telemetry on`'s
+# delegate is called from a job instead. Absent delegate, nothing runs — opt-in per machine.
+prepare-commit-msg:
+  commands:
+    aidd-session-trailer:
+      run: |
+        delegate="$(git rev-parse --git-common-dir)/hooks/aidd-session-trailer.sh"
+        if [ -f "$delegate" ]; then sh "$delegate" {1} {2}; fi

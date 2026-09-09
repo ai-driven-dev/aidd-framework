@@ -1,21 +1,10 @@
-/**
- * Command Matrix E2E — Plugin, Marketplace & Auth surface
- * Automated counterpart of: aidd_docs/tasks/2026_05/2026_05_06-cli-v5-cleanup-command-matrix.md
- *
- * Already covered by existing E2E journeys (not duplicated here):
- *   plugin-install.e2e.test.ts — marketplace add/list/remove/browse/check/overwrite,
- *                                plugin search/install
- *
- * See also: command-matrix-help.e2e.test.ts, command-matrix-ai.e2e.test.ts
- */
-
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTestEnv, runCli } from "./helpers.js";
 
 const AIDD_DIR = ".aidd";
-const EMPTY_MANIFEST = { version: 5, tools: {}, marketplaces: {} };
+const EMPTY_MANIFEST = { version: 8, tools: {} };
 const PLUGIN_FIXTURE = resolve(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
 
 async function seedManifest(projectDir: string): Promise<void> {
@@ -29,7 +18,7 @@ async function seedManifest(projectDir: string): Promise<void> {
 
 async function seedWithClaude(projectDir: string, fakeHome: string): Promise<void> {
   await seedManifest(projectDir);
-  await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+  await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 }
 
 async function writeMarketplace(
@@ -39,11 +28,6 @@ async function writeMarketplace(
   await mkdir(join(dir, ".claude-plugin"), { recursive: true });
   await writeFile(join(dir, ".claude-plugin", "marketplace.json"), JSON.stringify({ plugins }));
 }
-
-// ---------------------------------------------------------------------------
-// Plugin — install / remove / list / doctor / update / restore
-// (plugin search/install from marketplace are in plugin-install.e2e.test.ts)
-// ---------------------------------------------------------------------------
 
 describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
   it("plugin install <local-path> exits 0 with success message", async () => {
@@ -108,11 +92,11 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 
-  it("plugin doctor exits 0 with healthy message when tool is installed", async () => {
+  it("doctor exits 0 with healthy message when tool is installed", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("plugin-doctor");
     try {
       await seedWithClaude(projectDir, fakeHome);
-      const { stdout, exitCode } = await runCli(["plugin", "doctor"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["doctor"], projectDir, fakeHome);
       expect(exitCode).toBe(0);
       expect(stdout).toContain("healthy");
     } finally {
@@ -120,15 +104,13 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 
-  it("plugin doctor stays 0/healthy when non-plugin drift exists (regression: silent exit 1)", async () => {
-    // Regression for a silent exit-1: plugin doctor used to gate on the FULL
-    // doctor health (tracked-file / reference / layout warnings included) while
-    // only rendering pluginIssues — so unrelated drift made it exit 1 printing
-    // nothing. Here a tracked file is mutated (non-plugin drift): global doctor
-    // must flag it (exit 1), plugin doctor must stay scoped (exit 0 + healthy).
+  it("doctor --plugin stays 0/healthy when non-plugin drift exists (regression: silent exit 1)", async () => {
+    // A tracked file is mutated here — non-plugin drift — so unscoped doctor must flag it while
+    // `doctor --plugin` stays scoped to plugin issues.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("plugin-doctor-scope");
     try {
       await seedWithClaude(projectDir, fakeHome);
+      await runCli(["plugin", "install", PLUGIN_FIXTURE, "--tool", "claude"], projectDir, fakeHome);
       const manifest = JSON.parse(
         await readFile(join(projectDir, AIDD_DIR, "manifest.json"), "utf-8")
       );
@@ -136,10 +118,14 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
       await appendFile(join(projectDir, tracked), "\n<!-- drift -->\n");
 
       const global = await runCli(["doctor"], projectDir, fakeHome);
-      expect(global.exitCode).toBe(1); // full doctor sees the drift
+      expect(global.exitCode).toBe(1); // unscoped doctor sees the drift
 
-      const { stdout, exitCode } = await runCli(["plugin", "doctor"], projectDir, fakeHome);
-      expect(exitCode).toBe(0); // plugin doctor is plugin-scoped
+      const { stdout, exitCode } = await runCli(
+        ["doctor", "--plugin", "sample-plugin"],
+        projectDir,
+        fakeHome
+      );
+      expect(exitCode).toBe(0); // plugin-scoped doctor stays scoped
       expect(stdout).toContain("healthy");
     } finally {
       await cleanup();
@@ -176,12 +162,12 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 
-  it("ai restore exits 0 and restores plugin files when a tracked file is deleted", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("ai-restore-plugin");
+  it("sync --tool claude exits 0 and restores plugin files when a tracked file is deleted", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("sync-restore-plugin");
     try {
       await seedWithClaude(projectDir, fakeHome);
       await runCli(["plugin", "install", PLUGIN_FIXTURE, "--tool", "claude"], projectDir, fakeHome);
-      const { stdout, exitCode } = await runCli(["ai", "restore"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["sync", "--tool", "claude"], projectDir, fakeHome);
       expect(exitCode).toBe(0);
       expect(stdout).toMatch(/[Rr]estor|[Nn]othing to restore/);
     } finally {
@@ -219,10 +205,6 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// Marketplace — refresh / cache (add/list/browse/check/remove in plugin-install.e2e.test.ts)
-// ---------------------------------------------------------------------------
 
 describe.concurrent("Command Matrix: Marketplace cache + refresh", () => {
   it("marketplace refresh exits 0 (no-op when no marketplaces registered)", async () => {
@@ -274,7 +256,7 @@ describe.concurrent("Command Matrix: Marketplace cache + refresh", () => {
   });
 
   it("marketplace add with file:// URI exits 1 — unsupported format", async () => {
-    // NOTE from matrix: file:// URI format not supported; use absolute path instead
+    // `file://` URIs are unsupported; a marketplace source is an absolute path.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("mkt-add-file-uri");
     try {
       await seedManifest(projectDir);
@@ -290,10 +272,6 @@ describe.concurrent("Command Matrix: Marketplace cache + refresh", () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// Auth — offline operations only
-// ---------------------------------------------------------------------------
 
 describe.concurrent("Command Matrix: Auth (offline)", () => {
   it("auth status exits 0 and reports authentication state", async () => {

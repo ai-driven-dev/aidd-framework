@@ -4,19 +4,8 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
- * Phase 2 of "one route, and every sentence about it true"
- * (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/): the export route's writer —
- * the OTLP receiver, the export config reader, and the mapper that turned an exported
- * payload into a stored record — is deleted. Its reader is not: a record an earlier version
- * of this tool already wrote to someone's real sink, with `provenance: "export"`, must stay
- * readable, countable, and reportable exactly as before. Removing a way of writing never
- * removes a way of reading.
- *
- * This record is not hand-invented: it is the real shape the deleted production mapper
- * produced from a captured Claude Code OTLP payload (see
- * `tests/domain/models/cost-report.unit.test.ts`'s "one billed call, seen by both routes"
- * describe block, which carries the same record and proves the double-count rule that
- * needs it still holds).
+ * A record an earlier version of this tool wrote with `provenance: "export"` must stay
+ * readable, countable and reportable: the writer is gone, the reader is not.
  */
 const SINK_DAY_FILE = "2026-08-18.jsonl";
 const WORK_DAY = "2026-08-18";
@@ -124,9 +113,8 @@ describe("a record the removed export route already wrote stays readable", () =>
 
       expect(result.exitCode, result.stderr).toBe(0);
       const envelope = JSON.parse(result.stdout);
-      // One billed call, seen by both routes, counts once — the third double-count rule,
-      // still holding with an export-provenance record read from disk rather than exported
-      // live.
+      // One billed call, seen by both routes, counts once — holding for an export-provenance
+      // record read from disk.
       expect(envelope.totals.requests).toBe(1);
       expect(envelope.totals.input_tokens).toBe(2);
       expect(envelope.totals.cost_micro_usd).toBe(13220);

@@ -1,28 +1,23 @@
 import { createHash } from "node:crypto";
-import { stripJsonComments } from "../../../src/domain/formats/jsonc.js";
-import { FileHash } from "../../../src/domain/models/file.js";
+import type { FileMerger } from "../../../src/contexts/tools/domain/ports/file-merger.js";
+import { FileHash } from "../../../src/kernel/file.js";
 import {
   isPerKeyMergeStrategy,
   type MergeStrategy,
   type PerKeyMergeStrategy,
-} from "../../../src/domain/models/merge.js";
-import type { FileMerger } from "../../../src/domain/ports/file-merger.js";
-import type { FileReader } from "../../../src/domain/ports/file-reader.js";
-import type { FileWriter } from "../../../src/domain/ports/file-writer.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
+} from "../../../src/kernel/merge.js";
+import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../src/kernel/ports/file-writer.js";
+import type { Hasher } from "../../../src/kernel/ports/hasher.js";
+import { stripJsonComments } from "../../../src/kernel/reading/jsonc.js";
 
-/**
- * Pure in-memory implementation of the FileReader, FileWriter, and FileMerger ports.
- * Uses a Map<path, content> — no real I/O.
- */
 export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   /** Executable when `chmodExecutable` was called for it, absent otherwise — the two states
    * `delegateState` tells apart, without a filesystem. */
   private readonly executable = new Set<string>();
 
-  /** Normalized like every other reader in this class. Skipping `norm` made this the one
-   * method that could answer for a path `fileExists` disagreed with — which is the exact
-   * contradiction `FileReader.isExecutable` sits behind the port to prevent. */
+  /** Normalized like every other reader here: an un-normalized key would answer for a path
+   * `fileExists` disagrees with. */
   async isExecutable(path: string): Promise<boolean> {
     const key = norm(path);
     return this.files.has(key) && this.executable.has(key);
@@ -30,6 +25,9 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
 
   private readonly files = new Map<string, string>();
   private readonly hasher: Hasher;
+  /** Path → what it resolves to, for a test proving `realpath`-based containment
+   * without a real filesystem — see `setSymlink`. */
+  private readonly symlinks = new Map<string, string>();
 
   constructor(seed: Record<string, string> = {}, hasher?: Hasher) {
     this.hasher = hasher ?? new DefaultHasher();
@@ -69,9 +67,7 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     return content;
   }
 
-  /**
-   * Returns relative paths of all files under dirPath (recursive), same as FileAdapter.
-   */
+  /** Relative paths, recursive, the shape `FileAdapter` returns. */
   async listDirectory(dirPath: string): Promise<string[]> {
     const normalizedDir = norm(dirPath);
     const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
@@ -98,6 +94,28 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   async readFileHash(path: string): Promise<FileHash> {
     const content = await this.readFile(path);
     return this.hasher.hash(content);
+  }
+
+  /** Resolves through the longest matching registered symlink, like a real `fs.realpath`
+   * walking a symlinked ancestor; identity when none was declared for the path. */
+  async realpath(path: string): Promise<string> {
+    const key = norm(path);
+    let bestMatch: { link: string; target: string } | undefined;
+    for (const [link, target] of this.symlinks) {
+      if (key === link || key.startsWith(`${link}/`)) {
+        if (bestMatch === undefined || link.length > bestMatch.link.length) {
+          bestMatch = { link, target };
+        }
+      }
+    }
+    if (bestMatch === undefined) return key;
+    return bestMatch.target + key.slice(bestMatch.link.length);
+  }
+
+  /** Test-only: declares that `path` is a symlink resolving to `target`, so a test can
+   * prove `realpath`-based containment without touching a real filesystem. */
+  setSymlink(path: string, target: string): void {
+    this.symlinks.set(norm(path), norm(target));
   }
 
   async mergeJsonFile(path: string, content: string, strategy: MergeStrategy): Promise<void> {
@@ -128,6 +146,10 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     this.files.set(normalizedPath, JSON.stringify(merged, null, 2));
   }
 
+  async chmodExecutable(_path: string): Promise<void> {
+    // No-op: no permission bits in memory
+  }
+
   async deleteDirectory(dirPath: string): Promise<void> {
     const normalizedDir = norm(dirPath);
     const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
@@ -136,27 +158,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
         this.files.delete(key);
       }
     }
-  }
-
-  async chmodExecutable(path: string): Promise<void> {
-    this.executable.add(norm(path));
-  }
-
-  async backup(absolutePath: string): Promise<string> {
-    const content = await this.readFile(absolutePath);
-    const timestamp = new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[^0-9T]/g, "");
-    const backupPath = `${norm(absolutePath)}.bak.${timestamp}`;
-    this.files.set(backupPath, content);
-    return backupPath;
-  }
-
-  async hasLocalChanges(path: string, knownHash: FileHash): Promise<boolean> {
-    if (!(await this.fileExists(path))) return false;
-    const diskHash = await this.readFileHash(path);
-    return diskHash.value !== knownHash.value;
   }
 
   async listFilesRecursive(dirPath: string): Promise<string[]> {
@@ -170,8 +171,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     }
     return result;
   }
-
-  // ── Inspection helpers for test assertions ──────────────────────────────────
 
   setFile(path: string, content: string): void {
     this.files.set(norm(path), content);
@@ -201,8 +200,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
 function norm(path: string): string {
   return path.replaceAll("\\", "/");
 }
-
-// ── Private helpers ───────────────────────────────────────────────────────────
 
 class DefaultHasher implements Hasher {
   hash(content: string): FileHash {

@@ -3,27 +3,16 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
-/**
- * The flow axis, end to end: a period breaks down by the orchestrated run the journal's own
- * step sequence already names, through the real CLI binary and real disk - never the
- * in-memory doubles the domain unit tests exercise. Two properties this level alone can
- * prove: two runs of the *same* orchestrating skill in one session stay two rows, not one
- * merged by name, and a hand-run skill mid-flow counts inside it exactly as the journal's
- * own flat sequence forces it to.
- */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FBY";
 const VENDOR_ID = "66666666-6666-4666-8666-666666666666";
-// A second session with no run journal on disk at all - the shape a session resumed after
-// its context was compacted leaves behind: nothing is invoked again, so no `step_start`
-// hook fires, while the transcript goes on stating the step on every record it produces.
+// A second session with no run journal on disk at all - the shape a session resumed after its
+// context was compacted leaves: no `step_start` fires, while the transcript still states the step.
 const NO_JOURNAL_VENDOR_ID = "77777777-7777-4777-8777-777777777777";
 const PROJECT_ID = "acme/widgets";
 const PERIOD = ["--from", "2026-03-01", "--to", "2026-03-31"];
 
 // One session running the same orchestrating skill twice, with a hand-run skill inside the
-// first run, and work before either ever opens - the shape phase-1.md's own test scope
-// names: two orchestrated runs, a hand-run skill counted inside one of them, and work
-// outside any flow.
+// first run, and work before either ever opens.
 const JOURNAL_LINES = [
   {
     type: "session_start",
@@ -65,9 +54,8 @@ const RECORDS = [
   }),
   // Inside the first sdlc run, but from the hand-run skill - the journal cannot tell it apart.
   record({ turn_id: "first-run-hand-run", event_timestamp: "2026-03-10T09:35:00Z", cost_usd: 3 }),
-  // After the turn ended, before the next orchestrating step opens - still the first sdlc
-  // run, which a pause does not end. The separating record for this axis: while a turn_end
-  // closed a flow, this one fell outside every flow.
+  // After the turn ended, before the next orchestrating step opens - still the first sdlc run,
+  // which a pause does not end. The separating record for this axis.
   record({
     turn_id: "first-run-after-pause",
     event_timestamp: "2026-03-10T09:55:00Z",
@@ -179,10 +167,8 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
   });
 
   it("keeps a record made after the turn ended inside the flow that was still running", async () => {
-    // The rule this axis changed on 2026-09-04, end to end: a `turn_end` is a pause, not the
-    // end of an orchestration. This record sits between the pause at 09:50 and the next
-    // orchestrating step at 10:00, so where it lands is the whole difference between the two
-    // rules - it used to be counted outside every flow.
+    // A `turn_end` is a pause, not the end of an orchestration. This record sits between the
+    // pause at 09:50 and the next orchestrating step at 10:00, where the two rules differ.
     const { projectDir, fakeHome } = await seed();
 
     const result = await runCli(["telemetry", "report", ...PERIOD, "--json"], projectDir, fakeHome);
@@ -252,7 +238,6 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
     expect(stated?.totals.cost_micro_usd).toBe(13_000_000); // 6 + 7
     // A name is not a run: the row is a bucket drawn from however many runs the tool named.
     expect(stated?.started_at).toBeUndefined();
-    // And it never swallows the runs the journal did witness.
     const witnessed = envelope.by_flow.filter((row) => row.attribution === "journal-interval");
     expect(witnessed).toHaveLength(2);
   });

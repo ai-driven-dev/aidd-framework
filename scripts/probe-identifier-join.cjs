@@ -4,21 +4,10 @@
  * the session identifier a hook receives is the one the tool's own files carry, so a cost
  * read out of those files can be placed against the work the journal recorded.
  *
- * #632 proved it by running one real session. One session is a snapshot, and a tool update
- * can break the join without anything turning red. This is that check, made repeatable.
- *
- * It used to prove the join over the OTLP export route. That route was deleted — nothing
- * in this system opens a listener or configures a destination any more — so the probe now
- * proves it where it actually happens: `aidd telemetry read` opens the transcript Claude
- * Code wrote for the session the journal named. Same assumption, one fewer moving part,
- * and no network at all.
- *
- * **It costs nothing.** Claude Code mints its session identifier, fires `SessionStart` and
- * opens its transcript *before* it ever reaches the API. Pointed at a dead address with a
- * fake key and an empty home, it still does all three and then fails the call. Measured
- * 2026-08-29 on 2.1.250: hook, journal and transcript all carried the same identifier,
- * zero tokens and no credentials — which is what lets this run on every pull request
- * rather than nightly.
+ * It costs nothing because Claude Code mints its session identifier, fires `SessionStart`
+ * and opens its transcript *before* it ever reaches the API: pointed at a dead address with
+ * a fake key and an empty home, it still does all three and then fails the call. That is
+ * what lets this run on every pull request rather than nightly.
  *
  * Exit codes are the point, not decoration:
  *   0  the join holds
@@ -34,13 +23,12 @@ const path = require("node:path");
 const TOOL_CHANGED = 1;
 const PROBE_BROKEN = 2;
 
-/** How long Claude Code is given before this gives up on it. Generous on purpose: against
- * a dead address the tool retries, and every artefact this probe reads is written long
- * before the retries end — so the timeout bounds the run, it does not race it. */
+/** Generous on purpose: against a dead address the tool retries, and every artefact this
+ * probe reads is written long before the retries end, so the timeout bounds the run. */
 const RUN_TIMEOUT_MS = 90_000;
 
-/** Attributes this probe actually looked at, printed whichever way the run ends: a silent
- * removal has to be visible in the log, not only in a red cross. */
+/** Printed whichever way the run ends: a silent removal has to be visible in the log,
+ * not only in a red cross. */
 const CHECKED = [];
 
 function report(name, verdict, detail) {
@@ -84,10 +72,8 @@ function requireClaude() {
   return (version.stdout || "").trim();
 }
 
-/** Two hooks on one event, deliberately: the capture hook is this probe's own witness of
- * what the tool handed over, and the journal hook is the real one whose output `read` will
- * later have to join. Comparing the probe's witness against the framework's own record is
- * what makes a disagreement attributable. */
+/** Two hooks on one event: the capture hook witnesses what the tool handed over, the
+ * journal hook is the real one — which is what makes a disagreement attributable. */
 function makeProject(root, capture, journalHook) {
   const project = path.join(root, "project");
   fs.mkdirSync(path.join(project, ".claude"), { recursive: true });
@@ -131,8 +117,7 @@ process.stdin.on("end",()=>{try{fs.mkdirSync(process.argv[3],{recursive:true});
 fs.writeFileSync(path.join(process.argv[3],process.argv[2]+".json"),raw)}catch{}process.exit(0)});
 `;
 
-/** Every run file the journal hook left, by name. The name is half the join: the hook
- * writes `<run id>__<the tool's own session id>.jsonl`. */
+/** The name is half the join: the hook writes `<run id>__<the tool's own session id>.jsonl`. */
 function journalledSessionIds(project) {
   const dir = path.join(project, "aidd_docs", "runs");
   if (!fs.existsSync(dir)) return [];
@@ -142,9 +127,8 @@ function journalledSessionIds(project) {
     .map((name) => name.slice(name.indexOf("__") + 2, -".jsonl".length));
 }
 
-/** Every transcript Claude Code wrote under this run's own config directory, by the
- * identifier its file name carries. `claude-code-transcript.ts` locates a session exactly
- * this way, so this reads the same fact the production reader will. */
+/** `claude-code-transcript.ts` locates a session by the identifier in the file name, so
+ * this reads the same fact the production reader will. */
 function transcriptSessionIds(configDir) {
   const root = path.join(configDir, "projects");
   if (!fs.existsSync(root)) return [];
@@ -171,7 +155,7 @@ function main() {
   const project = makeProject(root, capture, journalHook);
 
   // A dead address, a fake key and an empty home: the session opens, both hooks fire and
-  // the transcript is created before any of the three matter. That is what makes this free.
+  // the transcript is created before any of the three matter.
   const run = spawnSync("claude", ["-p", "say OK"], {
     cwd: project,
     encoding: "utf8",
@@ -230,18 +214,16 @@ function main() {
     );
   }
 
-  // The three identifiers agreeing is the join. This last step is what makes it *this
-  // system's* join rather than the probe's own comparison: the shipped reader resolves the
-  // journalled session against the transcript, with no help from anything above.
+  // What makes it *this system's* join rather than the probe's own comparison: the shipped
+  // reader resolves the journalled session against the transcript, unaided.
   const read = spawnSync(process.execPath, [cli, "telemetry", "read"], {
     cwd: project,
     encoding: "utf8",
     env: { ...process.env, HOME: home, AIDD_USER_CONFIG_DIR: sinkDir },
   });
   const stdout = read.stdout || "";
-  // "no session found" is the reader saying the join failed; "read" is it saying the join
-  // held and the session carried no billable record — which is exactly right against a
-  // dead API. The two are different sentences on purpose.
+  // "no session found" says the join failed; "read" says it held and the session carried no
+  // billable record, which is right against a dead API. Two sentences on purpose.
   const found = /Claude Code:\s*read/u.test(stdout);
   report("read locates the session", found ? "present" : "MISSING", stdout.trim().split("\n")[1] ?? "");
   if (!found) {

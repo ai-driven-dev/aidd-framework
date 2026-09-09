@@ -6,22 +6,14 @@
 
 const { skillNameFromSkillFileRead } = require("./skill-detection.cjs");
 
-// A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
-// the identity both sides of this system join on: the hook writes it as `vendor_id` (see
-// `readSessionId` below) and the reader resolves a session by it (CODEX_ROLLOUT_LOCATION in
-// cli/src/domain/formats/codex-rollout.ts, whose `matches` compares `-<uuid>.jsonl`). The
-// join is filename to filename, and holds by construction.
+// A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is the
+// identity both sides join on: the hook writes it as `vendor_id`, the reader resolves a
+// session by it. The join is filename to filename, and holds by construction. It is never
+// read as `session_meta.id`, which a rollout can carry differently from its own filename.
 //
-// It is NOT read as `session_meta.id`, and an earlier version of this comment said it was -
-// "measured across every rollout on disk". Re-measured 2026-09-01 over 418 rollouts, that
-// claim is false: two of them, both `thread_source: "realtime_voice"`, carry a
-// `session_meta.id` that is not the uuid in their own filename. Nothing broke, because no
-// code here ever reads that field; what broke was the sentence explaining why this works.
-//
-// The two parses live apart because hooks/ is copied verbatim by the framework build and
-// can import nothing from cli/ - the same reason sanitizePathSegment is duplicated - so
-// tests/domain/formats/codex-rollout.unit.test.ts pins them to each other and turns red if
-// either moves.
+// The two parses live apart because hooks/ is copied verbatim and can import nothing from
+// cli/ - the same reason sanitizePathSegment is duplicated - so a test pins them to each
+// other and turns red if either moves.
 const CODEX_ROLLOUT_PREFIX = "rollout-";
 const CODEX_ROLLOUT_EXTENSION = ".jsonl";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -38,11 +30,9 @@ function codexSessionIdFromTranscriptPath(transcriptPath) {
 }
 
 // The filename first, `session_id` only as the fallback for a payload carrying no transcript
-// path - because the two disagree often. Measured 2026-09-01 over 418 rollouts on the
-// machine this was written on: 158 carry a `session_meta.session_id` that is not their own
-// `session_meta.id`, and it is `thread_source` that explains which - 89 `subagent`, 11
-// `user`, 58 with the field unset. A vendor_id written from `session_id` on any of those
-// names another rollout, and joins to nothing while the journal still looks healthy.
+// path: the two disagree on well over a third of rollouts, subagent threads most of all, and
+// a vendor_id written from `session_id` there names another rollout and joins to nothing
+// while the journal still looks healthy.
 function readSessionId(payload) {
   return codexSessionIdFromTranscriptPath(payload.transcript_path) ?? payload.session_id;
 }
@@ -51,7 +41,7 @@ module.exports = {
   readSessionId,
   codexSessionIdFromTranscriptPath,
   readCwd: (payload) => payload.cwd,
-  // Measured 2026-08-13, on codex.sse_event.
+  // Measured on codex.sse_event.
   vendorField: "conversation.id",
   stepStart: { skillName: skillNameFromSkillFileRead, turnIdField: "turn_id" },
   writtenPath: null,

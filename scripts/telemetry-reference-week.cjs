@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 /**
  * Prints the reference week: one period, measured end to end, broken down every way the
- * report knows how. The same scenario the e2e test asserts, printed so a person can read
- * what the system answers rather than infer it from assertions — one builder, so the demo
- * cannot drift from the test.
- *
- * Costs nothing: no tool binary, no network, everything under a throwaway temp dir removed
- * on the way out (`--keep` leaves it).
- *
- * Usage: node scripts/telemetry-reference-week.cjs [--keep] [--json]
+ * report knows how. The same builder the e2e test asserts against, so the demo cannot drift
+ * from the test. No tool binary, no network, everything under a throwaway temp dir.
  */
 
 const fs = require("node:fs");
@@ -21,8 +15,8 @@ const {
   EXPECTED,
 } = require("./lib/telemetry-reference-week.cjs");
 
-// Every axis the report can be asked for, in the order a person reads them: what it cost
-// in total, then when, then what the work was, then who and where.
+// In the order a person reads them: the total, then when, then what the work was, then
+// who and where.
 const AXES = [
   "total",
   "day",

@@ -1,9 +1,0 @@
-[
-  { "prompt": "Add a function to serialize widget frontmatter to YAML", "expect_action": "define-pure-function" },
-  { "prompt": "Write a pure function that converts command frontmatter to a JSON object", "expect_action": "define-pure-function" },
-  { "prompt": "Implement the inverse of serializeWidgetFrontmatter so it round-trips losslessly", "expect_action": "round-trip" },
-  { "prompt": "The deserializeWidgetFrontmatter function needs to be the exact inverse of serialize", "expect_action": "round-trip" },
-  { "prompt": "Write unit tests for the widgetFrontmatter format module", "expect_action": "test" },
-  { "prompt": "Add a new capability class for widget support", "expect_action": null },
-  { "prompt": "Add a new AI tool definition for the acme assistant", "expect_action": null }
-]

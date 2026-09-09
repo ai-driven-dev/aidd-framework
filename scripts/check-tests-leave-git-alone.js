@@ -1,25 +1,16 @@
 #!/usr/bin/env node
 /**
- * check-tests-leave-git-alone.js - Runs a command and fails when it changed the
- * repository's own git hooks.
+ * Runs a command and fails when it changed the repository's own git hooks. Git exports
+ * `GIT_DIR` into everything it spawns, so a suite's own `git init` can land its stubs in the
+ * real `.git/hooks` with every test still green — and `.git` is in no history, so there is
+ * nothing to restore from. Narrower on purpose than "a test must strip `GIT_*`": reading the
+ * real repository is fine, changing it never is.
  *
- * On 2026-09-03 the trailer-repair suite's `git init` inherited this repository's exported
- * `GIT_DIR`, so its stub `prepare-commit-msg` and stub delegate landed in the real
- * `.git/hooks`, replacing an install that had stood since 22 August. Every test passed.
- * `aidd telemetry check` reported it hours later, by which point the original was gone:
- * `.git/hooks` is in no history, so there was nothing to restore it from.
- *
- * Stripping `GIT_*` in that one suite fixes that one suite. This is the invariant instead,
- * and it is deliberately narrower than "a test must strip `GIT_*`" — some tests query the
- * real repository on purpose, walking the tree with `git ls-files`. Reading it is fine.
- * Changing it never is.
- *
- * The command's own exit code is passed through untouched: a red suite must stay red with
- * its own code, or this becomes a way to lose test failures.
+ * The command's own exit code is passed through untouched, or this becomes a way to lose
+ * test failures.
  *
  * Usage:
- *   node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/*.test.js'
- *   node scripts/check-tests-leave-git-alone.js --watch <dir> -- <command...>
+ *   node scripts/check-tests-leave-git-alone.js [--watch <dir>]... -- <command...>
  */
 
 const { spawnSync, execFileSync } = require("node:child_process");
@@ -32,9 +23,8 @@ const ROOT = path.resolve(__dirname, "..");
 const USAGE_EXIT = 2;
 const CHANGED_EXIT = 1;
 
-/** The hooks directory git actually runs from, resolved the way git resolves it — a
- * worktree's `.git` is a file, and `core.hooksPath` moves the directory outright, so
- * neither can be assumed to be `<root>/.git/hooks`. */
+/** Resolved the way git resolves it: a worktree's `.git` is a file, and `core.hooksPath`
+ * moves the directory outright, so neither is `<root>/.git/hooks`. */
 function repositoryHooksDir() {
   try {
     return execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-path", "hooks"], {
@@ -47,10 +37,7 @@ function repositoryHooksDir() {
 }
 
 /**
- * Every entry directly in `dir`, with what it takes to notice a change: the content hash,
- * the size, the mode, and a symlink's target.
- *
- * `null` — never an empty object — when the directory does not exist. A directory that
+ * `null` — never an empty object — when the directory does not exist: a directory that
  * appears where there was none is a change, and an absent-reads-as-empty snapshot would
  * call that nothing.
  */
@@ -73,13 +60,26 @@ function snapshotDirectory(dir) {
       shot[entry.name] = { directory: true };
       continue;
     }
-    const stat = fs.statSync(full);
+    // One open, then size, mode and bytes through that same descriptor: asking the path
+    // twice leaves a window in which the entry can change between the two answers.
+    let stat;
+    let bytes;
+    let fd;
+    try {
+      fd = fs.openSync(full, "r");
+      stat = fs.fstatSync(fd);
+      bytes = fs.readFileSync(fd);
+    } catch (err) {
+      if (err.code === "ENOENT") continue;
+      throw err;
+    } finally {
+      if (fd !== undefined) fs.closeSync(fd);
+    }
     shot[entry.name] = {
       size: stat.size,
       mode: stat.mode & 0o777,
-      // The hash, not the size alone: the leak that prompted this replaced a hook with a
-      // stub, and two different scripts can be the same length.
-      hash: createHash("sha256").update(fs.readFileSync(full)).digest("hex").slice(0, 16),
+      // The hash, not the size alone: a hook replaced by a stub can be the same length.
+      hash: createHash("sha256").update(bytes).digest("hex").slice(0, 16),
     };
   }
   return shot;
@@ -98,7 +98,6 @@ function describeEntry(name, before, after) {
   return null;
 }
 
-/** What changed between two snapshots, as lines a person can act on. */
 function describeChanges(before, after) {
   if (before === null && after === null) return [];
   if (before === null) return [`the watched directory appeared: ${Object.keys(after).join(", ")}`];

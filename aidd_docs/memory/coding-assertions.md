@@ -26,16 +26,24 @@ Never state in a commit message or a report anything not just observed in output
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
-| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, skill frontmatter and argument hints, context imports, markdown links, `scripts/` tests; `cli lint` and `cli typecheck` when `cli/` or `kanban/` changed |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, `scripts/` tests, skill frontmatter and argument hints, context imports and reference form, markdown links, the paths the prose names and a sentence written in two documents (`scripts/check-doc-duplication.js`); `cli` lint, architecture, typecheck and type honesty when `cli/` changed. `cli` knip and the full `cli` suite are pre-push, not pre-commit — see below |
 | 2 | `pnpm exec commitlint --edit` | the message against `commitlint.config.cjs` |
 
-Same hook regenerates each plugin's `CATALOG.md` and the README counts, and stages them.
+Same hook regenerates each plugin's `CATALOG.md`, the README counts and `docs/prompts-documentation.md`, and stages them.
+
+Every `cli` job is globbed on `cli/**`. A change under `kanban/` alone fires no local job; run `cd kanban && pnpm test` by hand. CI does cover it — `cli-ci.yml`'s `kanban-checks`, see `deployment.md`.
+
+- `context-reference-form` reads only the three files `update_memory.js`'s `TARGET_FILES` names: root `CLAUDE.md`, root `AGENTS.md`, the `copilot-instructions.md` under `.github/` (absent here). It never walks the tree, so `cli/CLAUDE.md`'s memory block is outside it.
+- `context-imports` walks the whole tree (`scripts/check-context-imports.js`'s `collectContextFiles`).
+- `context-reference-form` also globs `plugins/aidd-context/hooks/update_memory.js`, whose table is its source of truth.
 
 ## Before push
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
-| 1 | `pnpm exec lefthook run pre-push` | `cli knip:production`, then the full `cli` suite, when `cli/` changed |
+| 1 | `pnpm exec lefthook run pre-push` | `cli knip`, then the full `cli` suite, when `cli/` changed |
+
+`--no-verify` buys nothing: `validate.yml` re-runs the whole pre-commit over the whole tree on every push and pull request.
 
 ## Behavior
 

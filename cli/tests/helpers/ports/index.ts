@@ -5,6 +5,7 @@ export { FakeCurrentVersion } from "./fake-current-version.js";
 export { FakeNativePluginActivator } from "./fake-native-plugin-activator.js";
 export { darwinPlatform, FakePlatform, linuxPlatform, win32Platform } from "./fake-platform.js";
 export { FixturePluginFetcher } from "./fixture-plugin-fetcher.js";
+export { InMemoryEnvironment } from "./in-memory-environment.js";
 export { InMemoryFileAdapter } from "./in-memory-file-adapter.js";
 export { InMemoryManifestRepository } from "./in-memory-manifest-repository.js";
 export { InMemoryMarketplaceCache } from "./in-memory-marketplace-cache.js";

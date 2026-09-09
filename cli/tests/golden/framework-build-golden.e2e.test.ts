@@ -1,33 +1,15 @@
 /**
- * Framework build golden — machine-independent output snapshot for all targets and modes.
- *
- * Captures the file tree hash map from `framework build --target <t> [--flat]` against
- * tests/fixtures/framework-real and compares byte-for-byte against the stored
- * baseline in snapshots/framework-build/golden.json.
- *
- * The stored JSON maps key → { relative-path → SHA-256 hex }. Key format:
- *   "<target>" for marketplace mode, "<target>:flat" for flat mode.
- * All values are derived from file content only (no absolute paths, no timestamps).
- * This makes the snapshot machine-independent.
- *
- * FROZEN CELLS (marketplace baseline, never regenerate casually):
- *   claude — re-baselined once in the agents-manifest-fix pass (see below), still frozen since.
- * RE-BASELINED CELLS (flat-discovery-fix pass: bare paths, no plugin segment):
- *   claude:flat, cursor:flat, copilot:flat, codex:flat, opencode:flat
- * RE-BASELINED CELLS (agents-manifest-fix pass: `agents` is now a list of
- *   ./agents/*.md file paths instead of the invalid `["./agents"]` dir form):
- *   claude, cursor, copilot (marketplace)
- *
- * USAGE:
- *   Capture all:   UPDATE_FRAMEWORK_GOLDEN=1 pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
- *   Verify:        pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
+ * Keyed `<target>` or `<target>:flat` → { relative-path → SHA-256 }, so it holds on any
+ * machine. Recapture with UPDATE_FRAMEWORK_GOLDEN=1; re-baselining a cell is deliberate.
  */
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { AI_TOOL_IDS } from "../../src/kernel/tool.js";
 import { createTestEnv, runCli } from "../e2e/helpers.js";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../../..");
@@ -37,30 +19,42 @@ const SNAPSHOT_FILE = join(ROOT, "tests/golden/snapshots/framework-build/golden.
 type TargetSnapshot = Record<string, string>; // rel-path → sha256
 type GoldenSnapshot = Record<string, TargetSnapshot>; // key → files
 
-/** All marketplace targets */
 const MARKETPLACE_TARGETS = ["copilot", "codex", "claude", "cursor"] as const;
-/** All flat targets (including opencode which is flat-only) */
 const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode"] as const;
 
-/**
- * Frozen marketplace cell: its fresh build is byte-compared to the stored hash on
- * every run. Only claude is frozen — cursor/codex/copilot were re-baselined in the
- * plugin-root-token-rewrite pass (${CLAUDE_PLUGIN_ROOT} → tool-native token), and
- * copilot:flat in the flat-discovery-fix pass. claude itself was re-baselined once
- * in the agents-manifest-fix pass (agents → ./agents/*.md file list) and is frozen
- * at that value since.
- */
-const FROZEN_CELLS = new Set(["claude"]);
+const FROZEN_CELLS = new Set<string>([
+  ...MARKETPLACE_TARGETS,
+  ...FLAT_TARGETS.map((target) => `${target}:flat`),
+]);
 
-// This repo carries no .gitattributes, so a Windows checkout's core.autocrlf converts
-// every text file's LF to CRLF on write to disk (#707) - hashing those raw bytes would
-// diff on line endings alone against the LF-committed stored baseline. Fold CRLF -> LF
-// before hashing; skip anything that doesn't round-trip through UTF-8 (this tree's
-// outputs are all .md/.json/.yml/.js today) so a future binary asset isn't corrupted.
+// A Windows checkout's core.autocrlf writes CRLF, which would diff against the LF-committed
+// baseline on line endings alone; content that is not UTF-8 is hashed raw instead.
 function normalizeLineEndings(content: Buffer): Buffer {
   const text = content.toString("utf-8");
   if (Buffer.byteLength(text, "utf-8") !== content.length) return content;
   return Buffer.from(text.replace(/\r\n/g, "\n"), "utf-8");
+}
+
+function canonical(snapshot: TargetSnapshot): string {
+  return JSON.stringify(
+    Object.keys(snapshot)
+      .sort()
+      .map((key) => [key, snapshot[key]])
+  );
+}
+
+function describeDrift(stored: TargetSnapshot, captured: TargetSnapshot): string {
+  const keys = new Set([...Object.keys(stored), ...Object.keys(captured)]);
+  const moved = [...keys]
+    .filter((k) => stored[k] !== captured[k])
+    .sort()
+    .slice(0, 6)
+    .map((k) => {
+      if (stored[k] === undefined) return `+${k}`;
+      if (captured[k] === undefined) return `-${k}`;
+      return `~${k}`;
+    });
+  return moved.join(", ");
 }
 
 async function hashDirectory(dir: string): Promise<TargetSnapshot> {
@@ -89,22 +83,11 @@ async function captureTarget(
   const key = flat ? `${target}:flat` : target;
   const outDir = join(tempDir, `dist-${key.replace(":", "-")}`);
   await mkdir(outDir, { recursive: true });
-  const args = [
-    "framework",
-    "build",
-    "--source",
-    FRAMEWORK_FIXTURE,
-    "--target",
-    target,
-    "--out",
-    outDir,
-  ];
-  if (flat) args.push("--flat");
+  const args = ["translate", FRAMEWORK_FIXTURE, "--to", target, "--out", outDir];
+  if (flat) args.push("--as", "flat");
   const result = await runCli(args, projectDir, fakeHome);
   if (result.exitCode !== 0) {
-    throw new Error(
-      `framework build --target ${target}${flat ? " --flat" : ""} failed: ${result.stderr}`
-    );
+    throw new Error(`translate --to ${target}${flat ? " --as flat" : ""} failed: ${result.stderr}`);
   }
   return hashDirectory(outDir);
 }
@@ -125,10 +108,8 @@ async function captureAllCells(
 }
 
 describe.concurrent("Framework build golden — 9-cell matrix", () => {
-  // Two full 9-cell builds, concurrently with the other tests in this file - on a real
-  // windows-latest runner this measured at 60039ms and 60096ms, just over the 60s default,
-  // not a hang (#707 windows-probe, attempt 3, run 32596840364). Raised per-test rather
-  // than the e2e project's global testTimeout so every other e2e file's budget is unchanged.
+  // Two full 9-cell builds measured just past the 60s default on a Windows runner, not a
+  // hang. Raised per test so no other e2e file's budget moves.
   it("snapshot is deterministic (two captures of each target are byte-identical)", async () => {
     const env1 = await createTestEnv("fb-golden-det-1");
     const env2 = await createTestEnv("fb-golden-det-2");
@@ -173,9 +154,7 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
     }
   }, 120_000);
 
-  // Same reason as above: a full 9-cell build, concurrently with the other tests in this
-  // file, measured at 60096ms on a real windows-latest runner - just over the 60s default.
-  it("stored golden baseline covers all 9 cells and the frozen claude cell is byte-identical (AC #1)", async () => {
+  it("every one of the 9 cells is byte-identical to its stored baseline", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fb-golden-baseline");
     try {
       const captured = await captureAllCells(projectDir, fakeHome, tempDir);
@@ -189,32 +168,39 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
 
       const stored = JSON.parse(await readFile(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
 
-      // Assert all 9 cells exist in stored
       const expectedCells = [...MARKETPLACE_TARGETS, ...FLAT_TARGETS.map((t) => `${t}:flat`)];
       for (const key of expectedCells) {
         expect(stored[key], `stored snapshot missing cell: ${key}`).toBeDefined();
         expect(Object.keys(stored[key]).length, `cell ${key} must have files`).toBeGreaterThan(0);
       }
 
-      // Assert the frozen cell(s) are byte-identical to the stored baseline
+      // Every mismatching cell at once, compared as sorted entries: key order follows the
+      // platform's directory listing, the fact under test is which files exist and hash to what.
+      const drifted = [...FROZEN_CELLS].filter(
+        (key) => canonical(captured[key] ?? {}) !== canonical(stored[key] ?? {})
+      );
+      const detail = drifted
+        .map((key) => `${key}: ${describeDrift(stored[key] ?? {}, captured[key] ?? {})}`)
+        .join("\n");
+      expect(drifted, `cells differing from their stored baseline\n${detail}`).toEqual([]);
       for (const key of FROZEN_CELLS) {
-        const capturedCell = captured[key];
-        const storedCell = stored[key];
-        expect(
-          capturedCell,
-          `cell ${key}: output differs from stored pre-change baseline`
-        ).toStrictEqual(storedCell);
+        expect(captured[key], `cell ${key}`).toStrictEqual(stored[key]);
       }
     } finally {
       await cleanup();
     }
   }, 120_000);
 
-  it("all 9 cells are non-empty", async () => {
-    const stored = JSON.parse(await readFile(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
+  it("the matrix covers every tool the CLI builds for, and nothing else", () => {
+    const matrixTools = new Set<string>([...MARKETPLACE_TARGETS, ...FLAT_TARGETS]);
+    for (const id of AI_TOOL_IDS) {
+      expect(matrixTools.has(id), `${id} is a registered AI tool with no golden cell`).toBe(true);
+    }
+
+    const stored = JSON.parse(readFileSync(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
     const expectedCells = [...MARKETPLACE_TARGETS, ...FLAT_TARGETS.map((t) => `${t}:flat`)];
+    expect(Object.keys(stored).sort()).toEqual([...expectedCells].sort());
     for (const key of expectedCells) {
-      expect(stored[key], `missing cell: ${key}`).toBeDefined();
       expect(Object.keys(stored[key]).length, `cell ${key} must have files`).toBeGreaterThan(0);
     }
   });

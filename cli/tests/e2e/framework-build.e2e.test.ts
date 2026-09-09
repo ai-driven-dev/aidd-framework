@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTestEnv, FRAMEWORK_PATH, initProject, runCli } from "./helpers.js";
@@ -21,16 +21,16 @@ async function hashDirectory(dir: string): Promise<Map<string, string>> {
   return result;
 }
 
-describe.concurrent("E2E: aidd framework build", () => {
+describe.concurrent("E2E: aidd translate", () => {
   it("AC #1 + #4: build → marketplace add → plugin install runs without error", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-build-install");
     try {
       await initProject(projectDir, FRAMEWORK_PATH);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -38,7 +38,6 @@ describe.concurrent("E2E: aidd framework build", () => {
       expect(build.stdout).toContain("Built");
       expect(build.stdout).toContain("files written to");
 
-      // AC #1: verify OpenPlugin layout
       const marketplacePath = join(outDir, ".plugin", "marketplace.json");
       expect(existsSync(marketplacePath)).toBe(true);
 
@@ -71,7 +70,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist");
 
       const run1 = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -79,8 +78,9 @@ describe.concurrent("E2E: aidd framework build", () => {
 
       const snapshot1 = await hashDirectory(outDir);
 
+      // outDir already holds run1's output, so a second build needs --force.
       const run2 = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir, "--force"],
         projectDir,
         fakeHome
       );
@@ -105,14 +105,13 @@ describe.concurrent("E2E: aidd framework build", () => {
       const sourceDir = join(tempDir, "source");
       await cp(FRAMEWORK_PATH, sourceDir, { recursive: true });
 
-      // Corrupt the plugin manifest (remove required 'name' field)
       const manifestPath = join(sourceDir, "plugins", "aidd-test", ".claude-plugin", "plugin.json");
       await mkdir(join(sourceDir, "plugins", "aidd-test", ".claude-plugin"), { recursive: true });
       await writeFile(manifestPath, JSON.stringify({ version: "1.0.0" }), "utf-8");
 
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        ["framework", "build", "--source", sourceDir, "--target", "copilot", "--out", outDir],
+        ["translate", sourceDir, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -129,13 +128,12 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
       expect(build.exitCode).toBe(0);
 
-      // AC #6: agent keeps .md extension (no rename to .agent.md)
       const agentPath = join(outDir, "plugins", "aidd-test", "agents", "code-reviewer.md");
       expect(existsSync(agentPath)).toBe(true);
       const agentPathRenamed = join(
@@ -151,7 +149,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       expect(agentContent).toContain("name:");
       expect(agentContent).toContain("description:");
 
-      // AC #5: @./ rewritten to markdown link in skill
+      // `@./` rewritten to a markdown link in a skill.
       const skillPath = join(outDir, "plugins", "aidd-test", "skills", "hello.md");
       expect(existsSync(skillPath)).toBe(true);
       const skillContent = await readFile(skillPath, "utf-8");
@@ -171,7 +169,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -199,7 +197,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -223,8 +221,6 @@ describe.concurrent("E2E: aidd framework build", () => {
     }
   });
 
-  // ── Flat mode (AC #1, #2, #4, #9 flat variant) ────────────────────────────
-
   it("flat AC #1: --flat writes agents, skills, hooks, mcp under canonical paths", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-tree");
     try {
@@ -232,17 +228,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       await mkdir(projRoot, { recursive: true });
 
       const build = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -261,7 +247,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       expect(existsSync(join(projRoot, ".vscode", "mcp.json"))).toBe(true);
       expect(existsSync(join(projRoot, ".github", "plugin", "marketplace.json"))).toBe(false);
 
-      // AC #5: agent frontmatter restricted to Copilot allowlist (name, description, model, tools, agents, argument-hint)
+      // Agent frontmatter is restricted to Copilot's own allowlist.
       const COPILOT_ALLOWED_KEYS = new Set([
         "name",
         "description",
@@ -296,17 +282,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       await mkdir(projRoot, { recursive: true });
 
       const run1 = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -316,13 +292,12 @@ describe.concurrent("E2E: aidd framework build", () => {
 
       const run2 = await runCli(
         [
-          "framework",
-          "build",
-          "--source",
+          "translate",
           FRAMEWORK_PATH,
-          "--target",
+          "--to",
           "copilot",
-          "--flat",
+          "--as",
+          "flat",
           "--force",
           "--out",
           projRoot,
@@ -340,17 +315,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       }
 
       const run3 = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -367,7 +332,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
 
-      // AC #7: pre-seed .vscode/mcp.json with a user-owned server to assert preservation
+      // Pre-seeded with a user-owned server, which the merge must preserve.
       const vscodePath = join(projRoot, ".vscode");
       await mkdir(vscodePath, { recursive: true });
       const existingMcp = {
@@ -378,17 +343,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       );
 
       const build = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -409,21 +364,17 @@ describe.concurrent("E2E: aidd framework build", () => {
 
       const mcpRaw = await readFile(join(projRoot, ".vscode", "mcp.json"), "utf-8");
       expect(mcpRaw).not.toContain(varRef);
-      // The written value is "/"-separated on purpose (see resolveClaudeRootAbsolute): a
-      // backslash-native path embedded in JSON comes back doubly escaped, and a forward
-      // slash is a valid path separator on Windows too. The claim is unchanged - the MCP
-      // command names this project root - so the expected value is spelled the way the
-      // file spells it, rather than the assertion being dropped (#707).
+      // The written value is "/"-separated on purpose: a backslash-native path embedded in
+      // JSON comes back doubly escaped, and a forward slash is valid on Windows too.
       expect(mcpRaw).toContain(projRoot.replace(/\\/g, "/"));
 
-      // AC #7: top-level key must be "servers"; plugin keys prefixed with "aidd-test-"
+      // The top-level key is "servers", and plugin keys carry the plugin's own prefix.
       const mcpParsed = JSON.parse(mcpRaw) as { servers: Record<string, unknown> };
       expect(typeof mcpParsed.servers).toBe("object");
       const serverKeys = Object.keys(mcpParsed.servers);
       const pluginKeys = serverKeys.filter((k) => k.startsWith("aidd-test-"));
       expect(pluginKeys.length).toBeGreaterThan(0);
 
-      // AC #7: user-owned server must survive
       expect(mcpParsed.servers["my-existing-server"]).toBeDefined();
     } finally {
       await cleanup();
@@ -436,7 +387,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist-codex");
       await mkdir(outDir, { recursive: true });
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "codex", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "codex", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -462,7 +413,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist-claude");
       await mkdir(outDir, { recursive: true });
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "claude", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "claude", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -488,7 +439,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist-cursor");
       await mkdir(outDir, { recursive: true });
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "cursor", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "cursor", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -515,7 +466,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "opencode", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "opencode", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -526,33 +477,21 @@ describe.concurrent("E2E: aidd framework build", () => {
     }
   });
 
-  it("flat guard: --force without --flat exits non-zero with hint", async () => {
-    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-guard-force");
+  it("--force without --as builds marketplace mode normally into a fresh --out", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-market-force-fresh");
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--force",
-          "--out",
-          outDir,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--force", "--out", outDir],
         projectDir,
         fakeHome
       );
-      expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain("--force requires --flat");
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(join(outDir, ".plugin", "marketplace.json"))).toBe(true);
     } finally {
       await cleanup();
     }
   });
-
-  // ── New flat targets (P4-P6) ─────────────────────────────────────────────────
 
   it("AC #2: --target claude --flat materializes .claude/skills, .claude/agents, .mcp.json", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-claude");
@@ -560,25 +499,13 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "claude",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "claude", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Flat-installed");
-      // flat agents are bare (no plugin segment) under .claude/agents/
       expect(existsSync(join(projRoot, ".claude", "agents"))).toBe(true);
-      // flat skills are bare (no plugin segment) under .claude/skills/
       expect(existsSync(join(projRoot, ".claude", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, ".mcp.json"))).toBe(true);
       const mcp = JSON.parse(await readFile(join(projRoot, ".mcp.json"), "utf-8")) as Record<
@@ -597,24 +524,12 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "cursor",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "cursor", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
       expect(result.exitCode).toBe(0);
-      // flat agents are bare (no plugin segment) under .cursor/agents/
       expect(existsSync(join(projRoot, ".cursor", "agents"))).toBe(true);
-      // flat skills are bare (no plugin segment) under .cursor/skills/
       expect(existsSync(join(projRoot, ".cursor", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, ".cursor", "mcp.json"))).toBe(true);
       const agents = await readdir(join(projRoot, ".cursor", "agents"));
@@ -632,31 +547,20 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "codex",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "codex", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
       expect(result.exitCode).toBe(0);
       expect(existsSync(join(projRoot, ".codex", "agents"))).toBe(true);
-      // Codex scans .agents/skills/ for workspace skills (documented project skill root,
-      // verified live on 0.136); plugin-prefixed at one level, e.g. .agents/skills/aidd-context-00-onboard/
+      // Codex scans `.agents/skills/` for workspace skills, verified live on 0.136, and
+      // plugin-prefixed at one level - never `.codex/skills/`.
       expect(existsSync(join(projRoot, ".agents", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, ".codex", "skills"))).toBe(false);
       const config = await readFile(join(projRoot, ".codex", "config.toml"), "utf-8");
       // [[skills.config]] is intentionally NOT emitted — discovery is by placement
       expect(config).not.toContain("[[skills.config]]");
       expect(config).not.toContain("skills.config");
-      // AC #4: merges mcp_servers into config.toml
       expect(config).toContain("mcp_servers");
     } finally {
       await cleanup();
@@ -669,23 +573,12 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "opencode",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "opencode", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
       expect(result.exitCode).toBe(0);
       expect(existsSync(join(projRoot, ".opencode", "agents"))).toBe(true);
-      // flat skills are bare (no plugin segment) under .opencode/skills/
       expect(existsSync(join(projRoot, ".opencode", "skills"))).toBe(true);
       expect(existsSync(join(projRoot, "opencode.json"))).toBe(true);
       const opencode = JSON.parse(
@@ -705,12 +598,61 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "opencode", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "opencode", "--out", outDir],
         projectDir,
         fakeHome
       );
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toMatch(/Unsupported target.mode/i);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe.concurrent("E2E: aidd translate — marketplace mode never erases what it did not write", () => {
+  it("refuses a non-empty --out without --force, and leaves the foreign file untouched", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-market-preserve");
+    try {
+      const outDir = join(tempDir, "dist");
+      await mkdir(outDir, { recursive: true });
+      const keepPath = join(outDir, "keep.txt");
+      await writeFile(keepPath, "keepme", "utf-8");
+
+      const build = await runCli(
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
+        projectDir,
+        fakeHome
+      );
+
+      expect(build.exitCode).not.toBe(0);
+      expect(build.stderr).toContain(outDir);
+      expect(build.stderr).toContain("--force");
+      expect(existsSync(keepPath)).toBe(true);
+      expect(await readFile(keepPath, "utf-8")).toBe("keepme");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("with --force, writes its own output but keeps the foreign file", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-market-force");
+    try {
+      const outDir = join(tempDir, "dist");
+      await mkdir(outDir, { recursive: true });
+      const keepPath = join(outDir, "keep.txt");
+      await writeFile(keepPath, "keepme", "utf-8");
+
+      const build = await runCli(
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir, "--force"],
+        projectDir,
+        fakeHome
+      );
+
+      expect(build.exitCode).toBe(0);
+      expect(existsSync(keepPath)).toBe(true);
+      expect(await readFile(keepPath, "utf-8")).toBe("keepme");
+      expect(existsSync(join(outDir, ".plugin", "marketplace.json"))).toBe(true);
     } finally {
       await cleanup();
     }

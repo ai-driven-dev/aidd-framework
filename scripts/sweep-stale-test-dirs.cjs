@@ -1,15 +1,7 @@
-// Removes temp directories a killed test run left behind, before the next run starts.
-//
-// Every suite in this repository creates its own directory under `os.tmpdir()` and removes
-// it in an `after`/`finally`. Neither fires when a run is killed - a timeout, a `^C`, a
-// crashed worker - so the directory survives with whatever it held. That filled a 460 GB
-// disk twice in two days, 22 GB each time, and the second time it filled far enough that no
-// command could write its own output any more. A leak that makes a green run impossible to
-// obtain costs more than a slow one.
-//
-// One implementation, required by both sides: the CLI's vitest globalSetup and the plugin's
-// node:test suites. Two copies of this would be the same duplication the read path just spent
-// three phases removing.
+// Removes temp directories a killed test run left behind, before the next run starts: an
+// `after`/`finally` never fires on a kill, so the directory survives with whatever it held,
+// and enough of those fill a disk far enough that no green run can be obtained at all.
+// One implementation for both callers, the CLI's vitest globalSetup and the node:test suites.
 const { readdirSync, rmSync, statSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
@@ -24,9 +16,8 @@ const PREFIXES = [
   "trust-store-",
 ];
 
-// Only what a concurrent run cannot still be inside. Two vitest projects run in one
-// invocation, and someone may run a second suite alongside the first; deleting a directory
-// another process is writing into would trade a disk leak for a flake, the worse of the two.
+// Only what a concurrent run cannot still be inside: deleting a directory another process
+// is writing into would trade a disk leak for a flake, the worse of the two.
 const STALE_AFTER_MS = 60 * 60 * 1000;
 
 function sweepStaleTestDirs(now = Date.now()) {

@@ -1,0 +1,213 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import { DoctorLayoutUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-layout-use-case.js";
+import { DoctorMergeFilesUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-merge-files-use-case.js";
+import { DoctorPluginUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-plugin-use-case.js";
+import { DoctorReferencesUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-references-use-case.js";
+import { DoctorRegistrationUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
+import { DoctorTrackedFilesUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-tracked-files-use-case.js";
+import { DoctorUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-use-case.js";
+import { DetectPluginDriftUseCase } from "../../../../src/contexts/framework/application/shared/detect-plugin-drift-use-case.js";
+import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
+import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
+import type { ManifestRepository } from "../../../../src/contexts/framework/domain/ports/manifest-repository.js";
+import { FileHash } from "../../../../src/kernel/file.js";
+import type { FileReader } from "../../../../src/kernel/ports/file-reader.js";
+import type { Hasher } from "../../../../src/kernel/ports/hasher.js";
+import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
+
+const EXPECTED_HASH = "abc123abc123abc123abc123abc123ab";
+const DRIFTED_HASH = "def456def456def456def456def456de";
+const PLUGIN_FILE = ".claude/plugins/my-plugin/commands/cmd.md";
+
+function makeManifest(pluginFileHash: string): Manifest {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "1.0.0", []);
+  manifest.addPlugin(
+    "claude",
+    InstalledPlugin.fromJSON({
+      name: "my-plugin",
+      source: { kind: "local", path: "/some/path" },
+      version: "1.0.0",
+      strict: false,
+      files: { [PLUGIN_FILE]: pluginFileHash },
+      scope: "project",
+    })
+  );
+  return manifest;
+}
+
+function makeFs(fileExists: boolean, diskHash: string): FileReader {
+  return {
+    fileExists: async () => fileExists,
+    isExecutable: async () => false,
+    realpath: async (path: string) => path,
+    readFileHash: async () => new FileHash(diskHash),
+    readFile: async () => "",
+    listDirectory: async () => [],
+    listFilesRecursive: async () => [],
+  };
+}
+
+function makeManifestRepo(manifest: Manifest): ManifestRepository {
+  return {
+    path: "/proj/.aidd/manifest.json",
+    load: async () => manifest,
+    save: async () => {},
+    delete: async () => {},
+  };
+}
+
+const noopHasher: Hasher = {
+  hash: () => new FileHash("00000000000000000000000000000000"),
+};
+
+function makeDoctorUseCase(fs: FileReader, manifest: Manifest): DoctorUseCase {
+  return new DoctorUseCase(
+    makeManifestRepo(manifest),
+    new DoctorTrackedFilesUseCase(fs),
+    new DoctorMergeFilesUseCase(fs, noopHasher),
+    new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs)),
+    new DoctorReferencesUseCase(fs),
+    new DoctorLayoutUseCase(fs),
+    new DoctorRegistrationUseCase(
+      fs,
+      new InMemoryMarketplaceRegistry(),
+      new Map(),
+      new Map(),
+      new Map(),
+      () => "/user-cache",
+      { get: () => "1.0.0" }
+    )
+  );
+}
+
+describe("DoctorUseCase — plugin integrity", () => {
+  describe("when plugin file is missing", () => {
+    it("reports a missing plugin issue", async () => {
+      const manifest = makeManifest(EXPECTED_HASH);
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = makeDoctorUseCase(fs, manifest);
+
+      const report = await useCase.execute({ projectRoot: "/proj" });
+
+      expect(report.pluginIssues).toHaveLength(1);
+      expect(report.pluginIssues[0].issue).toBe("missing");
+      expect(report.pluginIssues[0].pluginName).toBe("my-plugin");
+      expect(report.pluginIssues[0].filePath).toBe(PLUGIN_FILE);
+      expect(report.healthy).toBe(false);
+    });
+  });
+
+  describe("when plugin file has hash mismatch", () => {
+    it("reports a hash-mismatch plugin issue", async () => {
+      const manifest = makeManifest(EXPECTED_HASH);
+      const fs = makeFs(true, DRIFTED_HASH);
+      const useCase = makeDoctorUseCase(fs, manifest);
+
+      const report = await useCase.execute({ projectRoot: "/proj" });
+
+      expect(report.pluginIssues).toHaveLength(1);
+      expect(report.pluginIssues[0].issue).toBe("hash-mismatch");
+      expect(report.pluginIssues[0].toolId).toBe("claude");
+    });
+  });
+
+  describe("when all plugin files are present and correct", () => {
+    it("returns empty pluginIssues", async () => {
+      const manifest = makeManifest(EXPECTED_HASH);
+      const fs = makeFs(true, EXPECTED_HASH);
+      const useCase = makeDoctorUseCase(fs, manifest);
+
+      const report = await useCase.execute({ projectRoot: "/proj" });
+
+      expect(report.pluginIssues).toHaveLength(0);
+    });
+  });
+
+  describe("when pluginName filter is set", () => {
+    it("only checks the specified plugin", async () => {
+      const manifest = makeManifest(EXPECTED_HASH);
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = makeDoctorUseCase(fs, manifest);
+
+      const report = await useCase.execute({ projectRoot: "/proj", pluginName: "other-plugin" });
+
+      expect(report.pluginIssues).toHaveLength(0);
+    });
+  });
+
+  describe("when a user-scope plugin was never installed on this machine", () => {
+    it("reports one not-installed-on-machine issue, not one 'missing' issue per file", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: "aidd-test",
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: { "a/one.md": EXPECTED_HASH, "a/two.md": EXPECTED_HASH },
+          scope: "user",
+        })
+      );
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
+
+      const issues = await useCase.execute({ manifest, projectRoot: "/proj", allowedIds: null });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].issue).toBe("not-installed-on-machine");
+      expect(issues[0].toolId).toBe("cursor");
+      expect(issues.filter((i) => i.issue === "missing")).toHaveLength(0);
+    });
+  });
+
+  describe("when plugin is installed under user-scope (Cursor Mode B)", () => {
+    it("checks files under the resolved user-scope base dir, not projectRoot", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      const cursorBaseDir = join(homedir(), ".cursor", "plugins", "local");
+      const userScopeRelPath = "aidd-context/skills/06-discovery/SKILL.md";
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: "aidd-context",
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: { [userScopeRelPath]: EXPECTED_HASH },
+          scope: "user",
+        })
+      );
+      const checkedPaths: string[] = [];
+      const fs: FileReader = {
+        fileExists: async (p: string) => {
+          checkedPaths.push(p);
+          return true;
+        },
+        isExecutable: async () => false,
+        realpath: async (path: string) => path,
+        readFileHash: async () => new FileHash(EXPECTED_HASH),
+        readFile: async () => "",
+        listDirectory: async () => [],
+        listFilesRecursive: async () => [],
+      };
+      const pluginUseCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
+
+      await pluginUseCase.execute({
+        manifest,
+        projectRoot: "/proj",
+        allowedIds: null,
+      });
+
+      const expectedAbs = join(cursorBaseDir, userScopeRelPath);
+      expect(checkedPaths).toContain(expectedAbs);
+      expect(checkedPaths.every((p) => !p.startsWith("/proj/aidd-context"))).toBe(true);
+    });
+  });
+});

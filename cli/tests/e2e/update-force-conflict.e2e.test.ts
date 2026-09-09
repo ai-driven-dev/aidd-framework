@@ -9,17 +9,17 @@ async function seedProject(projectDir: string): Promise<void> {
   await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
   await writeFile(
     join(projectDir, AIDD_DIR, "manifest.json"),
-    JSON.stringify({ version: 5, tools: {}, marketplaces: {} }),
+    JSON.stringify({ version: 8, tools: {} }),
     "utf-8"
   );
 }
 
 async function installClaude(projectDir: string, fakeHome: string): Promise<void> {
-  await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+  await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 }
 
 async function installVscode(projectDir: string, fakeHome: string): Promise<void> {
-  await runCli(["ide", "install", "vscode"], projectDir, fakeHome);
+  await runCli(["framework", "install", "--tool", "vscode"], projectDir, fakeHome);
 }
 
 async function modifyFirstTrackedFile(projectDir: string, toolId: string): Promise<void> {
@@ -41,55 +41,10 @@ async function modifyTrackedFile(projectDir: string): Promise<void> {
   return modifyFirstTrackedFile(projectDir, "claude");
 }
 
+// Bare `aidd update` is self-update and touches no tracked file, so the project-wide sweep
+// under test is `framework update` without `--tool`.
 describe.concurrent("E2E: update conflict guard", () => {
-  describe("aidd update (top-level)", () => {
-    it("exits 1 when a tracked file is modified in non-TTY mode (no --force)", async () => {
-      const { projectDir, fakeHome, cleanup } = await createTestEnv("update-guard-all-exit1");
-      try {
-        await seedProject(projectDir);
-        await installClaude(projectDir, fakeHome);
-        await modifyTrackedFile(projectDir);
-
-        const { exitCode, stderr } = await runCli(["update"], projectDir, fakeHome);
-
-        expect(exitCode).toBe(1);
-        expect(stderr.toLowerCase()).toMatch(/force|non-interactive/);
-      } finally {
-        await cleanup();
-      }
-    });
-
-    it("exits 0 with --force when a tracked file is modified", async () => {
-      const { projectDir, fakeHome, cleanup } = await createTestEnv("update-guard-all-force");
-      try {
-        await seedProject(projectDir);
-        await installClaude(projectDir, fakeHome);
-        await modifyTrackedFile(projectDir);
-
-        const { exitCode } = await runCli(["update", "--force"], projectDir, fakeHome);
-
-        expect(exitCode).toBe(0);
-      } finally {
-        await cleanup();
-      }
-    });
-
-    it("exits 0 when all files are unmodified (no prompt, no --force needed)", async () => {
-      const { projectDir, fakeHome, cleanup } = await createTestEnv("update-guard-all-unmod");
-      try {
-        await seedProject(projectDir);
-        await installClaude(projectDir, fakeHome);
-
-        const { exitCode } = await runCli(["update"], projectDir, fakeHome);
-
-        expect(exitCode).toBe(0);
-      } finally {
-        await cleanup();
-      }
-    });
-  });
-
-  describe("aidd ai update", () => {
+  describe("aidd framework update --tool claude", () => {
     it("exits 1 when a tracked AI tool file is modified in non-TTY mode (no --force)", async () => {
       const { projectDir, fakeHome, cleanup } = await createTestEnv("update-guard-ai-exit1");
       try {
@@ -97,7 +52,11 @@ describe.concurrent("E2E: update conflict guard", () => {
         await installClaude(projectDir, fakeHome);
         await modifyTrackedFile(projectDir);
 
-        const { exitCode, stderr } = await runCli(["ai", "update"], projectDir, fakeHome);
+        const { exitCode, stderr } = await runCli(
+          ["framework", "update", "--tool", "claude"],
+          projectDir,
+          fakeHome
+        );
 
         expect(exitCode).toBe(1);
         expect(stderr.toLowerCase()).toMatch(/force|non-interactive/);
@@ -113,7 +72,11 @@ describe.concurrent("E2E: update conflict guard", () => {
         await installClaude(projectDir, fakeHome);
         await modifyTrackedFile(projectDir);
 
-        const { exitCode } = await runCli(["ai", "update", "--force"], projectDir, fakeHome);
+        const { exitCode } = await runCli(
+          ["framework", "update", "--tool", "claude", "--force"],
+          projectDir,
+          fakeHome
+        );
 
         expect(exitCode).toBe(0);
       } finally {
@@ -127,7 +90,11 @@ describe.concurrent("E2E: update conflict guard", () => {
         await seedProject(projectDir);
         await installClaude(projectDir, fakeHome);
 
-        const { exitCode } = await runCli(["ai", "update"], projectDir, fakeHome);
+        const { exitCode } = await runCli(
+          ["framework", "update", "--tool", "claude"],
+          projectDir,
+          fakeHome
+        );
 
         expect(exitCode).toBe(0);
       } finally {
@@ -136,7 +103,7 @@ describe.concurrent("E2E: update conflict guard", () => {
     });
   });
 
-  describe("aidd ide update", () => {
+  describe("aidd framework update --tool vscode", () => {
     it("exits 1 when a tracked IDE tool file is modified in non-TTY mode (no --force)", async () => {
       const { projectDir, fakeHome, cleanup } = await createTestEnv("update-guard-ide-exit1");
       try {
@@ -144,7 +111,11 @@ describe.concurrent("E2E: update conflict guard", () => {
         await installVscode(projectDir, fakeHome);
         await modifyFirstTrackedFile(projectDir, "vscode");
 
-        const { exitCode, stderr } = await runCli(["ide", "update"], projectDir, fakeHome);
+        const { exitCode, stderr } = await runCli(
+          ["framework", "update", "--tool", "vscode"],
+          projectDir,
+          fakeHome
+        );
 
         expect(exitCode).toBe(1);
         expect(stderr.toLowerCase()).toMatch(/force|non-interactive/);
@@ -160,7 +131,11 @@ describe.concurrent("E2E: update conflict guard", () => {
         await installVscode(projectDir, fakeHome);
         await modifyFirstTrackedFile(projectDir, "vscode");
 
-        const { exitCode } = await runCli(["ide", "update", "--force"], projectDir, fakeHome);
+        const { exitCode } = await runCli(
+          ["framework", "update", "--tool", "vscode", "--force"],
+          projectDir,
+          fakeHome
+        );
 
         expect(exitCode).toBe(0);
       } finally {
@@ -174,7 +149,11 @@ describe.concurrent("E2E: update conflict guard", () => {
         await seedProject(projectDir);
         await installVscode(projectDir, fakeHome);
 
-        const { exitCode } = await runCli(["ide", "update"], projectDir, fakeHome);
+        const { exitCode } = await runCli(
+          ["framework", "update", "--tool", "vscode"],
+          projectDir,
+          fakeHome
+        );
 
         expect(exitCode).toBe(0);
       } finally {

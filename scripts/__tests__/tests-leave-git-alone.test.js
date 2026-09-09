@@ -13,18 +13,12 @@ const {
 const GUARD = path.resolve(__dirname, "..", "check-tests-leave-git-alone.js");
 
 /**
- * The guard that would have caught a test writing into the repository's own hooks.
+ * The guard that catches a test writing into the repository's own hooks. A suite's own
+ * `git init` inheriting an exported `GIT_DIR` lands its stubs in the real `.git/hooks` with
+ * every test green, and `.git/hooks` is in no history.
  *
- * It happened: on 2026-09-03 the trailer-repair suite's `git init` inherited this
- * repository's exported `GIT_DIR`, so its stub `prepare-commit-msg` and stub delegate
- * landed in the real `.git/hooks`, replacing an install that had stood since 22 August.
- * Every test passed. `aidd telemetry check` reported it hours later, by which point the
- * original was gone — `.git/hooks` is in no history.
- *
- * `CLEAN_ENV` in that one suite fixes that one suite. This is the invariant instead, and it
- * is deliberately narrower than "tests must strip GIT_*": some tests query the real
- * repository on purpose (`git ls-files` over the tree). Reading it is fine. Changing it is
- * never fine.
+ * Deliberately narrower than "tests must strip GIT_*": some tests query the real repository
+ * on purpose. Reading it is fine, changing it is never fine.
  */
 
 function withDir(run) {
@@ -36,7 +30,6 @@ function withDir(run) {
   }
 }
 
-// ── the snapshot ───────────────────────────────────────────────────────────
 
 test("a directory that does not exist snapshots as absent, never as empty", () => {
   withDir((dir) => {
@@ -58,7 +51,6 @@ test("a snapshot carries every file's size and mode, not only its name", () => {
   });
 });
 
-// ── what counts as a change ────────────────────────────────────────────────
 
 test("an untouched directory reports no change", () => {
   withDir((dir) => {
@@ -83,7 +75,7 @@ test("a file whose content changed is reported, even at the same size", () => {
   });
 });
 
-// This is the exact shape of the leak: a real hook replaced by a shorter stub.
+// The exact shape of the leak: a real hook replaced by a shorter stub.
 test("a hook replaced by a stub is reported as changed", () => {
   withDir((dir) => {
     const at = path.join(dir, "prepare-commit-msg");
@@ -158,7 +150,6 @@ test("a directory that was absent and now exists is a change, not a fresh baseli
   });
 });
 
-// ── the guard, run for real ────────────────────────────────────────────────
 
 test("a command that leaves the watched directory alone passes the guard through", () => {
   withDir((dir) => {

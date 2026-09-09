@@ -1,0 +1,21 @@
+{
+  "version": 8,
+  "tools": {
+    "claude": {
+      "toolId": "claude",
+      "version": "1.0.0",
+      "files": [],
+      "mergeFiles": [],
+      "excludedMcp": [
+        {
+          "configPath": ".claude/settings.json",
+          "entryKey": "old-server"
+        },
+        {
+          "configPath": ".claude/settings.json",
+          "entryKey": "legacy-server"
+        }
+      ]
+    }
+  }
+}

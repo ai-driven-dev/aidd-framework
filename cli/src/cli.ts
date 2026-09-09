@@ -1,24 +1,20 @@
 import { platform } from "node:os";
 import { Command } from "commander";
-import { registerAiCommand } from "./application/commands/ai.js";
-import { registerAuthCommand } from "./application/commands/auth.js";
-import { registerCleanCommand } from "./application/commands/clean.js";
-import { registerDoctorCommand } from "./application/commands/doctor.js";
-import { registerFrameworkCommand } from "./application/commands/framework.js";
-import { registerIdeCommand } from "./application/commands/ide.js";
-import { registerKanbanCommand } from "./application/commands/kanban.js";
-import { registerMarketplaceCommand } from "./application/commands/marketplace.js";
-import { runMenuLoop } from "./application/commands/menu.js";
-import { registerPluginCommand } from "./application/commands/plugin.js";
-import { registerRestoreCommand } from "./application/commands/restore.js";
-import { registerSelfUpdateCommand } from "./application/commands/self-update.js";
-import { registerSetupCommand } from "./application/commands/setup.js";
-import { registerStatusCommand } from "./application/commands/status.js";
-import { registerTelemetryCommand } from "./application/commands/telemetry.js";
-import { registerUpdateCommand } from "./application/commands/update.js";
-import { CLIOutput } from "./application/output.js";
-import { CurrentVersionAdapter } from "./infrastructure/adapters/current-version-adapter.js";
-import { createDeps } from "./infrastructure/deps.js";
+import { registerAuthCommand } from "./presentation/commands/auth.js";
+import { registerCleanCommand } from "./presentation/commands/clean.js";
+import { registerDoctorCommand } from "./presentation/commands/doctor.js";
+import { registerFrameworkCommand } from "./presentation/commands/framework.js";
+import { registerMarketplaceCommand } from "./presentation/commands/marketplace.js";
+import { runMenuLoop } from "./presentation/commands/menu.js";
+import { registerPluginCommand } from "./presentation/commands/plugin.js";
+import { registerSetupCommand } from "./presentation/commands/setup.js";
+import { registerSyncCommand } from "./presentation/commands/sync.js";
+import { registerTelemetryCommand } from "./presentation/commands/telemetry.js";
+import { registerTranslateCommand } from "./presentation/commands/translate.js";
+import { registerUpdateCommand } from "./presentation/commands/update.js";
+import { CLIOutput } from "./presentation/output.js";
+import { CurrentVersionAdapter } from "./runtime/self-update/current-version-adapter.js";
+import { createDeps } from "./runtime/wiring/framework.js";
 
 function formatVersion(version: string): string {
   return `aidd/${version} node/${process.versions.node} ${platform()}-${process.arch}`;
@@ -36,38 +32,37 @@ program
 
 registerSetupCommand(program);
 registerFrameworkCommand(program);
-registerAiCommand(program);
-registerIdeCommand(program);
+registerTranslateCommand(program);
 registerPluginCommand(program);
 registerMarketplaceCommand(program);
 registerAuthCommand(program);
-registerStatusCommand(program);
-registerKanbanCommand(program);
-registerRestoreCommand(program);
+registerSyncCommand(program);
 registerUpdateCommand(program);
 registerDoctorCommand(program);
 registerCleanCommand(program);
 registerTelemetryCommand(program);
-registerSelfUpdateCommand(program);
 
-// Commands already paying for network I/O: piggyback the update-check refresh on them.
-// Subcommand-path-granular — `marketplace remove` (offline) and `self-update` are deliberately absent.
+// Commands already paying for network I/O, so the update-check refresh rides one of them.
+// `marketplace remove` is offline and `update` already resolves the latest version itself.
 const ONLINE_COMMAND_PATHS = new Set([
-  "update",
   "marketplace refresh",
   "marketplace check",
   "marketplace list",
   "marketplace add",
+  "sync",
 ]);
 
 program.hook("preAction", async (_thisCommand, actionCommand) => {
+  if (process.env.AIDD_SKIP_UPDATE_CHECK === "1") return;
   const opts = program.opts<{ verbose?: boolean }>();
   const output = new CLIOutput(opts.verbose ?? false);
   const deps = await createDeps(process.cwd(), { verbose: opts.verbose ?? false }, output).catch(
     () => null
   );
   if (!deps) return;
-  if (actionCommand.name() === "self-update") return;
+  // A bare verb with no subject means "the CLI itself" (Claude Code/Codex convention):
+  // `update` resolves the latest version on its own, so the generic check is redundant.
+  if (actionCommand.name() === "update") return;
   await deps.checkUpdateUseCase.printFromCacheOnly().catch((err: unknown) => {
     deps.logger.debug(
       `CLI update check failed: ${err instanceof Error ? err.message : String(err)}`
@@ -76,6 +71,11 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
 });
 
 program.hook("postAction", async (_thisCommand, actionCommand) => {
+  // The refresh asks GitHub what the latest release is and caches the answer, so any
+  // run that performs it produces output depending on what has been published since.
+  // A test suite that captures output cannot afford that: every release would rewrite
+  // its expectations. Same switch shape as AIDD_SKIP_MARKETPLACE_REFRESH, same reason.
+  if (process.env.AIDD_SKIP_UPDATE_CHECK === "1") return;
   if (!ONLINE_COMMAND_PATHS.has(resolveCommandPath(actionCommand))) return;
   const opts = program.opts<{ verbose?: boolean }>();
   const output = new CLIOutput(opts.verbose ?? false);

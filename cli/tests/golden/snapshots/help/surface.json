@@ -1,0 +1,202 @@
+[
+  {
+    "invocation": "aidd",
+    "exitCode": 0,
+    "help": "Usage: aidd [options] [command]\n\nGenerate AI coding assistant configurations from the AIDD framework\n\nOptions:\n  -V, --version                 Show version number\n  --verbose                     Show detailed diagnostic output (default: false)\n  -h, --help                    display help for command\n\nCommands:\n  setup [options]               Set up or update the project to a correct state\n                                — bootstraps the whole project (marketplace,\n                                framework, tools, plugins); see `framework\n                                install`, which acts on the framework alone\n  framework                     Manage the framework's lifecycle on installed\n                                tools\n  translate [options] <source>  Convert an arbitrary source into a target-native\n                                plugin tree — records nothing (see `sync` for\n                                the manifest-driven, tracked version)\n  plugin                        Manage plugins for AI tools\n  marketplace                   Manage plugin marketplaces\n  auth                          Manage authentication\n  sync [options] [files...]     Rewrite owned files from what is already there —\n                                regenerate tracked files, driven by the manifest\n                                (see `translate`, which converts a source\n                                without recording anything)\n  update|upgrade [options]      Update the aidd CLI itself to the latest version\n  doctor [options]              Detected and equipped tools, plugins, drift, and\n                                problems — across all tools or one\n  clean [options]               Remove all AIDD-managed files from the project —\n                                retires every part of AIDD; see `framework\n                                remove`, which removes the framework only\n  telemetry                     Control whether AIDD may measure this project\n  help [command]                display help for command"
+  },
+  {
+    "invocation": "aidd auth",
+    "exitCode": 0,
+    "help": "Usage: aidd auth [options] [command]\n\nManage authentication\n\nOptions:\n  -h, --help       display help for command\n\nCommands:\n  login [options]  Authenticate with GitHub\n  logout           Remove stored authentication\n  status           Show authentication status"
+  },
+  {
+    "invocation": "aidd auth login",
+    "exitCode": 0,
+    "help": "Usage: aidd auth login [options]\n\nAuthenticate with GitHub\n\nOptions:\n  --gh                    Use GitHub CLI token (default: false)\n  --token <value>         Personal access token\n  --level <user|project>  Storage level (user or project)\n  -h, --help              display help for command"
+  },
+  {
+    "invocation": "aidd auth logout",
+    "exitCode": 0,
+    "help": "Usage: aidd auth logout [options]\n\nRemove stored authentication\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd auth status",
+    "exitCode": 0,
+    "help": "Usage: aidd auth status [options]\n\nShow authentication status\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd clean",
+    "exitCode": 0,
+    "help": "Usage: aidd clean [options]\n\nRemove all AIDD-managed files from the project — retires every part of AIDD; see\n`framework remove`, which removes the framework only\n\nOptions:\n  --force          Confirm file removal (skip dry-run) (default: false)\n  --scope <scope>  project (default) cleans this project alone; user undoes the\n                   machine-wide registration setup --scope user wrote and purges\n                   the shared source itself\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd doctor",
+    "exitCode": 0,
+    "help": "Usage: aidd doctor [options]\n\nDetected and equipped tools, plugins, drift, and problems — across all tools or\none\n\nOptions:\n  --tool <tool>    Limit to a specific AI or IDE tool\n  --plugin <name>  Limit plugin checks to a specific plugin\n  --scope <scope>  project (default) checks this project's own manifest; user\n                   checks the machine-wide manifest --scope user setup wrote\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd framework",
+    "exitCode": 0,
+    "help": "Usage: aidd framework [options] [command]\n\nManage the framework's lifecycle on installed tools\n\nOptions:\n  -h, --help         display help for command\n\nCommands:\n  install [options]  Install a tool's runtime configuration from bundled assets\n                     — acts on the framework alone (see `setup`, which\n                     bootstraps the whole project)\n  remove [options]   Remove a tool's generated configuration files — removes the\n                     framework only (see `clean`, which removes all of AIDD)\n  update [options]   Re-install tool configs from bundled CLI assets, moving to\n                     a new version (all installed tools if --tool is omitted;\n                     see `marketplace refresh`, which re-fetches catalogs\n                     instead)\n  rules [options]    List the rules installed in this project, across every AI\n                     tool\n  help [command]     display help for command"
+  },
+  {
+    "invocation": "aidd framework install",
+    "exitCode": 0,
+    "help": "Usage: aidd framework install [options]\n\nInstall a tool's runtime configuration from bundled assets — acts on the\nframework alone (see `setup`, which bootstraps the whole project)\n\nOptions:\n  --tool <tool>  AI or IDE tool ID\n  -f, --force    Overwrite already-installed tool (default: false)\n  --no-plugins   Skip propagation of already-installed plugins onto the new tool\n  -h, --help     display help for command"
+  },
+  {
+    "invocation": "aidd framework remove",
+    "exitCode": 0,
+    "help": "Usage: aidd framework remove [options]\n\nRemove a tool's generated configuration files — removes the framework only (see\n`clean`, which removes all of AIDD)\n\nOptions:\n  --tool <tool>  AI or IDE tool ID\n  -h, --help     display help for command"
+  },
+  {
+    "invocation": "aidd framework rules",
+    "exitCode": 0,
+    "help": "Usage: aidd framework rules [options]\n\nList the rules installed in this project, across every AI tool\n\nOptions:\n  --json      Print the inventory as JSON\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd framework update",
+    "exitCode": 0,
+    "help": "Usage: aidd framework update [options]\n\nRe-install tool configs from bundled CLI assets, moving to a new version (all\ninstalled tools if --tool is omitted; see `marketplace refresh`, which\nre-fetches catalogs instead)\n\nOptions:\n  --tool <tool>  Limit update to a specific AI or IDE tool\n  -f, --force    Overwrite modified files without prompting (default: false)\n  -h, --help     display help for command"
+  },
+  {
+    "invocation": "aidd marketplace",
+    "exitCode": 0,
+    "help": "Usage: aidd marketplace [options] [command]\n\nManage plugin marketplaces\n\nOptions:\n  -h, --help                     display help for command\n\nCommands:\n  add [options] [name] [source]  Register a plugin marketplace\n  list [options]                 List registered plugin marketplaces\n  remove [options] <name>        Remove a registered plugin marketplace\n  refresh [options] [name]       Refresh registered marketplaces — re-fetches\n                                 catalogs; see `framework update`, which moves\n                                 installed tools to a new version instead\n  check                          Report stale marketplaces and upstream-removed\n                                 plugins"
+  },
+  {
+    "invocation": "aidd marketplace add",
+    "exitCode": 0,
+    "help": "Usage: aidd marketplace add [options] [name] [source]\n\nRegister a plugin marketplace\n\nOptions:\n  --scope <user|project>  Registration scope (default: project) (default:\n                          \"project\")\n  --yes                   Skip the trust + cleanup prompts\n  --overwrite             Replace an existing marketplace with the same name\n  --token <value>         Auth token (host detected from source URL at fetch\n                          time)\n  -h, --help              display help for command"
+  },
+  {
+    "invocation": "aidd marketplace check",
+    "exitCode": 0,
+    "help": "Usage: aidd marketplace check [options]\n\nReport stale marketplaces and upstream-removed plugins\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd marketplace list",
+    "exitCode": 0,
+    "help": "Usage: aidd marketplace list [options]\n\nList registered plugin marketplaces\n\nOptions:\n  --plugins   Also fetch and print all plugins from each marketplace catalog\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd marketplace refresh",
+    "exitCode": 0,
+    "help": "Usage: aidd marketplace refresh [options] [name]\n\nRefresh registered marketplaces — re-fetches catalogs; see `framework update`,\nwhich moves installed tools to a new version instead\n\nOptions:\n  --force     Clear cache before re-fetching\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd marketplace remove",
+    "exitCode": 0,
+    "help": "Usage: aidd marketplace remove [options] <name>\n\nRemove a registered plugin marketplace\n\nOptions:\n  --yes       Skip the orphan-cleanup prompt\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd plugin",
+    "exitCode": 0,
+    "help": "Usage: aidd plugin [options] [command]\n\nManage plugins for AI tools\n\nOptions:\n  -h, --help                  display help for command\n\nCommands:\n  remove [options] <name>     Remove a plugin from one or all AI tools\n  list [options]              List installed plugins for one or all AI tools\n  install [options] [plugin]  Install a plugin (marketplace name, local path, or\n                              interactive pick)\n  search [options] <query>    Search registered marketplaces for plugins\n  update [options] [name]     Update one or all plugins for one or all AI tools"
+  },
+  {
+    "invocation": "aidd plugin install",
+    "exitCode": 0,
+    "help": "Usage: aidd plugin install [options] [plugin]\n\nInstall a plugin (marketplace name, local path, or interactive pick)\n\nOptions:\n  --from <market>         Marketplace name (when multiple match)\n  --tool <toolId>         Target AI tool (default: all installed)\n  --token <value>         Auth token (host detected from source URL at fetch\n                          time)\n  --scope <user|project>  Install scope; must match the tool's supported scope\n  --yes                   Auto-resolve interactive prompts (CI mode)\n  -h, --help              display help for command"
+  },
+  {
+    "invocation": "aidd plugin list",
+    "exitCode": 0,
+    "help": "Usage: aidd plugin list [options]\n\nList installed plugins for one or all AI tools\n\nOptions:\n  --tool <toolId>  Target AI tool (default: all installed)\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd plugin remove",
+    "exitCode": 0,
+    "help": "Usage: aidd plugin remove [options] <name>\n\nRemove a plugin from one or all AI tools\n\nOptions:\n  --tool <toolId>  Target AI tool (default: all installed)\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd plugin search",
+    "exitCode": 0,
+    "help": "Usage: aidd plugin search [options] <query>\n\nSearch registered marketplaces for plugins\n\nOptions:\n  --recommended         Show only recommended plugins\n  --marketplace <name>  Limit to a single marketplace\n  -h, --help            display help for command"
+  },
+  {
+    "invocation": "aidd plugin update",
+    "exitCode": 0,
+    "help": "Usage: aidd plugin update [options] [name]\n\nUpdate one or all plugins for one or all AI tools\n\nOptions:\n  --tool <toolId>  Target AI tool (default: all installed)\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd setup",
+    "exitCode": 0,
+    "help": "Usage: aidd setup [options]\n\nSet up or update the project to a correct state — bootstraps the whole project\n(marketplace, framework, tools, plugins); see `framework install`, which acts on\nthe framework alone\n\nOptions:\n  --source <mode>           Framework source: remote or local\n  --path <dir>              Absolute path to local framework (required with\n                            --source local)\n  --release <tag>           Marketplace release tag to fetch (e.g., v1.2.3)\n  --ai <ids>                Comma-separated AI tool IDs, or 'all' (e.g.,\n                            claude,cursor or all)\n  --ide <ids>               Comma-separated IDE tool IDs, or 'all' (e.g., vscode\n                            or all)\n  --plugins <mode>          Plugin install mode: none | all | recommended |\n                            comma-separated names\n  --no-default-marketplace  Skip auto-registering aidd-framework (no source\n                            prompt, no plugin install)\n  --yes                     Accept defaults without prompting\n  --scope <scope>           project (default) installs into this project alone;\n                            user registers the shared framework source and\n                            native activation machine-wide, writing nothing\n                            under this project\n  -h, --help                display help for command"
+  },
+  {
+    "invocation": "aidd sync",
+    "exitCode": 0,
+    "help": "Usage: aidd sync [options] [files...]\n\nRewrite owned files from what is already there — regenerate tracked files,\ndriven by the manifest (see `translate`, which converts a source without\nrecording anything)\n\nArguments:\n  files            Limit sync to specific tracked files\n\nOptions:\n  -f, --force      Sync without prompting (default: false)\n  --tool <tool>    Limit sync to a specific tool\n  --plugin <name>  Limit sync to a specific plugin\n  --scope <scope>  project (default) resolves this project's own manifest; user\n                   resolves the machine-wide manifest --scope user setup wrote,\n                   restoring no project files\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd telemetry",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry [options] [command]\n\nControl whether AIDD may measure this project\n\nOptions:\n  -h, --help        display help for command\n\nCommands:\n  on [options]      Turn on the AIDD telemetry switch and git-ignore the run\n                    journal\n  read [options]    Read what sessions cost from the files their tools already\n                    wrote, with no process running\n  identity          Whether this person's own identifier is attached to records\n                    read locally\n  check             Check whether the measurement chain is actually recording\n                    for this project\n  report [options]  Report what a period, or one task inside it, cost — tokens,\n                    models and steps, with how strongly each was attributed\n  off               Turn off the AIDD telemetry switch, warning if a tool's own\n                    settings file still exports\n  forget [options]  Irreversibly remove what this tool measured: this project's\n                    run journal, this machine's stored records, and this\n                    machine's identity file\n  help [command]    display help for command"
+  },
+  {
+    "invocation": "aidd telemetry check",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry check [options]\n\nCheck whether the measurement chain is actually recording for this project\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry forget",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry forget [options]\n\nIrreversibly remove what this tool measured: this project's run journal, this\nmachine's stored records, and this machine's identity file\n\nOptions:\n  --yes       Confirm removal after seeing what would go — without it, nothing\n              is removed (default: false)\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry identity",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry identity [options] [command]\n\nWhether this person's own identifier is attached to records read locally\n\nOptions:\n  -h, --help                  display help for command\n\nCommands:\n  use [options] [identifier]  Mint this person's identifier, or take one minted\n                              on another machine. --name attaches a display name\n  off                         Opt out: new records carry no person, from now on\n  link <identity>             Add an identifier this person cannot choose onto\n                              this same person - one row, not two, in a report\n  unlink <identity>           Withdraw an added identifier from this person"
+  },
+  {
+    "invocation": "aidd telemetry identity link",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry identity link [options] <identity>\n\nAdd an identifier this person cannot choose onto this same person - one row, not\ntwo, in a report\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry identity off",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry identity off [options]\n\nOpt out: new records carry no person, from now on\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry identity unlink",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry identity unlink [options] <identity>\n\nWithdraw an added identifier from this person\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry identity use",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry identity use [options] [identifier]\n\nMint this person's identifier, or take one minted on another machine. --name\nattaches a display name\n\nOptions:\n  --name <value>  A display name for whichever identifier this call settles on\n  -h, --help      display help for command"
+  },
+  {
+    "invocation": "aidd telemetry off",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry off [options]\n\nTurn off the AIDD telemetry switch, warning if a tool's own settings file still\nexports\n\nOptions:\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry on",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry on [options]\n\nTurn on the AIDD telemetry switch and git-ignore the run journal\n\nOptions:\n  --yes       Confirm writing the git-tracked switch — this turns measurement on\n              for everyone who clones (default: false)\n  -h, --help  display help for command"
+  },
+  {
+    "invocation": "aidd telemetry read",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry read [options]\n\nRead what sessions cost from the files their tools already wrote, with no\nprocess running\n\nOptions:\n  --session <id>  One session to read. Omitted, every session the run journal\n                  knows is read\n  -h, --help      display help for command"
+  },
+  {
+    "invocation": "aidd telemetry report",
+    "exitCode": 0,
+    "help": "Usage: aidd telemetry report [options]\n\nReport what a period, or one task inside it, cost — tokens, models and steps,\nwith how strongly each was attributed\n\nOptions:\n  --from <day>       First UTC day to report, as YYYY-MM-DD\n  --to <day>         Last UTC day to report, as YYYY-MM-DD (default today)\n  --days <n>         How many days back to report, ending at --to (default 7)\n  --task <identity>  Restrict to the sessions that wrote into this task, as\n                     <yyyy_mm>/<name>\n  --project <id>     Restrict to this project\n  --step <name>      Restrict to this step\n  --model <name>     Restrict to this model\n  --tool <id>        Restrict to this tool\n  --axis <axis>      Print one axis as a table to paste elsewhere: total | day |\n                     step | model | agent | prompt | task | backlog | flow |\n                     tool | project | person\n  --json             Print one object a program can parse, instead of text for a\n                     person\n  -h, --help         display help for command"
+  },
+  {
+    "invocation": "aidd translate",
+    "exitCode": 0,
+    "help": "Usage: aidd translate [options] <source>\n\nConvert an arbitrary source into a target-native plugin tree — records nothing\n(see `sync` for the manifest-driven, tracked version)\n\nArguments:\n  source                   Path to the source framework directory\n\nOptions:\n  --to <target>            Conversion target (claude, cursor, copilot, codex,\n                           opencode)\n  --out <dir>              Output directory (marketplace dist or project root)\n  --as <marketplace|flat>  Output layout (default: \"marketplace\")\n  --force                  Overwrite existing files at canonical paths under\n                           --out\n  -h, --help               display help for command"
+  },
+  {
+    "invocation": "aidd update",
+    "exitCode": 0,
+    "help": "Usage: aidd update|upgrade [options]\n\nUpdate the aidd CLI itself to the latest version\n\nOptions:\n  --check      Check if a newer version is available without installing\n               (default: false)\n  --dry-run    Preview the update without installing (default: false)\n  -f, --force  Reinstall even if already up to date (default: false)\n  -h, --help   display help for command"
+  }
+]

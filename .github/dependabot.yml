@@ -29,6 +29,14 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # devDependencies batch into one PR instead of one per package — the CLI's
+    # Windows job alone runs ~8 min, and an unrelated bump should not pay for it once
+    # per dependency.
+    groups:
+      npm-dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -42,6 +50,29 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    groups:
+      npm-dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "kanban"
+    target-branch: "next"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore"
       include: "scope"

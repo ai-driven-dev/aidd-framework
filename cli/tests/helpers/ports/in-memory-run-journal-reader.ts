@@ -1,13 +1,11 @@
-import type { RunJournal, RunJournalStore } from "../../../src/domain/ports/run-journal-reader.js";
+import type {
+  RunJournal,
+  RunJournalStore,
+} from "../../../src/contexts/telemetry/domain/ports/run-journal-reader.js";
 
-/** In-memory double for `RunJournalStore` — a journal per session id, or `null` for a
- * session the map holds nothing for, mirroring the port's own contract of never throwing.
- * `runFileNames` is settable directly rather than derived from `journals`: a name-only
- * listing must be able to name a file `list()` could never parse, which is exactly the
- * damaged-journal case a caller of `listRunFiles()` needs. `undeletable`, mirroring
- * `InMemoryTelemetrySink`, stands in for a run file that refuses removal. `deletedFromDirs`
- * records every `dir` argument `deleteRunFile` actually received — what a mutation test
- * checks to prove a caller passed the preview's own path, never this double's `runsDir`. */
+/** In-memory double for `RunJournalStore`. `runFileNames` is settable rather than derived, so
+ * a listing can name a file `list()` could never parse; `undeletable` stands in for a run file
+ * that refuses removal; `deletedFromDirs` and `listCalls` record what a caller actually did. */
 export class InMemoryRunJournalReader implements RunJournalStore {
   readonly runsDir = "/fake/project/aidd_docs/runs";
   runFileNames: string[] = [];
@@ -17,6 +15,7 @@ export class InMemoryRunJournalReader implements RunJournalStore {
   readonly deletedFiles: string[] = [];
   readonly deletedFromDirs: string[] = [];
   readonly undeletable = new Set<string>();
+  listCalls = 0;
   private readonly journals = new Map<string, RunJournal>();
 
   set(sessionId: string, journal: RunJournal): void {
@@ -28,6 +27,7 @@ export class InMemoryRunJournalReader implements RunJournalStore {
   }
 
   async list(): Promise<readonly RunJournal[]> {
+    this.listCalls += 1;
     return [...this.journals.values()];
   }
 

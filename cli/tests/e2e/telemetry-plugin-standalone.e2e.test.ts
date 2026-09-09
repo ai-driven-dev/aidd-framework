@@ -2,12 +2,13 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
+import { environmentWithoutGitVariables } from "../../src/runtime/git/git-environment.js";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { copyFixtureTree, pathWithoutAidd, runCli } from "./helpers.js";
 
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
@@ -51,12 +52,8 @@ describe("the plugin measures on its own", () => {
     };
   }
 
-  /** What used to be `telemetry-switch.cjs on` — the switch moved behind `aidd telemetry
-   * on` in phase 3, so writing the file directly is what proves this section's actual
-   * claim (the hooks record with no CLI on the path) without depending on a binary this
-   * section's own environment deliberately excludes from `PATH`. The switch itself, and
-   * its own edge cases, are pinned in `cli/tests/e2e/telemetry.e2e.test.ts` and
-   * `cli/tests/e2e/telemetry-on-runs-privacy.e2e.test.ts`. */
+  /** The switch is seeded by writing the file, never through `aidd telemetry on`: the claim
+   * here is that the hooks record with no CLI on the `PATH` this section strips. */
   async function enableTelemetry(): Promise<void> {
     await mkdir(join(projectDir, ".aidd"), { recursive: true });
     await writeFile(
@@ -87,13 +84,8 @@ describe("the plugin measures on its own", () => {
     });
   }
 
-  // Recording, with no `aidd` anywhere. This is the half of the promise that survives the
-  // read path moving into the CLI, and the reason the hooks stayed plain node: a session
-  // measured now is readable later, by a CLI that was not installed when it ran. Answering is
-  // pinned separately, in telemetry-cost-skill-commands.e2e.test.ts. Turning measurement on
-  // moved behind `aidd telemetry on` in phase 3, so it is no longer this section's own claim
-  // — `enableTelemetry` seeds the switch directly, and only the journaling below runs with
-  // no CLI anywhere on `PATH`.
+  // The hooks are plain node so that a session measured now stays readable later, by a CLI
+  // that was not installed when it ran.
   it("journals a whole Claude Code session with no aidd on the path", async () => {
     await enableTelemetry();
     await replayHook("claude-code-session-start", "session-start", {});
@@ -114,12 +106,8 @@ describe("the plugin measures on its own", () => {
     expect(lines.map((line) => line.type)).toContain("step_start");
   });
 
-  // The whole promise phase 6 exists to restate, proven end to end rather than in two
-  // halves that each assume the other: a session is journalled with `aidd` nowhere on
-  // this machine at all, and only afterwards is the CLI invoked to read it back. Neither
-  // `enableTelemetry` nor `replayHook` above ever calls it; `runCli` below is the first
-  // invocation of `dist/cli.js` in this test, and it runs after every write has already
-  // happened.
+  // Neither `enableTelemetry` nor `replayHook` invokes the binary: `runCli` below is this
+  // test's first, and it runs after every write has already happened.
   it("reads a session's figures complete, though the CLI did not exist when it ran", async () => {
     await enableTelemetry();
     await replayHook("claude-code-session-start", "session-start", {});
@@ -141,22 +129,16 @@ describe("the plugin measures on its own", () => {
     });
     await replayHook("claude-code-session-start", "turn-end", {});
 
-    // Only now does the CLI run at all, against the exact project and home the hooks above
-    // wrote into with no CLI on the path and no CLI ever invoked. `read` has no session
-    // identifier of its own to look for — `ReadLocalCostOptions`'s own doc comment: absent
-    // one, it "reads every session the run journal knows about", the file just written
-    // with no CLI present. Finding anything at all below already answers the question;
-    // the `--task` assertion further down narrows to a fact the transcript itself could
-    // never state, and could only have come from that same journal.
+    // `read` takes no session identifier: absent one it reads every session the run journal
+    // knows about, which here is the file the hooks just wrote.
     const read = await runCli(["telemetry", "read"], projectDir, fakeHome, {
       env: { AIDD_USER_CONFIG_DIR: configDir },
     });
     expect(read.exitCode, read.stderr).toBe(0);
     expect(read.stdout).toContain("Claude Code: read");
 
-    // The captured fixture's own transcript falls in August 2026, not whatever week this
-    // suite happens to run in - the same period `telemetry-lifecycle.e2e.test.ts` names for
-    // the identical fixture, wide enough to cover it regardless of today's date.
+    // The captured transcript falls in August 2026, so the period is fixed rather than
+    // relative to whatever week this suite runs in.
     const period = ["--from", "2026-08-01", "--to", "2026-08-31"];
     const reported = await runCli(
       ["telemetry", "report", ...period, "--json"],
@@ -175,19 +157,15 @@ describe("the plugin measures on its own", () => {
     expect(envelope.totals.input_tokens + envelope.totals.output_tokens).toBeGreaterThan(0);
     expect(envelope.by_step.map((row) => row.step)).toContain("probe-echo");
 
-    // The same figures, exactly, as `telemetry-lifecycle.e2e.test.ts` pins from a session
-    // where the CLI was present throughout — this session's own numbers do not shrink for
-    // having been recorded without it.
+    // The same figures a session recorded with the CLI present yields: they do not shrink
+    // for having been measured without it.
     const reportedText = await runCli(["telemetry", "report", ...period], projectDir, fakeHome, {
       env: { AIDD_USER_CONFIG_DIR: configDir },
     });
     expect(reportedText.stdout).toContain(SESSION_TOKENS);
 
-    // The load-bearing assertion: task identity exists only in the journal's own
-    // `file_written` line (`aidd_docs/tasks/2026_08/2026_08_21_probe-task/notes.md`,
-    // written above with no CLI anywhere) — the transcript fixture has no notion of an
-    // AIDD task folder at all. `--task` narrowing to this exact figure, rather than
-    // "nothing in this selection", is possible only because `read` consulted that line.
+    // Task identity exists only in the journal's own `file_written` line: the transcript
+    // fixture has no notion of a task folder, so narrowing proves `read` consulted it.
     const byTask = await runCli(
       ["telemetry", "report", ...period, "--task", TASK],
       projectDir,

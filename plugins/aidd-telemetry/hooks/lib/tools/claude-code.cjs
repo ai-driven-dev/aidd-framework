@@ -20,7 +20,7 @@ function writtenPath(payload) {
 module.exports = {
   readSessionId: (payload) => payload.session_id,
   readCwd: (payload) => payload.cwd,
-  // CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE, measured 2026-08-13.
+  // CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE, measured on its own export.
   vendorField: "session.id",
   stepStart: {
     skillName: skillNameFromArgument({
@@ -31,10 +31,8 @@ module.exports = {
     }),
     turnIdField: "prompt_id",
   },
-  // Claude Code alone, and that is a coverage fact rather than an oversight: Copilot and
-  // Cursor were never captured handing a path to a hook, and Codex writes through an
-  // apply_patch command string. A host with no writtenPath here is not blind to tasks -
-  // file-writes.cjs's observed pass covers it - but a stated path is exact where an
-  // observed one is inferred, so it is preferred wherever it exists.
+  // Claude Code alone: no other host was captured handing a path to a hook. A host without
+  // one is not blind to tasks - file-writes.cjs's observed pass covers it - but a stated path
+  // is exact where an observed one is inferred.
   writtenPath,
 };

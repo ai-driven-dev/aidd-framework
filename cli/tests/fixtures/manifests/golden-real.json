@@ -1,0 +1,30 @@
+{
+  "version": 8,
+  "tools": {
+    "claude": {
+      "toolId": "claude",
+      "version": "1.0.0",
+      "files": [
+        {
+          "relativePath": ".claude/settings.json",
+          "hash": "267dba9c9c9dbe2190d91ae84213c77b"
+        }
+      ],
+      "mergeFiles": [],
+      "plugins": [
+        {
+          "name": "aidd-test",
+          "source": {
+            "kind": "local",
+            "path": "/fixture/plugins/aidd-test"
+          },
+          "version": "1.0.0",
+          "strict": false,
+          "files": {},
+          "scope": "project",
+          "marketplace": "aidd-framework"
+        }
+      ]
+    }
+  }
+}

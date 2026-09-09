@@ -3,16 +3,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
-/**
- * Two records `aidd telemetry read` produced from the captured Codex rollout, seeded
- * straight into the sink rather than re-read here. The read path has its own tests; this
- * file's subject is the report, and going through the read would make it depend on whether
- * the machine happens to have OpenCode installed — `aidd telemetry read` consults every
- * declared tool, and OpenCode's reader shells out with a ten-second budget.
- *
- * Their moments are in July while the day file is named for a much later day. That gap is
- * deliberate: it is what a period has to select through.
- */
+/** Seeded straight into the sink: going through the read would depend on whether the machine
+ * has OpenCode installed. Their July moments sit in a day file named for a much later day. */
 const CODEX_RECORDS = [
   {
     kind: "request",
@@ -52,9 +44,8 @@ const CODEX_RECORDS = [
   },
 ] as const;
 
-/** Three records the filter tests narrow over: two inside the period, one on the same
- * moment `CODEX_RECORDS` uses but carrying a model no in-period record ever names - known
- * to a sweep of this file, but idle in every selection that stays inside the period. */
+/** Three records the filter tests narrow over: two inside the period, one carrying a model no
+ * in-period record names — known to a sweep of the file, idle in every in-period selection. */
 const FILTER_RECORDS = [
   {
     kind: "request",
@@ -179,9 +170,7 @@ describe("aidd telemetry report", () => {
 
     expect(result.exitCode).toBe(0);
     // Recomputed by hand from the rollout's own `last_token_usage` increments, not from
-    // anything this codebase produces: turn 019fae6f contributes 8898 input (22229 minus
-    // its 20224 cached, per OpenAI's inclusive convention) + 827 output + 65792 cache
-    // reads = 75,517; turn 019fae71 contributes 5032 + 3550 + 99840 = 108,422.
+    // anything this codebase produces: 75,517 for one turn and 108,422 for the other.
     expect(result.stdout).toContain("183,939");
     // Codex's own files carry no dollar figure; a zero here would read as free.
     expect(result.stdout).toContain("amount unknown");

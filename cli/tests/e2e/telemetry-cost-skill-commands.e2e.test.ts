@@ -2,23 +2,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { cp, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, runCli } from "./helpers.js";
 
-/**
- * What `01-cost` promises, held to what the CLI actually accepts and answers.
- *
- * Two failures this guards, and they are different: an answer that changed when the plugin's
- * own copy of the report was deleted, and a command the skill names that the CLI never
- * accepts. The second is what the plugin script used to make impossible by construction —
- * the skill and the script shipped together — and is exactly what the move to `aidd` puts at
- * risk.
- *
- * The fixture is synthetic on purpose. It has to be reproducible in CI, and it must not be
- * somebody's real usage: this repository is public, and the layer's own rule is that nothing
- * leaves the machine. The confrontation with real data is a separate, uncommitted step,
- * recorded in the phase's notes — a synthetic fixture agrees with the code that reads it.
- */
-const REPO_ROOT = resolve(process.cwd(), "..");
+/** Two different failures are guarded here: an answer that changed when the plugin's own copy
+ * of the report was deleted, and a command the skill names that the CLI never accepts. */
+const REPO_ROOT = REPOSITORY_ROOT;
 const FIXTURE = resolve(process.cwd(), "tests/fixtures/cli-owns-read");
 const SKILL_DIR = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills", "01-cost");
 const PERIOD = ["--from", "2026-01-01", "--to", "2026-01-31"];
@@ -45,11 +34,8 @@ function commandsNamedBySkill(): string[] {
   return [...found];
 }
 
-/** `<axis>` and friends stand for a choice the agent makes; a placeholder is expanded to its
- * first alternative so the command can actually be run, rather than skipped. Any `<a|b|c>`
- * is expanded by its own shape rather than by a copy of one skill's list: pinning the list
- * here meant the skill could not name a new axis without this regex being edited in the same
- * breath, and the failure it produced named the placeholder, not the drift. */
+/** A placeholder stands for a choice the agent makes, expanded by its own shape rather than
+ * by a copy of one skill's list, so the skill can name a new axis without editing this. */
 function runnable(command: string): string[] {
   return command
     .replace(/<([^<>|]+)(?:\|[^<>]+)>/gu, "$1")

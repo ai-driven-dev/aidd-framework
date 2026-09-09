@@ -1,8 +1,8 @@
 name: Validate
 
-# Runs the framework's pre-commit hooks against the full tree on every push
-# and pull request, so contributions that bypass lefthook locally
-# (--no-verify, fork PRs, web edits) are still gated by the same logic.
+# Runs the pre-commit hooks against the full tree on every push and pull request, so work
+# that bypassed lefthook locally is gated by the same logic. The generator hooks `git add`
+# what they regenerate instead of failing on drift, so a step below re-checks against HEAD.
 
 on:
   push:
@@ -20,6 +20,12 @@ jobs:
     env:
       LEFTHOOK_CHILD: "1"
       CI: "true"
+      # cli-ci.yml owns these three unconditionally, so running them again buys no coverage.
+      # cli-type-honesty is deliberately NOT excluded: no cli-ci.yml job runs it, making this
+      # its only CI coverage. The exclusion is also why no `cli/` install runs below — the
+      # three hooks needing cli/node_modules are the three dropped, and every hook that stays
+      # reads `cli/` as text from the repository root.
+      LEFTHOOK_EXCLUDE: "cli-biome,cli-architecture,cli-typecheck"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,25 +36,27 @@ jobs:
           node-version: "22"
 
       - name: Install pnpm
-        run: |
-          corepack enable
+        run: corepack enable
 
       - name: Cache pnpm store
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/share/pnpm/store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile --ignore-scripts
-
-      - name: Install cli dependencies
-        # cli/ is a self-contained project (own lockfile, not a pnpm workspace
-        # member) — the root install above never touches it, but the
-        # cli-biome/cli-typecheck pre-commit hooks below need cli/node_modules
-        # to exist or they fail outright ("biome: not found").
-        run: cd cli && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run pre-commit hooks against the full tree
         run: pnpm exec lefthook run pre-commit --all-files --force
+
+      # The generator hooks `git add` their output and never fail on drift, so a stale
+      # CATALOG.md, prompts doc or README count passes the step above in silence. Against
+      # HEAD, not the index: the generators already staged, so a plain `git diff` is empty.
+      - name: Fail if a generated file drifted from what pre-commit regenerated
+        run: |
+          if ! git diff --exit-code HEAD -- 'plugins/*/CATALOG.md' docs/prompts-documentation.md README.md; then
+            echo "::error::A generated file is stale. Run 'pnpm exec lefthook run pre-commit --all-files --force' locally and commit the result."
+            exit 1
+          fi

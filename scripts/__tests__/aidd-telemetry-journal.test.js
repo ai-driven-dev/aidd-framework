@@ -1,12 +1,9 @@
 const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
 
-// Patched before repo.cjs is required below, since repo.cjs destructures spawnSync at
-// require time - a monkeypatch of child_process's own export applied after that point
-// would never reach repo.cjs's already-captured reference. This is what lets
-// countGitInvocations() count real git calls in-process, with no PATH shim: a shim
-// script needs a POSIX shebang and the execute bit to run, neither of which Windows
-// honours (it resolves an executable by PATHEXT/extension instead).
+// Patched before repo.cjs is required, which destructures spawnSync at require time. This
+// is what lets countGitInvocations() count real git calls in-process, with no PATH shim: a
+// shim needs a shebang and the execute bit, neither of which Windows honours.
 let gitCallCounter = null;
 const realSpawnSync = childProcess.spawnSync;
 childProcess.spawnSync = (command, ...rest) => {
@@ -57,14 +54,9 @@ const {
 
 const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/tools/index.cjs");
 
-// One exact key set per line type (see phase-1.md) - the replacement for the
-// old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
-// longer exists.
-//
-// plugin_version is here, not optional in this list, because every test below runs
-// against this repository's own real, readable `.claude-plugin/plugin.json` - the
-// unreadable-manifest case (plugin_version genuinely absent) is asserted on its own,
-// against a temporary copy whose manifest this suite deletes.
+// One exact key set per line type. plugin_version is not optional here, because every test
+// below runs against this repository's own readable manifest; the absent case is asserted
+// on its own, against a temporary copy whose manifest this suite deletes.
 const SESSION_START_KEYS = [
   "type",
   "at",
@@ -149,22 +141,17 @@ test("detectHost recognises Copilot's compat shape - session_id and hook_event_n
   assert.equal(detectHost(loadFixture("copilot-compat-turn-end.json")), "copilot");
 });
 
-// Captured 2026-08-28 from a real `@github/copilot` 1.0.80 session's own hook stdin, in a
-// project declaring this plugin's own PascalCase events. Two shapes nothing had ever
-// captured, and the reason they matter is what the same session settled about the other
-// three: `copilot-compat-{session-start,post-tool-use-skill,turn-end}.json` were compared
-// key-for-key against that stdin and match exactly. The compat shape is what this plugin's
-// hooks actually receive - not a variant they might.
+// Captured from a real Copilot session's own hook stdin, in a project declaring this
+// plugin's PascalCase events. The compat shape is what these hooks actually receive, not a
+// variant they might: every compat fixture was compared key-for-key against that stdin.
 test("detectHost recognises the two compat shapes captured last, so all five of Copilot's events are pinned rather than three", () => {
   assert.equal(detectHost(loadFixture("copilot-compat-user-prompt-submitted.json")), "copilot");
   assert.equal(detectHost(loadFixture("copilot-compat-pre-tool-use-skill.json")), "copilot");
 });
 
-// Copilot's compat builder renames a built-in tool to Claude Code's own PascalCase spelling
-// - the same session captured `tool_name: "Read"` for a file read - but leaves `skill`
-// lowercase. `STEP_START_BY_HOST.copilot`'s compat branch keys on that exact lowercase
-// spelling, so the asymmetry is load-bearing: were `skill` renamed the way `Read` is, no
-// step would ever open on this shape and a whole session would read as unattributed.
+// Copilot's compat builder renames a built-in tool to Claude Code's PascalCase spelling but
+// leaves `skill` lowercase, and the compat branch keys on that exact lowercase spelling: were
+// `skill` renamed the way `Read` is, no step would open and a session would read unattributed.
 test("a compat skill call names the tool in lowercase, unlike the PascalCase every built-in tool gets", () => {
   const preToolUse = loadFixture("copilot-compat-pre-tool-use-skill.json");
   const postToolUse = loadFixture("copilot-compat-post-tool-use-skill.json");
@@ -415,12 +402,9 @@ for (const name of [
   });
 }
 
-// Codex has no `Stop` event. Its own vocabulary, read out of the 0.149.0 binary and
-// confirmed by a live `codex exec`, is SessionStart / SessionEnd / PostToolUse and friends -
-// SessionStart and SessionEnd fired, Stop never did, so every Codex session journalled a
-// session_start with nothing after it. Both fixtures below are real captures from
-// that run with the home path redacted; this test replays the SessionEnd one as the
-// turn-end hook receives it, and fails if a Codex turn ever stops closing.
+// Codex has no `Stop` event: its own vocabulary is SessionStart / SessionEnd / PostToolUse,
+// so a journal waiting for Stop records a session_start with nothing after it. Both fixtures
+// are real captures with the home path redacted.
 test("Codex's own SessionEnd payload closes the turn, since Codex never sends a Stop", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/codex-session-end.git" });
   try {
@@ -518,10 +502,6 @@ test("a file-written replay with hook_event_name stripped still appends a file_w
   }
 });
 
-// The two hardcoded-list versions of these checks (one per redacted concern) were replaced
-// by a single directory-scanning test, further down, per phase-1.md task 3.3: "run it over
-// every fixture in the directory... which were never checked" - a hardcoded FIXTURE_NAMES
-// array is exactly the thing a fixture added later would silently escape.
 
 test("the Cursor fixture's user_email is the redaction placeholder", () => {
   const cursor = loadFixture("cursor-session-start.json");
@@ -604,9 +584,8 @@ test("AIDD_RUNS_DIR overrides the in-repo default outright", () => {
   });
 });
 
-// a worktree gets its own journal by decision, not by accident. This is the test
-// that decision asked for - it also proves --show-toplevel behaves as resolveRunsDir
-// assumes, rather than merely asserting the assumption.
+// A worktree gets its own journal by decision, and this also proves --show-toplevel behaves
+// the way resolveRunsDir assumes rather than merely asserting the assumption.
 function addWorktree(main, dir) {
   execFileSync("git", ["add", "-A"], { cwd: main, env: CLEAN_ENV });
   execFileSync("git", ["commit", "-q", "-m", "init", "--allow-empty"], {
@@ -616,12 +595,10 @@ function addWorktree(main, dir) {
   execFileSync("git", ["worktree", "add", "-b", "feature", dir], { cwd: main, env: CLEAN_ENV });
 }
 
-// git's --show-toplevel resolves symlinks (macOS's /var, /tmp among them) and, on
-// Windows, always answers with a forward-slash long-filename path - which can differ
-// in spelling from fs.realpathSync() of the same directory when %TEMP% itself
-// resolves through an 8.3 short alias. fs.realpathSync.native asks the OS for the
-// canonical form on every platform, which collapses both differences; lowercased on
-// win32 since NTFS paths are case-insensitive.
+// git's --show-toplevel resolves symlinks and, on Windows, answers with a long-filename
+// path that can differ from fs.realpathSync()'s when %TEMP% resolves through an 8.3 alias.
+// `.native` asks the OS for the canonical form; lowercased on win32, where paths are
+// case-insensitive.
 function canonicalPath(target) {
   const resolved = fs.realpathSync.native(target);
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
@@ -657,10 +634,8 @@ function makeTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-// `withConfig` is independent of `withRunsDir`: the switch and the location
-// it writes to no longer have to move together, which is the whole point of
-// phase 1. Defaults to a switched-on repo, matching every test written
-// before the config file existed.
+// `withConfig` is independent of `withRunsDir`: the switch and the location it writes to do
+// not have to move together. Defaults to a switched-on repository.
 function makeTempRepo({ remote, withRunsDir = true, withConfig = true } = {}) {
   const dir = makeTempDir("aidd-telemetry-repo-");
   execFileSync("git", ["init", "-q"], { cwd: dir, env: CLEAN_ENV });
@@ -699,10 +674,9 @@ function makePayload({ cwd, sessionId, event }) {
   };
 }
 
-// `event` defaults from the payload's own hook_event_name, and is overridable
-// for tests that exercise a disagreement or an absent hook_event_name.
-// AIDD_RUNS_DIR is set to "" (which runsDir treats as unset, being falsy) so
-// an ambient override in this process's real environment can never leak in.
+// `event` defaults from the payload's own hook_event_name, overridable for a test exercising
+// a disagreement. AIDD_RUNS_DIR is set to "", which runsDir treats as unset, so an ambient
+// override in this process's real environment can never leak in.
 function replayIn(payload, event = ARGV_EVENT_BY_HOOK_EVENT_NAME[payload.hook_event_name]) {
   const args = event ? [script, event] : [script];
   return spawnSync(process.execPath, args, {
@@ -763,8 +737,8 @@ function replayInWithGitDir(payload, gitDir) {
   });
 }
 
-// Run files are `.jsonl` - one line per observation, appended, never
-// rewritten (see plan.md). Recurses because AIDD_RUNS_DIR can point anywhere.
+// Run files are `.jsonl` - one line per observation, appended, never rewritten. Recurses
+// because AIDD_RUNS_DIR can point anywhere.
 function readRunFiles(dir) {
   const files = [];
   let entries;
@@ -1223,11 +1197,8 @@ test("ten turns in one session produce one file, not ten, and its lines record r
     assert.equal(afterStart.length, 1);
     const startLine = readLines(afterStart[0])[0];
 
-    // nowIso() truncates to whole seconds, so a Stop replayed within the
-    // same wall-clock second as SessionStart would not visibly move `at`
-    // even if handleTurnEnd ran correctly. Crossing a second boundary for
-    // real is what makes "time advances" a fact about handleTurnEnd, not a
-    // fact about clock resolution.
+    // nowIso() truncates to whole seconds, so a Stop replayed inside the same second would
+    // not visibly move `at` even when handleTurnEnd ran correctly.
     execFileSync("sleep", ["1.1"]);
 
     for (let i = 0; i < 9; i++) {
@@ -1413,9 +1384,8 @@ test("a Stop still appends its line even when the run file's existing content is
 });
 
 test("a session that never produces a git commit still yields a complete session_start line", () => {
-  // makeTempRepo runs `git init` and configures identity but never commits -
-  // every test in this file already exercises that shape. This test states
-  // the acceptance criterion explicitly rather than leaving it implicit.
+  // makeTempRepo runs `git init` and configures identity but never commits, so a repository
+  // with no HEAD is the shape under test here.
   const repo = makeTempRepo({ remote: "git@github.com:acme/no-commit.git" });
   try {
     const log = spawnSync("git", ["log"], { cwd: repo, encoding: "utf8", env: CLEAN_ENV });
@@ -1437,11 +1407,6 @@ test("a session that never produces a git commit still yields a complete session
   }
 });
 
-// `parent_run_id is present and null` is gone: the field itself left
-// the written form. Measured reason, from plan.md - a subagent shares its
-// parent's session_id, and SubagentStart/SubagentStop carry an agent_id, so
-// nesting is inside a run, not between runs; there is nothing left for the
-// field to model.
 
 test("vendor_field names the export-side attribute, and vendor_id is the same session.id value a live export would carry", () => {
   // vendor_id is exactly the payload's session_id, the same value Claude
@@ -1556,10 +1521,8 @@ test("findRunFileByVendorId ignores leftover pre-event-log .json files (both the
   }
 });
 
-// Restores process.env exactly, including "unset" when a key didn't exist.
-// Used below to drive processPayload in-process rather than through a child
-// process, since counting git invocations needs to observe *this* process's
-// PATH.
+// Restores process.env exactly, including "unset" when a key did not exist. Drives
+// processPayload in-process, since counting git invocations observes this process's PATH.
 function withEnv(overrides, fn) {
   const original = {};
   for (const key of Object.keys(overrides)) {
@@ -1822,14 +1785,6 @@ test("taskFolderRelativePath returns null for non-string or empty input", () => 
   assert.equal(taskFolderRelativePath(undefined, "/repo/aidd_docs/tasks/2026_08/alpha/x.md"), null);
 });
 
-// advanceTasks (the tasks[]-interval state machine) is gone outright, along
-// with every pure-unit test of it: file_written no longer computes or stores
-// an interval, or a task_id - it records the path, and nothing derives from
-// it in this hook. The six advanceTasks tests that stood here (open/leave-
-// open/resume/close-and-open/null-switch/placeholder-replace) have no
-// replacement, because there is no longer a state machine for them to prove
-// correct - the assertions they made are about a shape this plan removes,
-// not evidence this plan still needs in another form.
 
 test("a session with no file-written at all produces only the session_start line, never a file_written line", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/no-write.git" });
@@ -2203,11 +2158,9 @@ test("a truncated final line leaves every earlier line readable", () => {
 });
 
 test("no source file in hooks/lib/ reads a run file's contents back - record.cjs and file-writes.cjs never read a file at all", () => {
-  // Scoped to record.cjs and file-writes.cjs, not repo.cjs: repo.cjs legitimately
-  // reads .aidd/config.json, which is not a run file. This is the static
-  // half of the hard constraint (append never reads); the dynamic half is
-  // exercised above by the corrupted-content and byte-identity tests, which
-  // would fail immediately if a read-modify-write crept back in.
+  // Scoped to record.cjs and file-writes.cjs, not repo.cjs, which legitimately reads
+  // .aidd/config.json. The static half of "append never reads"; the dynamic half is the
+  // corrupted-content and byte-identity tests above.
   const recordSrc = fs.readFileSync(
     path.join(root, "plugins/aidd-telemetry/hooks/lib/record.cjs"),
     "utf8",
@@ -2449,10 +2402,8 @@ test("a leaked GIT_DIR never redirects a session into another repository", () =>
   }
 });
 
-// ---------------------------------------------------------------------------
-// Phase 1: the journal serves four hosts (see phase-1.md). Each host's own
-// SessionStart shape, mirroring scripts/__tests__/fixtures/*-session-start.json -
-// same field names, synthetic ids so each test owns its own session.
+// Each host's own SessionStart shape, mirroring fixtures/*-session-start.json: same field
+// names, synthetic ids so each test owns its own session.
 
 function makeCodexPayload({ cwd, sessionId, event, turnId }) {
   return {
@@ -2481,11 +2432,9 @@ function makeCopilotPayload({ cwd, sessionId }) {
   };
 }
 
-// Copilot's other builder, _vsCodeCompat (see lib/host.cjs): Claude Code's own event
-// spelling reused verbatim (session_id, hook_event_name) instead of sessionId, plus a
-// timestamp field neither Codex nor Claude Code ever carries. Mirrors the shape measured
-// 2026-08-21 against a real @github/copilot@1.0.80 session - see
-// fixtures/copilot-compat-*.json for the untouched capture this builder is shaped from.
+// Copilot's other builder, _vsCodeCompat: Claude Code's own event spelling reused verbatim,
+// plus a timestamp field neither Codex nor Claude Code carries. Shaped from the untouched
+// capture in fixtures/copilot-compat-*.json.
 function makeCopilotCompatPayload({ cwd, sessionId, event }) {
   return {
     hook_event_name: event,
@@ -2495,13 +2444,9 @@ function makeCopilotCompatPayload({ cwd, sessionId, event }) {
   };
 }
 
-// Cursor's own captured payload (fixtures/cursor-session-start.json - the exact shape the
-// probe measured, per plan.md) carries no top-level cwd at all, only workspace_roots.
-// repo.cjs's resolveWriteTarget/resolveRunsDir read payload.cwd unconditionally, and
-// repo.cjs is outside phase-1's architecture projection - translating workspace_roots into a
-// usable cwd is not this phase's work to invent. So this builder mirrors the real shape
-// exactly; it must NOT grow a cwd field just to make a happy-path test pass, or the test
-// would assert a capability the code does not have.
+// Cursor's captured payload carries no top-level cwd at all, only workspace_roots. This
+// builder mirrors that shape exactly and must NOT grow a cwd field to make a happy-path test
+// pass, or the test would assert a capability the code does not have.
 function makeCursorPayload({ cwd, sessionId, event }) {
   return {
     conversation_id: sessionId,
@@ -2733,9 +2678,8 @@ test("a Copilot compat turn-end appends a turn_end line to the file its own sess
   }
 });
 
-// Renamed from a title claiming "the two are no longer indistinguishable from outside" -
-// this pair (a run file vs none) is exactly what the criterion says is NOT enough; the real
-// comparison (unrecognised payload vs no payload at all) is asserted separately below.
+// A run file against none is not the decisive comparison; unrecognised payload against no
+// payload at all is, and it is asserted separately below.
 test("a Copilot compat session-start writes a run file; an unrecognised payload of the same event writes the unrecognised marker instead, never a run file of its own", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-compat-vs-unrecognised.git" });
   try {
@@ -2901,7 +2845,6 @@ test("every fixture in the directory is free of a real email address, a real hom
   }
 });
 
-// ── Phase 2: a started step is a fact ─────────────────────────────────────────
 
 const {
   SKILL_FILE_PATTERN,
@@ -2909,10 +2852,9 @@ const {
 } = require("../../plugins/aidd-telemetry/hooks/lib/step-starts.cjs");
 const { buildStepStartLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.cjs");
 
-// Each entry is a real captured payload, edited only where a test needs its own repo,
-// session or skill name. The shapes themselves are never hand-written: Copilot delivering
-// its arguments as a JSON string and Codex naming the tool `Bash` are exactly the details
-// a plausible invention would get wrong.
+// Each entry is a real captured payload, edited only where a test needs its own repo, session
+// or skill name: Copilot delivering its arguments as a JSON string and Codex naming the tool
+// `Bash` are exactly the details an invented shape would get wrong.
 const STEP_FIXTURE_BY_HOST = {
   "claude-code": "claude-code-post-tool-use-skill.json",
   copilot: "copilot-post-tool-use-skill.json",
@@ -2920,10 +2862,9 @@ const STEP_FIXTURE_BY_HOST = {
   cursor: "cursor-post-tool-use-skill-read.json",
 };
 
-// Codex's session identity is the rollout it writes, read off transcript_path, not the
-// session_id the payload also carries - a resumed session's session_id names its parent.
-// A test that renamed only session_id would leave the two events pointing at two different
-// sessions, which is precisely the bug the derivation exists to prevent.
+// Codex's session identity is the rollout it writes, not the session_id the payload also
+// carries, which on a resumed session names its parent. Renaming only session_id would point
+// the two events at two different sessions.
 function retargetCodexTranscript(payload, sessionId) {
   // The last 36 characters before the extension, exactly as the hook's own parse takes
   // them - matching a UUID-ish run of characters instead could cross the timestamp
@@ -2987,10 +2928,9 @@ function endPayload(cwd, sessionId, skill) {
   return payload;
 }
 
-// A skill's end is the one thing about a step no host emits - measured, a `Skill` call's own
-// `tool_result` returns in about a tenth of a second, which is the dispatch and not the
-// completion. So the skill declares it, through a tool call it makes, and the hook - which
-// alone holds the session id and the working directory - writes the line.
+// A skill's end is the one thing about a step no host emits: a `Skill` call's `tool_result`
+// returns in a tenth of a second, which is the dispatch and not the completion. So the skill
+// declares it, and the hook, which alone holds the session id and cwd, writes the line.
 test("a skill declaring its own end leaves a step_end naming it", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/step-end.git" });
   try {
@@ -3010,10 +2950,9 @@ test("a skill declaring its own end leaves a step_end naming it", () => {
   }
 });
 
-// The same watermark `task-declared.cjs` protects, and for the same reason: file-writes.cjs
-// reads the run file's own mtime as "the moment this session last wrote a line" to know what
-// changed since. A step end landing between a shell write and the turn end that observes it
-// would push that mark past the write, silently dropping it.
+// The watermark `task-declared.cjs` protects: file-writes.cjs reads the run file's mtime as
+// "the moment this session last wrote a line", so a step end landing between a shell write
+// and the turn end that observes it would push that mark past the write.
 test("a step end never costs the turn a write it should have observed", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/step-end-mtime.git" });
   const sessionId = "00000000-0000-4000-8000-00000000e0df";
@@ -3043,10 +2982,9 @@ function stepLinesIn(repo) {
 }
 
 // Claude Code and Copilot name the skill in a tool argument; Codex and Cursor leave only a
-// SKILL.md path. Four hosts, one assertion, because the point of the table is that the
-// caller cannot tell which family ran.
-// Hex throughout, so Codex's identity really is derived from its transcript path rather
-// than quietly falling back to session_id because the synthetic id is not a UUID.
+// SKILL.md path. One assertion for four hosts, because the caller cannot tell which family
+// ran. Hex throughout, so Codex's identity is really derived from its transcript path rather
+// than falling back to session_id because a synthetic id is not a UUID.
 const STEP_SESSION_SUFFIX_BY_HOST = {
   "claude-code": "aaa",
   copilot: "bbb",
@@ -3209,9 +3147,8 @@ test("a file whose name ends in SKILL.md but sits outside a skills tree opens no
   assert.equal(SKILL_FILE_PATTERN.test("sed -n '1,120p' .agents/skills/alpha/SKILL.md"), true);
 });
 
-// The decisive shape is a call the argument family REJECTS that still carries a SKILL.md
-// path: on an argument-family host, merely reading a skill file is not opening a step.
-// A fallback chain would mint a phantom step here, and a payload the argument family
+// The decisive shape is a call the argument family rejects that still carries a SKILL.md
+// path: a fallback chain would mint a phantom step here, and a payload the argument family
 // accepts could never show it, since the first family would answer and the second never run.
 test("reading a SKILL.md on an argument-family host opens no step - the table names one family, it is not a fallback chain", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/step-two-candidates.git" });
@@ -3294,10 +3231,9 @@ test("adding a fifth host is a table entry, not an edit to the handler", () => {
   }
 });
 
-// The word hooks.json ships and the word journal.cjs accepts are two halves of one
-// contract, and nothing else checks they agree. The journal was already dead on every
-// real installation once, for a mismatch of exactly this shape that 2250 tests missed
-// because they all ran from the source tree.
+// The word hooks.json ships and the word journal.cjs accepts are two halves of one contract,
+// and nothing else checks they agree. A mismatch leaves the journal dead on every real
+// installation while a suite running from the source tree stays green.
 test("every argv word hooks.json ships is one journal.cjs recognises", () => {
   const declared = JSON.parse(
     fs.readFileSync(path.join(root, "plugins/aidd-telemetry/hooks/hooks.json"), "utf8")
@@ -3395,7 +3331,6 @@ test("a turn that wrote nothing into a task folder records nothing", () => {
   }
 });
 
-// ── Phase 3: a declared task ──────────────────────────────────────────────────
 
 const {
   TASK_PATH_PATTERN,
@@ -3418,12 +3353,9 @@ const TASK_DECLARED_FIXTURE_BY_HOST = {
   copilot: "copilot-task-declared.json",
 };
 
-// Each entry is a real captured payload (see fixtures/README.md, "The task-declaration
-// payloads"), edited only where a test needs its own repo or session - never a hand-written
-// shape. declaredTaskPath finds the task path by pattern match, not by cwd, so the captured
-// tool_input/toolArgs value is left exactly as captured; only the fields the run-file lookup
-// and session identity depend on are retargeted, the same way stepPayload/sessionStartPayload
-// above retarget the step-opening captures.
+// Each entry is a real captured payload, edited only where a test needs its own repo or
+// session. declaredTaskPath matches by pattern, not by cwd, so the captured arguments are
+// left exactly as captured and only the fields the run-file lookup depends on are retargeted.
 function taskPayload(host, { cwd, sessionId }) {
   const payload = loadFixture(TASK_DECLARED_FIXTURE_BY_HOST[host]);
   if (host === "cursor") {
@@ -3558,7 +3490,6 @@ test("declaredTaskPath reads tool_input first and Copilot's toolArgs string only
   assert.equal(declaredTaskPath({ tool_input: { command: "echo hi" } }), null);
 });
 
-// a session says which worktree it ran in ------------------------------------
 
 // A linked worktree of `repo`, switched on, with its own runs directory. The seed commit
 // is what `git worktree add` needs a HEAD for; makeTempRepo leaves the repo empty.
@@ -3687,14 +3618,10 @@ test("a plain checkout that happens to live in a directory named 'worktrees' is 
   }
 });
 
-// OpenCode is the one host with no hook payload of its own: `hooks/opencode-plugin.js`
-// builds one and spawns this same journal, so `lib/tools/opencode.cjs` is only ever reached
-// through that synthesized shape. Nothing drove it here — a coverage run over this suite
-// showed `opencode.cjs` at 0% of its own functions while the other four hosts were between
-// 96% and 100% — so the fifth host's write path was the one never exercised in process.
-// The payload below is exactly what `opencode-plugin.js` builds (`{ tool, session_id, cwd }`,
-// and `tool_input` on a tool call); it carries no `hook_event_name`, so the event can only
-// come from argv, which is the second thing this covers.
+// OpenCode is the one host with no hook payload of its own: `opencode-plugin.js` builds one
+// and spawns this same journal, so `lib/tools/opencode.cjs` is only ever reached through that
+// synthesized shape. The payload below is exactly what the plugin builds, and it carries no
+// `hook_event_name`, so the event can only come from argv.
 function openCodePayload({ cwd, sessionId, toolInput }) {
   return {
     tool: "opencode",

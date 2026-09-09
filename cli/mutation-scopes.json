@@ -1,0 +1,67 @@
+{
+  "$comment": "The one declaration of what mutation testing covers and the floor each scope must hold. scripts/run-mutation.mjs runs a scope by name and fails below its break; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps, that every scope declares a floor, and that package.json has a script per scope. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated. A floor is raised to the measured score after a run, never lowered without the reason here. A scope's mutate is one glob or a list where a leading ! excludes; tools is split one scope per tool profile: a profile is a static declaration whose every mutant reruns each test that loads it, and the five together outlasted every other scope on a two-core runner; vscode's single file stays with the rest.",
+  "scopes": {
+    "kernel": {
+      "mutate": "src/kernel/**/*.ts",
+      "break": 71
+    },
+    "tools": {
+      "mutate": [
+        "src/contexts/tools/**/*.ts",
+        "!src/contexts/tools/domain/profiles/claude/**/*.ts",
+        "!src/contexts/tools/domain/profiles/codex/**/*.ts",
+        "!src/contexts/tools/domain/profiles/copilot/**/*.ts",
+        "!src/contexts/tools/domain/profiles/cursor/**/*.ts",
+        "!src/contexts/tools/domain/profiles/opencode/**/*.ts"
+      ],
+      "break": 76
+    },
+    "telemetry": {
+      "mutate": "src/contexts/telemetry/**/*.ts",
+      "break": 75
+    },
+    "translate": {
+      "mutate": "src/contexts/translate/**/*.ts",
+      "break": 85
+    },
+    "distribution": {
+      "mutate": "src/contexts/distribution/**/*.ts",
+      "break": 77
+    },
+    "framework": {
+      "mutate": "src/contexts/framework/**/*.ts",
+      "break": 69
+    },
+    "presentation": {
+      "mutate": "src/presentation/**/*.ts",
+      "break": 95
+    },
+    "runtime": {
+      "mutate": "src/runtime/**/*.ts",
+      "break": 67
+    },
+    "tools-claude": {
+      "mutate": "src/contexts/tools/domain/profiles/claude/**/*.ts",
+      "break": 92
+    },
+    "tools-codex": {
+      "mutate": "src/contexts/tools/domain/profiles/codex/**/*.ts",
+      "break": 87
+    },
+    "tools-copilot": {
+      "mutate": "src/contexts/tools/domain/profiles/copilot/**/*.ts",
+      "break": 80
+    },
+    "tools-cursor": {
+      "mutate": "src/contexts/tools/domain/profiles/cursor/**/*.ts",
+      "break": 94
+    },
+    "tools-opencode": {
+      "mutate": "src/contexts/tools/domain/profiles/opencode/**/*.ts",
+      "break": 81
+    }
+  },
+  "excluded": {
+    "src/cli.ts": "The entry point. It registers commands and returns: no branch a mutant could change that a unit or integration test would see, and what proves it runs is the e2e suite, which mutation excludes because it spawns a built binary no mutant reaches."
+  }
+}

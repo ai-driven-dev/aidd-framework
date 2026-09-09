@@ -1,13 +1,14 @@
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, gitSetOriginRemote, runCli } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const PLUGIN_SOURCE = join(REPO_ROOT, "plugins", "aidd-telemetry");
 const SESSION_FIXTURE = join(
   REPO_ROOT,
@@ -17,17 +18,17 @@ const SESSION_FIXTURE = join(
   "claude-code-session-start.json"
 );
 
-// Every other test runs the journal hook from the source tree. Installation moves it, and
-// a move that drops hooks/lib/ leaves a hook that throws on its first require — silently,
-// since a hook that fails is a hook that never records. Only running the installed copy
-// catches that.
+// Installation moves the journal hook, and a move dropping `hooks/lib/` leaves one that
+// throws on its first require - silently, since a hook that fails never records.
 describe("E2E: the journal hook runs from where installation puts it", () => {
   it("records a session through the installed plugin, not the source tree", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-hook-install");
     try {
       await gitInit(projectDir);
       await gitSetOriginRemote(projectDir, "git@github.com:aidd-lab/hook-install.git");
-      expect((await runCli(["ai", "install", "claude"], projectDir, fakeHome)).exitCode).toBe(0);
+      expect(
+        (await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome)).exitCode
+      ).toBe(0);
       expect(
         (await runCli(["plugin", "install", PLUGIN_SOURCE, "--yes"], projectDir, fakeHome)).exitCode
       ).toBe(0);

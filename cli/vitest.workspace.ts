@@ -17,6 +17,15 @@ export default defineWorkspace([
   {
     plugins: [textLoader(TEXT_EXTENSIONS)],
     test: {
+      name: "architecture",
+      include: ["tests/architecture/**/*.arch.test.ts"],
+      globals: false,
+      environment: "node",
+    },
+  },
+  {
+    plugins: [textLoader(TEXT_EXTENSIONS)],
+    test: {
       name: "integration",
       include: ["tests/**/*.integration.test.ts"],
       globals: false,
@@ -33,7 +42,7 @@ export default defineWorkspace([
       globals: false,
       environment: "node",
       testTimeout: 60000,
-      globalSetup: ["./tests/helpers/sweep-stale-temp-dirs.ts"],
+      globalSetup: ["./tests/e2e/global-setup.ts", "./tests/helpers/sweep-stale-temp-dirs.ts"],
     },
   },
 ]);

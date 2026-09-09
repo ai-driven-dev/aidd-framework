@@ -1,8 +1,7 @@
-// A skill's own end, declared the way a task already is: read out of a tool call's own
-// free-form arguments, never from a field a host populates. Nothing any host emits says when
-// a skill's work finishes - measured, the `tool_result` for a `Skill` call comes back in
-// about a tenth of a second, which is the dispatch and not the completion - so the only party
-// that can say it is the skill itself, and the only channel it has is a tool call it makes.
+// A skill's own end, read out of a tool call's free-form arguments and never from a field a
+// host populates. Nothing any host emits says when a skill's work finishes: a `Skill` call's
+// `tool_result` comes back in a tenth of a second, which is the dispatch and not the
+// completion, so the only party that can say it is the skill itself.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -99,7 +98,7 @@ test("every skill declaring its own end declares it in the form the hook reads",
 // lives; a copy kept here would be the second, and the two would disagree first.
 function orchestratingSkillsTheReaderKnows() {
   const source = fs.readFileSync(
-    path.join(__dirname, "..", "..", "cli", "src", "domain", "models", "flow-attribution.ts"),
+    path.join(__dirname, "..", "..", "cli", "src", "contexts", "telemetry", "domain", "flow-attribution.ts"),
     "utf8"
   );
   const declared = /ORCHESTRATING_SKILLS: ReadonlySet<string> = new Set\(\[([^\]]*)\]\)/u.exec(
@@ -110,11 +109,9 @@ function orchestratingSkillsTheReaderKnows() {
 }
 
 test("every skill that opens a flow also says when that flow is over", () => {
-  // Without the marker a flow closes on the next orchestrating step_start or, failing that,
-  // on the journal's own last witnessed moment - so an orchestration that never says it is
-  // done goes on owning everything the session did afterwards. The reader stopped closing a
-  // flow at a `turn_end` on 2026-09-04, which is what makes this declaration load-bearing
-  // rather than a refinement.
+  // The reader does not close a flow at a `turn_end`, so without the marker a flow closes on
+  // the next orchestrating step_start or on the journal's last witnessed moment - and an
+  // orchestration that never says it is done owns everything the session did afterwards.
   const qualified = orchestratingSkillsTheReaderKnows().filter((skill) => skill.includes(":"));
   assert.ok(qualified.length > 0, "no orchestrating skill is named in the plugin-qualified form");
 

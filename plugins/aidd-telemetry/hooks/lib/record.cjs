@@ -97,19 +97,13 @@ function findRunFileByVendorId(dir, vendorId) {
 // on session_start, so a reader can tell a file's shape without scanning it.
 const SCHEMA_VERSION = 2;
 
-// Which export-side attribute vendor_id can be joined against, per host - each host's own
-// hooks/lib/tools/<host>.cjs states it, measured or explicitly null; this is that fact
-// gathered into the one shape buildSessionStartLine below already expects.
+// Which export-side attribute vendor_id joins against, per host: each host's own tools file
+// states it, measured or explicitly null, and this gathers them into one shape.
 const VENDOR_FIELD_BY_HOST = Object.freeze(
-  Object.fromEntries(
-    Object.entries(TOOLS_BY_HOST).map(([host, tool]) => [host, tool.vendorField])
-  )
+  Object.fromEntries(Object.entries(TOOLS_BY_HOST).map(([host, tool]) => [host, tool.vendorField]))
 );
 
-// codexSessionIdFromTranscriptPath and readSessionId(host, payload) live in
-// hooks/lib/tools/ now (codex.cjs and tools/index.cjs respectively) and are re-exported
-// below unchanged - CLI tests reach them by exactly these names (see
-// cli/tests/helpers/telemetry-journal-hook.ts).
+// Re-exported below under exactly these names: the CLI's test helpers reach them that way.
 const { codexSessionIdFromTranscriptPath } = require("./tools/codex.cjs");
 
 const PRIVATE_FILE_MODE = 0o600;
@@ -120,23 +114,14 @@ function appendLine(filePath, line) {
   fs.appendFileSync(filePath, `${JSON.stringify(line)}\n`, { mode: PRIVATE_FILE_MODE });
 }
 
-// worktree_id / worktree_repo_id are omitted entirely, never written as null or "", for a
-// session that is not in a linked worktree - the common case, a plain checkout. See
-// `worktreeFields` in hooks/lib/repo.cjs for why absence is the only honest answer there:
-// an empty string would gather every plain checkout into one group as though they were the
-// same worktree. They are appended after the fields that were already on this line, so a
-// reader keyed on order sees no existing key move. No schema_version bump: an optional
-// field a reader may not know about is exactly what an optional field is for.
+// worktree_id, worktree_repo_id and plugin_version are omitted entirely, never null and
+// never "", when nothing can name one - see `worktreeFields` in repo.cjs for why absence is
+// the only honest answer. They are appended after the fields already on this line, so a
+// reader keyed on order sees no existing key move, and an optional field a reader may not
+// know about needs no schema_version bump.
 //
-// plugin_version is the same shape, appended after them for the same reason: this plugin's
-// own version, from `plugin-version.cjs`'s two routes - the manifest beside these hooks
-// after a tool's own install, or what the `aidd` CLI recorded when it did the install - and
-// omitted entirely, never `null` and never a guessed or inherited value, when neither can
-// name one. Stamped once, on the one line that names the session, never repeated
-// on every later line: it is a fact about which build of this plugin observed the whole
-// session, not a per-event fact. Never the framework's own version, and never the CLI's -
-// this hook is the one producer that can honestly say which build of *this plugin* wrote
-// this line.
+// plugin_version is stamped once, on the line that names the session: it is a fact about
+// which build of this plugin observed the session, never the framework's or the CLI's.
 function buildSessionStartLine({
   at,
   runId,
@@ -172,42 +157,33 @@ function buildTurnEndLine({ at, promptId }) {
   return line;
 }
 
-// path is repository-relative and "/"-separated on every platform. Never a task_id: that
-// derivation belongs to the reader, not the writer.
-// `source` says how the path came to be known, for the same reason step_attribution does:
-// "tool-stated" is the path the host handed us, exact and with no false positive.
-// "observed" is a file that changed inside a task folder while this session was running,
-// which is how a write made through a shell command or an apply_patch becomes visible at
-// all - and which can, in principle, catch a file something else on the machine wrote in
-// the same window. A consumer that must not risk that filters on this field.
+// path is repository-relative and "/"-separated on every platform, never a task_id: that
+// derivation belongs to the reader. `source` says how the path came to be known -
+// "tool-stated" is exact, "observed" is a file that changed inside a task folder while the
+// session ran, which can in principle catch a write something else on the machine made.
 function buildFileWrittenLine({ at, path: writtenPath, source }) {
   return { type: "file_written", at, path: writtenPath, source };
 }
 
-// A start, and nothing else. No end, no duration, no parent: no tool exposes when a
-// skill's work finishes, so all three would be a conclusion stored as a fact. The skill
-// name is sanitised as a value, never as a path segment - it is a name here, not a
-// location. turn_id is omitted, never written as null, when the host carries none.
+// A start and nothing else: no tool exposes when a skill's work finishes, so an end, a
+// duration or a parent would be a conclusion stored as a fact. The skill name is sanitised
+// as a value, never as a path segment.
 function buildStepStartLine({ at, skill, turnId }) {
   const line = { type: "step_start", at, skill: sanitizeSkillName(skill) };
   if (typeof turnId === "string" && turnId !== "") line.turn_id = turnId;
   return line;
 }
 
-// The end of the step `skill` names, told rather than inferred - see step-ends.cjs for why no
-// hook can observe it. Carries the skill, never only the moment: a bare end would have to
-// close whatever step is open, which closes the wrong one the moment a skill invokes another.
+// Told rather than inferred - see step-ends.cjs for why no hook can observe it. Carries the
+// skill, never only the moment: a bare end closes whatever step is open, which is the wrong
+// one as soon as a skill invokes another.
 function buildStepEndLine({ at, skill }) {
   return { type: "step_end", at, skill: sanitizeSkillName(skill) };
 }
 
-// A start, told rather than inferred, the same way step_start is: a tool call named a task
-// path, so this session is on that task from here. No end on this line either, and for the
-// same reason step_start carries none - closing is the reader's derivation, from whichever
-// turn_end or later task_declared comes next (see buildTaskIntervals in the CLI's own
-// cli/src/domain/models/task-attribution.ts, which is where that walk lives now). path is
-// repository-relative like file_written's, never a task_id: the derivation belongs to the
-// reader.
+// A tool call named a task path, so this session is on that task from here. No end on this
+// line, for the reason step_start carries none: closing is the reader's derivation, from
+// whichever turn_end or later task_declared comes next.
 function buildTaskDeclaredLine({ at, path: declaredPath }) {
   return { type: "task_declared", at, path: declaredPath };
 }
@@ -219,26 +195,21 @@ function sanitizeSkillName(skill) {
   return cleaned === "" || cleaned === "." || cleaned === ".." ? "-" : cleaned;
 }
 
-// sessionId arrives already read behind the host declaration (see readSessionId above) -
-// this function never assumes payload.session_id is that host's own spelling. The working
-// directory is read the same way, behind readCwd - Cursor names it workspace_roots, never
-// cwd (see hooks/lib/repo.cjs).
+// sessionId and the working directory both arrive behind the host's own declaration: Cursor
+// names its directory workspace_roots, never cwd.
 function handleSessionStart(payload, host, sessionId) {
   const target = resolveWriteTarget(readCwd(host, payload));
   if (!target) return;
   const { projectId, projectRemote, dir, repoRoot, worktreeId, worktreeRepoId } = target;
 
-  // Before the run file, and outside the guard below: the commit trailer's call site can go
-  // missing in a repository whose `prepare-commit-msg` another tool regenerates, and a
-  // session that already has a run file is exactly the one whose second SessionStart should
-  // still put it back. Here rather than in `journal.cjs` because this is the only place that
-  // already holds an *enabled* repository's hooks directory - `resolveWriteTarget` gated on
-  // that and paid the `rev-parse` for it - and buying a module boundary with a second
-  // process on every session start is not a trade this hook makes.
-  repairCommitTrailerHook(target.hooksDir, target.gitDir);
+  // Before the run file and outside the guard below: the trailer's call site can go missing
+  // where another tool regenerates `prepare-commit-msg`, and the session that already has a
+  // run file is exactly the one whose next SessionStart should put it back. Here because
+  // this is the only place already holding an enabled repository's hooks directory.
+  repairCommitTrailerHook(target.hooksDir, target.gitDir, repoRoot);
 
-  // SessionStart is not documented to fire once per session_id - `source` takes values
-  // beyond `startup` - so this guard prevents a second file for one vendor_id.
+  // SessionStart is not documented to fire once per session_id, so this guard prevents a
+  // second file for one vendor_id.
   if (findRunFileByVendorId(dir, sessionId)) return;
 
   const runId = generateUlid();
@@ -274,25 +245,19 @@ function handleTurnEnd(payload, host, sessionId) {
   appendLine(filePath, buildTurnEndLine({ at: nowIso(), promptId: payload.prompt_id }));
 }
 
-// A payload's session is only readable behind a known host's own spelling
-// (readSessionId above), so an unrecognised one has no session and therefore no run file
-// to append to; it lands in one file shared by the whole repo instead, named so it can
-// never collide with `<runId>__<vendorId>.jsonl`.
+// An unrecognised payload has no readable session and so no run file to append to: it lands
+// in one file shared by the repository, named so it can never collide with a run file.
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
 
-// Overwritten, not appended: journal.cjs already keeps this off the tool-used path (the
-// git-shellout gate), so this only ever runs once per session-start or turn-end - but it
-// still stays at exactly one line however many of those arrive, and `at` is always the
-// most recent one rather than freezing on the first. A marker that never moved forward
-// would recreate the stale-forever diagnosis this whole change removed from `hook fired`.
+// Overwritten, not appended: the file stays at exactly one line however many events arrive,
+// and `at` is always the most recent, since a marker frozen on the first would read as stale
+// forever.
 function handleUnrecognisedPayload(payload) {
-  // An unrecognised payload's own shape is, by definition, unknown - it may spell its
-  // working directory differently, or carry none at all (Cursor already does this among
-  // declared hosts), so payload.cwd is used only when it looks usable. process.cwd()
-  // falls back: a hook always runs inside the project it measures, which is a fact about
-  // where this process runs, not a guess about the payload. Which of the two produced a
-  // given marker is not recorded, since it does not change the answer.
-  const cwd = payload && typeof payload.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
+  // An unrecognised payload's shape is by definition unknown - it may spell its working
+  // directory differently or carry none, as Cursor already does - so payload.cwd is used
+  // only when usable, and process.cwd() falls back on where this hook is running.
+  const cwd =
+    payload && typeof payload.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
   const target = resolveRunsDir(cwd);
   if (!target) return;
 

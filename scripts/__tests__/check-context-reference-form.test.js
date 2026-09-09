@@ -8,14 +8,10 @@ const {
 } = require("../check-context-reference-form.js");
 
 /**
- * The memory block's reference form, checked against the hook that writes it.
- *
- * `CLAUDE.md` takes `@aidd_docs/…` because Claude Code resolves that import.
- * `AGENTS.md` takes a markdown link because the tools reading it — codex, cursor,
- * opencode — do not: an `@` line there is inert text that loads nothing and says
- * nothing. The hook has known this since #732; what was missing is anything that
- * notices when a file drifts back, which is how the wrong form reached `next`
- * inside an unrelated commit.
+ * The memory block's reference form, checked against the hook that writes it. `CLAUDE.md`
+ * takes `@aidd_docs/…` because Claude Code resolves that import; `AGENTS.md` takes a markdown
+ * link because the tools reading it do not, and an `@` line there is inert text that loads
+ * nothing and reports nothing. What this adds is noticing a file that drifts back.
  */
 
 const HOOK = `
@@ -42,7 +38,6 @@ function block(...lines) {
 const AT_LINE = "@aidd_docs/memory/architecture.md";
 const LINK_LINE = "[aidd_docs/memory/architecture.md](aidd_docs/memory/architecture.md)";
 
-// ── the hook's table is the source of truth ────────────────────────────────
 
 test("the declared form of each context file is read from the hook itself", () => {
   assert.deepEqual(readDeclaredTargets(HOOK), [
@@ -58,7 +53,6 @@ test("a hook whose table cannot be read is an error, never an empty pass", () =>
   assert.throws(() => readDeclaredTargets("const TARGET_FILES = whatever;"), /TARGET_FILES/u);
 });
 
-// ── the form each file carries ─────────────────────────────────────────────
 
 test("a block written in the form its file declares raises nothing", () => {
   assert.deepEqual(referenceFormProblems(block(AT_LINE), "at"), []);
@@ -89,7 +83,6 @@ test("every reference in the block is checked, not only the first", () => {
   assert.equal(referenceFormProblems(mixed, "link").length, 2);
 });
 
-// ── what is deliberately not a problem ─────────────────────────────────────
 
 test("a context file with no memory block is not a problem", () => {
   assert.deepEqual(referenceFormProblems("# Title\n\nprose only\n", "link"), []);
@@ -116,7 +109,6 @@ test("an unclosed block is left to the hook to report", () => {
   assert.deepEqual(referenceFormProblems(unclosed, "link"), []);
 });
 
-// ── the files on disk ──────────────────────────────────────────────────────
 
 test("a file the hook declares but the repository does not have is skipped", () => {
   const problems = checkFiles([{ path: "does-not-exist.md", syntax: "link" }], {

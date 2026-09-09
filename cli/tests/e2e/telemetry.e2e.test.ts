@@ -13,13 +13,13 @@ async function seedManifest(projectDir: string): Promise<void> {
   await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
   await writeFile(
     join(projectDir, AIDD_DIR, "manifest.json"),
-    JSON.stringify({ version: 5, tools: {}, marketplaces: {} }),
+    JSON.stringify({ version: 8, tools: {}, marketplaces: {} }),
     "utf-8"
   );
 }
 
 async function installClaude(projectDir: string, fakeHome: string): Promise<void> {
-  const result = await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+  const result = await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
   expect(result.exitCode).toBe(0);
 }
 
@@ -49,7 +49,11 @@ describe.concurrent("E2E: aidd telemetry on/off — the switch alone", () => {
       await gitInit(projectDir);
       await seedManifest(projectDir);
       await installClaude(projectDir, fakeHome);
-      const cursorInstall = await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
+      const cursorInstall = await runCli(
+        ["framework", "install", "--tool", "cursor"],
+        projectDir,
+        fakeHome
+      );
       expect(cursorInstall.exitCode).toBe(0);
 
       // Never turned on: `telemetry off` must leave every tool's config untouched.

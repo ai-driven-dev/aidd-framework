@@ -4,14 +4,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
- * The core's own claim, held to the built command: a person asks what a period consumed
- * and gets all six answers - total, by model, by framework task, by skill, by person and
- * by project - each reconciling to the same total.
- *
- * One session, journalled with two declared tasks back to back plus a record before
- * either was declared, so `by_task` has something real to break down: a named row per
- * task, and the row for what fell in no declared interval, summing back to the total
- * exactly like every other axis.
+ * One session, journalled with two declared tasks back to back plus a record predating
+ * both, so `by_task` has a named row per task and a row for what fell in no interval.
  */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const VENDOR_ID = "22222222-2222-4222-8222-222222222222";
@@ -150,11 +144,9 @@ describe("aidd telemetry report — the six questions, over one period", () => {
     expect(result.exitCode).toBe(0);
     const envelope = JSON.parse(result.stdout) as Envelope;
 
-    // The total: what the whole period cost.
     expect(envelope.totals.requests).toBe(3);
     expect(envelope.totals.cost_micro_usd).toBe(7_000_000);
 
-    // Every breakdown sums back to the same total - the report's whole claim.
     for (const rows of [
       envelope.by_model,
       envelope.by_task,
@@ -166,8 +158,6 @@ describe("aidd telemetry report — the six questions, over one period", () => {
       expect(sumCost(rows)).toBe(envelope.totals.cost_micro_usd);
     }
 
-    // by_task specifically: one row per declared task, plus the remainder - the sixth
-    // question, the one a `--task` filter alone could never answer.
     const taskNames = envelope.by_task.map((row) => row.task);
     expect(taskNames).toContain(ALPHA_TASK);
     expect(taskNames).toContain(BETA_TASK);
@@ -201,8 +191,8 @@ describe("aidd telemetry report — the six questions, over one period", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(ALPHA_TASK);
     expect(result.stdout).toContain(BETA_TASK);
-    // BEFORE_ANY_DECLARATION's own moment (08:30) is earlier than alpha's declaration
-    // (09:00) - one of the three named reasons, never the generic label it replaced.
+    // BEFORE_ANY_DECLARATION's moment (08:30) precedes alpha's declaration (09:00), which
+    // is one of the three named reasons a row carries no task.
     expect(result.stdout).toContain("before the next task this session declares");
   });
 });

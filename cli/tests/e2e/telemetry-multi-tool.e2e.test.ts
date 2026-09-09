@@ -1,21 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { chmod, cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, runCli, sinkDirIn } from "./helpers.js";
 
-/**
- * Three readable tools through one report, from the files each of them actually writes.
- *
- * Everything here is a real capture. The Claude Code transcript and the Codex rollout come
- * from `tests/fixtures/local-cost`; the hook payloads come from `scripts/__tests__/fixtures`
- * and are replayed through the journal hook itself, so the writer is exercised rather than
- * imitated. OpenCode is served by a stand-in `opencode` on the path answering with the
- * captured export payload — the reader shells out, and an e2e must not depend on whether
- * the machine running it happens to have that tool installed.
- */
-const REPO_ROOT = resolve(process.cwd(), "..");
+/** Three readable tools through one report, from real captures: hook payloads replayed
+ * through the journal hook itself, and a stand-in `opencode` on the path, since the reader
+ * shells out and an e2e must not depend on the machine having that tool installed. */
+const REPO_ROOT = REPOSITORY_ROOT;
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
@@ -78,17 +72,9 @@ describe("aidd telemetry, across every tool that can be read", () => {
     );
   }
 
-  /** Answers `opencode export <id> --sanitize` with the captured payload **for its own
-   * session and no other**, and nothing else with anything. A real binary would make this
-   * test depend on the machine it runs on.
-   *
-   * The session check is not decoration. Answering for any id at all is what a tool whose
-   * identifiers collided with another's would look like, and this stand-in used to do
-   * exactly that: every session read against it came back with OpenCode's figures, so one
-   * session's consumption was stored three times under three vendor ids, and this file
-   * asserted the tripled number under a comment claiming each tool's figures stayed its
-   * own. A real `opencode export` answers "session not found" for a foreign id — measured
-   * 2026-09-01, exit 1 — so this now does too. */
+  /** Answers `opencode export <id> --sanitize` with the captured payload for its own session
+   * and no other. Answering for any id at all is what colliding identifiers would look like,
+   * and would store one session's figures under every vendor id; a real binary exits 1. */
   async function installOpencodeStandIn(): Promise<void> {
     await mkdir(binDir, { recursive: true });
     const standIn = join(binDir, "opencode");
@@ -156,9 +142,8 @@ describe("aidd telemetry, across every tool that can be read", () => {
     );
   }
 
-  /** Hand-written, unlike the Claude Code one, and deliberately so: the hook stamps every
-   * line with the moment it runs, and the Codex rollout captured here is from July. A step
-   * interval that could reach it can only be constructed, never replayed. */
+  /** Hand-written, unlike the Claude Code one: the hook stamps every line with the moment it
+   * runs, so an interval reaching the captured rollout can only be constructed. */
   async function journalCodexSessionBackdated(): Promise<void> {
     const runsDir = join(projectDir, "aidd_docs", "runs");
     await mkdir(runsDir, { recursive: true });
@@ -209,10 +194,8 @@ describe("aidd telemetry, across every tool that can be read", () => {
 
     const out = await reportEverything();
 
-    // Every tool reports tokens and none reports an amount: no tool's own files carry a
-    // dollar figure, on any reader wired today. Claude Code's cost reaches the sink only
-    // through its OTLP export, which this path does not use. A zero here would read as
-    // free, so the report says the amount is unknown for all three.
+    // No tool's own files carry a dollar figure on any reader wired today, and Claude Code's cost
+    // reaches the sink only through OTLP, so a zero here would read as free.
     expect(out).toMatch(/Claude Code\s+amount unknown/u);
     expect(out).toMatch(/Codex\s+amount unknown/u);
     expect(out).toMatch(/OpenCode\s+amount unknown/u);
@@ -229,8 +212,8 @@ describe("aidd telemetry, across every tool that can be read", () => {
     const out = await reportEverything();
 
     expect(out).toMatch(/Cursor\s+not covered — It writes no token count/u);
-    // Copilot is covered (#697), but no session of its own was journalled in this test -
-    // reading as "nothing in this period" is the correct answer, never "not covered".
+    // Copilot is covered, but no session of its own was journalled here, so "nothing in this
+    // period" is the correct answer, never "not covered".
     expect(out).toMatch(/GitHub Copilot\s+nothing in this period/u);
     expect(out).not.toMatch(/GitHub Copilot\s+not covered/u);
   });
@@ -303,16 +286,14 @@ describe("aidd telemetry, across every tool that can be read", () => {
 
     expect(result.exitCode, result.stderr).toBe(0);
     expect(result.stdout).toContain(`task ${TASK}`);
-    // Only Claude Code wrote into that folder; Codex's figures must not follow it there.
-    // "in this selection", not "in this period": --task narrows the record set before any
-    // breakdown runs, so Codex's zero here is the task filter's doing, not real idleness.
+    // Only Claude Code wrote into that folder. "In this selection", not "in this period": --task
+    // narrows the record set first, so Codex's zero is the filter's doing, not real idleness.
     expect(result.stdout).not.toContain("183,939");
     expect(result.stdout).toMatch(/Codex\s+nothing in this selection/u);
   });
 
-  // #686. The Claude Code transcript this reads carries a captured `<synthetic>` line —
-  // a notice the tool composed itself, not a call anyone was billed for. It used to reach
-  // the sink and sit in this breakdown beside the real models, as though it were one.
+  // The Claude Code transcript carries a captured `<synthetic>` line, a notice the tool composed
+  // itself rather than a call anyone was billed for; it must not sit beside the real models.
   it("breaks a real session down by model and lists only models", async () => {
     await journalClaudeSession();
     await journalCodexSessionBackdated();

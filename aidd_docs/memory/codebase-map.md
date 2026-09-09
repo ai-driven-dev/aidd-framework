@@ -13,6 +13,7 @@ flowchart TD
     Root --> Docs["docs/"]
     Root --> AiddDocs["aidd_docs/"]
     Root --> Manifest[".claude-plugin/"]
+    Root --> Claude[".claude/"]
     Root --> GH[".github/"]
 ```
 
@@ -20,13 +21,14 @@ flowchart TD
 
 | Path | Holds |
 | --- | --- |
-| `plugins/` | the product — one dir per plugin, each with `skills/`, optionally `agents/`, `commands/`, `hooks/`, `rules/` |
+| `plugins/` | the product — one dir per plugin, each with `plugins/<plugin>/.claude-plugin/plugin.json` and `skills/`, optionally `agents/`, `commands/`, `hooks/`, `rules/` |
 | `cli/` | the `aidd` binary. Has its own memory bank and `CLAUDE.md` |
-| `kanban/` | the task board, bundled into the CLI, never published alone |
+| `kanban/` | the task board. A private package with its own lockfile, unwired from the CLI |
 | `scripts/` | repository checks and generators, run by lefthook and CI. Tests in `scripts/__tests__/` |
-| `docs/` | durable docs — architecture, plugin authoring, glossary, maintainer runbook |
-| `aidd_docs/` | this memory bank, plus task documents read by `aidd kanban` |
-| `.claude-plugin/` | `marketplace.json`, the version manifest |
+| `docs/` | durable docs — architecture, plugin authoring, glossary, maintainer runbook. `prompts-documentation.md` is generated |
+| `aidd_docs/` | this memory bank, plus `tasks/`, `runs/`, `product/`, `specs/`, `recipes/`, `brainstorm/` |
+| `.claude-plugin/` | `marketplace.json`, the plugin manifest. Versions live in `.release-please-manifest.json` — see `deployment.md` |
+| `.claude/` | registers this checkout as a local marketplace, so a contributor runs the plugins they edit |
 | `.github/` | workflows, issue templates, rulesets |
 
 ## Entry points
@@ -36,10 +38,11 @@ flowchart TD
 | Binary | `cli/src/cli.ts` → `dist/cli.js`, bin name `aidd` |
 | Workflow | `plugins/<plugin>/skills/<NN>-<name>/SKILL.md` |
 | Memory refresh | `plugins/aidd-context/hooks/update_memory.js`, on `SessionStart` |
+| Run journal | `plugins/aidd-telemetry/hooks/journal.cjs`, on `SessionStart`, `Stop`, `PostToolUse` |
 
 ## Packages
 
 | Package | Released |
 | --- | --- |
 | `cli` (`@ai-driven-dev/cli`) | npm, the only published package |
-| `kanban` | private, compiled into the CLI. Depends on npm packages only, never on `cli/` |
+| `kanban` (`@ai-driven-dev/kanban-source`) | private. Depends on npm packages only, never on `cli/` |

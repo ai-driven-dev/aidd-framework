@@ -1,10 +1,6 @@
-// Every other tool has between three and eight captures behind its reader. OpenCode had
-// none - its coverage was asserted from a doc comment (`plugin README.md`'s "OpenCode
-// misses a server process's first session"), never from a payload. This file replaces that
-// with real captures of `session.idle` and a completed tool part, plus `session.created`
-// reconstructed from a verified SDK type declaration plus a genuinely captured sibling
-// event - see fixtures/README.md's "OpenCode's plugin events" for exactly what each one
-// rests on and does not.
+// Real captures of `session.idle` and a completed tool part, plus `session.created`
+// reconstructed from a verified SDK type declaration and a genuinely captured sibling event -
+// see fixtures/README.md for exactly what each one rests on and what it does not.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -16,7 +12,7 @@ const { detectHost } = require("../../plugins/aidd-telemetry/hooks/lib/host.cjs"
 
 const PLUGIN_SOURCE = path.resolve(
   __dirname,
-  "../../plugins/aidd-telemetry/hooks/opencode-plugin.js",
+  "../../plugins/aidd-telemetry/hooks/opencode-plugin.js"
 );
 const fixturesDir = path.join(__dirname, "fixtures");
 
@@ -24,16 +20,17 @@ function loadFixture(name) {
   return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), "utf8"));
 }
 
-// A byte-identical `.mjs` twin, for this file alone - the same reason
-// opencode-plugin.test.js's own `makeInstalledRepo` keeps one: this repository declares no
-// `"type": "module"` anywhere up the tree, so plain Node's `import()` would read
-// `opencode-plugin.js` as CommonJS and choke on its `export` syntax. OpenCode's own loader
-// does not consult that field at all - the extension is the only thing that differs from
-// what ships.
+// A byte-identical `.mjs` twin: this repository declares no `"type": "module"` anywhere up
+// the tree, so plain Node's `import()` would read the plugin as CommonJS and choke on its
+// `export` syntax. OpenCode's own loader consults no such field, and the extension is the
+// only thing that differs from what ships.
 let pluginModulePromise;
 async function pluginModule() {
   if (!pluginModulePromise) {
-    const twin = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aidd-opencode-payloads-")), "opencode-plugin.mjs");
+    const twin = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "aidd-opencode-payloads-")),
+      "opencode-plugin.mjs"
+    );
     fs.copyFileSync(PLUGIN_SOURCE, twin);
     pluginModulePromise = import(pathToFileURL(twin).href);
   }
@@ -49,23 +46,19 @@ async function journalCallsFor() {
 }
 
 // OpenCode loads every function-valued named export of a file in `plugin/` as a plugin
-// factory of its own. Measured live against opencode 1.14.20 in a freshly installed
-// project: a second such export returning `null` killed `opencode run` with
-// `TypeError: null is not an object (evaluating 'S.auth')` before any session started, so
-// installing this framework made the tool it measures unusable. A non-function export is
-// ignored by that same loader, which is why the spawn-free seam this file needs rides on
-// the plugin function as a property instead of standing beside it as a second export.
+// factory of its own, and a second such export returning `null` kills `opencode run` before
+// any session starts. A non-function export is ignored by that same loader, which is why the
+// spawn-free seam rides on the plugin function as a property.
 test("the plugin file exports one plugin factory, never a second one OpenCode would call", async () => {
   const exported = await pluginModule();
   const factories = Object.keys(exported).filter((name) => typeof exported[name] === "function");
   assert.deepEqual(factories, ["AiddTelemetry"]);
 });
 
-// `opencode run` is always a session OpenCode never announced: measured, `session.created`
-// is published on its own bus and never reaches a plugin's event hook (plugins/aidd-telemetry
-// /README.md, "OpenCode misses a server process's first session"). Without these four cases the
-// journal receives a turn-end for a run file that was never created, drops it, and every
-// OpenCode session reads back as nothing at all - while the tool is declared covered.
+// `opencode run` is always a session OpenCode never announced: `session.created` is published
+// on its own bus and never reaches a plugin's event hook. Without these four cases the journal
+// receives a turn-end for a run file that was never created, drops it, and every OpenCode
+// session reads back as nothing at all while the tool is declared covered.
 test("session.idle for a session nobody announced opens it first, so the journal has a run file to write into", async () => {
   const calls = await journalCallsFor();
   const idle = loadFixture("opencode-session-idle.json");
@@ -74,11 +67,11 @@ test("session.idle for a session nobody announced opens it first, so the journal
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["session-start", "turn-end"],
+    ["session-start", "turn-end"]
   );
   assert.deepEqual(
     produced.map((call) => call.payload.cwd),
-    ["/home/user/fallback", "/home/user/fallback"],
+    ["/home/user/fallback", "/home/user/fallback"]
   );
   assert.equal(detectHost(produced[0].payload), "opencode");
 });
@@ -91,7 +84,7 @@ test("a task declaration in a session nobody announced opens it first too, never
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["session-start", "tool-used"],
+    ["session-start", "tool-used"]
   );
   assert.equal(produced[0].payload.session_id, produced[1].payload.session_id);
 });
@@ -104,12 +97,12 @@ test("a session already announced is never opened a second time", async () => {
   const produced = calls(
     loadFixture("opencode-session-idle.json"),
     sessionDirectories,
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["turn-end"],
+    ["turn-end"]
   );
 });
 
@@ -119,12 +112,12 @@ test("a session OpenCode did announce produces its one session-start, never a do
   const produced = calls(
     loadFixture("opencode-session-created.json"),
     new Map(),
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["session-start"],
+    ["session-start"]
   );
 });
 
@@ -138,7 +131,7 @@ test("a second session.idle on one already-opened session adds no second session
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["turn-end"],
+    ["turn-end"]
   );
 });
 
@@ -146,6 +139,28 @@ test("an event this plugin does not act on opens no session either", async () =>
   const calls = await journalCallsFor();
 
   assert.deepEqual(calls({ type: "message.updated", properties: {} }, new Map(), "/x"), []);
+});
+
+// OpenCode's bus carries event types this plugin never dispatches on, none of them guaranteed
+// to carry a `properties` object. Session id resolution runs before the per-type dispatch that
+// would ignore such an event, so it alone decides whether one crashes OpenCode's event loop.
+test("an event with no properties at all does not crash resolving its session id", async () => {
+  const calls = await journalCallsFor();
+
+  assert.deepEqual(calls({ type: "server.connected" }, new Map(), "/x"), []);
+});
+
+// The field this reads is real, but nothing guarantees OpenCode fills `properties.info`
+// before firing: an empty `properties` object must resolve to an undefined id, not throw.
+test("session.created with an empty properties object does not crash, it opens an unnamed session", async () => {
+  const calls = await journalCallsFor();
+
+  const produced = calls({ type: "session.created", properties: {} }, new Map(), "/x");
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["session-start"]
+  );
 });
 
 test("session.idle, captured live, turns into a turn-end call the journal recognises as opencode", async () => {
@@ -224,12 +239,12 @@ test("a second session.created on one server keeps its own directory, never over
   const firstIdle = builder(
     { type: "session.idle", properties: { sessionID: first.properties.info.id } },
     sessionDirectories,
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
   const secondIdle = builder(
     { type: "session.idle", properties: { sessionID: second.properties.info.id } },
     sessionDirectories,
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
 
   assert.equal(firstCall.payload.cwd, first.properties.info.directory);
@@ -244,10 +259,8 @@ test("an event this plugin does not act on produces no journal call", async () =
   assert.equal(builder({ type: "message.updated", properties: {} }, new Map(), "/x"), null);
 });
 
-// A completed tool part, captured live (opencode 1.14.20, 2026-08-31, model
-// opencode/ling-3.0-flash-fin-free): the model called its own `read` tool, and the plugin's
-// `event` hook received the part carrying that call's own arguments - see fixtures/README.md's
-// "OpenCode's tool part" for what was measured and what was not. Turns into a tool-used call
+// A completed tool part, captured live: the model called its own `read` tool and the plugin's
+// `event` hook received the part carrying that call's arguments. Turns into a tool-used call
 // the same shape Claude Code's Read and Codex's Bash already give the declaration reader.
 test("a completed tool part, captured live, turns into a tool-used call the journal recognises as opencode", async () => {
   const builder = await journalCallFor();
@@ -295,13 +308,9 @@ test("a tool part still pending or running produces no journal call - only a com
   assert.equal(builder(running, new Map(), "/x"), null);
 });
 
-// The negative, captured live in the same run as the positive above: a completed `bash`
-// tool call, `ls -la`, naming no task folder anywhere in its own arguments. Produces no
-// journal call at all: a pre-filter over the call's own arguments, mirroring
-// `task-declared.cjs`'s own `TASK_PATH_PATTERN`, refuses it before a call is ever built -
-// on OpenCode, `tool-used` does nothing else downstream for a call that names no task (see
-// `opencode-plugin.js`'s own comment on `declaredTaskCallFor`), so nothing is lost by never
-// spawning `journal.cjs` for it.
+// The negative, captured live in the same run as the positive above: a completed `bash` call
+// naming no task folder anywhere in its arguments. The pre-filter refuses it before a call is
+// ever built, and on OpenCode `tool-used` does nothing else downstream for such a call.
 test("a completed tool part naming no task folder produces no journal call at all - nothing downstream would have acted on it", async () => {
   const builder = await journalCallFor();
   const event = loadFixture("opencode-tool-part-no-task.json");

@@ -5,30 +5,23 @@ import { fileURLToPath } from "node:url";
 const root = resolve(fileURLToPath(import.meta.url), "../..");
 
 const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
-// The budget exists to make growth visible, not to be a wall: it is raised
-// deliberately when a feature earns it, and the raise is what a reviewer sees.
-// 560 was set when measurement across five tools took the bundle to 500.8 KB.
-// 590 was set when resolving one person across tools and machines (#661) took
-// the bundle to 567.7 KB - tighter headroom than the 560 raise left, on
-// purpose, rather than padding past what was actually measured.
-// 593 was set when `by_prompt` joined the breakdowns: measured 588.4 -> 590.6 KB,
-// +2.2 KB for the axis no host limit can empty. Same tight headroom.
-// 596 was set when `by_agent` learned to tell a main thread from a tool that never
-// names an agent: measured 592.0 -> 593.8 KB across two changes, the flow axis's own
-// tool-stated row included. Same 2.2 KB headroom the raise before it left.
-// 598 was set when the journal reader began reading the schema a journal states it was
-// written under, and the diagnostic gained the reason for refusing one: measured
-// 594.3 -> 595.8 KB. Same 2.2 KB headroom as the two raises before it.
-// 601 was set when `aidd ai rules` took over the rule inventory the explore skill used to
-// run as its own script: measured 596.6 -> 599.0 KB, +2.4 KB for a use case, a model, a
-// display and the subcommand. It deletes 198 lines from a plugin, which the bundle does
-// not carry either way - the trade is a plugin script that had drifted for bytes that are
-// measured. Same 2.2 KB headroom as the three raises before it.
-// 603 was set when a marketplace registry that cannot be read began saying so: measured
-// 600.7 -> 601.2 KB, +0.5 KB for one guard and the sentence it prints. The smallest raise so
-// far, for the smallest change - and the one that showed the budget had 0.3 KB of headroom
-// left, which is less than a correctness fix costs. Same 2.2 KB headroom as the four raises
-// before it.
+// The budget makes growth visible rather than walling it off: a raise is deliberate, is
+// what a reviewer sees, and leaves ~2 % headroom over what was measured, never more.
+// The registry of every raise, budget then measurement then what landed:
+// 560 KB: 500.8 KB, measurement across five tools.
+// 590 KB: 567.7 KB, one person resolved across tools and machines.
+// 593 KB: 590.6 KB, the `by_prompt` breakdown.
+// 596 KB: 593.8 KB, `by_agent` telling a main thread from a tool that names no agent.
+// 598 KB: 595.8 KB, the journal reader on a journal's stated schema, plus the refusal reason.
+// 601 KB: 599.0 KB, `aidd ai rules` taking over the rule inventory.
+// 557 KB: 545.7 KB, a reset measured against a stale lockfile, remeasured after the merge.
+// 567 KB: 555.7 KB, the four telemetry axes and `framework rules`.
+// 578 KB: 566.8 KB, OpenCode's hooks bridge.
+// 595 KB: 584.55 KB, the marketplace source-conflict guard.
+// 610 KB: 597.95 KB, the machine-scope migration and the rollback refusal.
+// 625 KB: 612.56 KB, `--scope user` on `setup`, `doctor` and `sync`.
+// 641 KB: 628.26 KB, `clean --scope user` and sync's migration of a pre-shared-source project.
+// 654 KB: 641.0 KB, the shared-plugin, narrowing, hook and Windows-lookup passes.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

@@ -1,17 +1,13 @@
-import type { TelemetryExportLeftover } from "../../../src/domain/models/telemetry-export-leftover.js";
-import type { TelemetryRecorderDeclarationSetup } from "../../../src/domain/models/telemetry-setup.js";
 import type {
   TelemetryEvidenceReader,
   TelemetrySwitchSetupRead,
   TelemetryUnrecognisedPayload,
-} from "../../../src/domain/ports/telemetry-evidence-reader.js";
+} from "../../../src/contexts/telemetry/domain/ports/telemetry-evidence-reader.js";
+import type { TelemetryExportLeftover } from "../../../src/contexts/telemetry/domain/telemetry-export-leftover.js";
+import type { TelemetryRecorderDeclarationSetup } from "../../../src/contexts/telemetry/domain/telemetry-setup.js";
 
-/** Shared by every test that needs `TelemetryEvidenceReader` without a real config file on
- * disk — `enabled` defaults to `true` since that is the ordinary case a report or a check
- * runs against; a test that cares about the off state sets it explicitly. `leftoverExport`
- * defaults to empty — a machine with nothing left over — for the same reason.
- * `switchSetup`/`recorderDeclaration` default to a readable, absent-everywhere state — a
- * clean machine that has never touched either fact. */
+/** `TelemetryEvidenceReader` without a real config file on disk. Every field defaults to the
+ * ordinary clean-machine state, so a test sets only the one it cares about. */
 export class StubTelemetryEvidenceReader implements TelemetryEvidenceReader {
   enabled = true;
   unrecognisedPayload: TelemetryUnrecognisedPayload | null = null;

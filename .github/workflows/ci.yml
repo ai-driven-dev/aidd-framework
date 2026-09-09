@@ -9,11 +9,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-permissions:
-  contents: write
-  pull-requests: write
-  packages: write
-  id-token: write
+# No default grant: a job added later starts with nothing rather than inheriting write
+# access it never asked for.
+permissions: {}
 
 jobs:
   commitlint:
@@ -32,6 +30,21 @@ jobs:
           configFile: commitlint.config.cjs
           commitDepth: 1
 
+      # `commitDepth: 1` lints the head commit, not the subject a squash merge gives `next`,
+      # which GitHub defaults to the PR title. The title goes through the same config here.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: github.event_name == 'pull_request'
+        with:
+          node-version: "22"
+      - name: Lint the PR title (the subject a squash merge will actually use)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+          printf '%s' "$PR_TITLE" | pnpm exec commitlint --config commitlint.config.cjs
+
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
@@ -45,24 +58,6 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
       paths_released: ${{ steps.release.outputs.paths_released }}
-      aidd_context_release_created: ${{ steps.release.outputs['plugins/aidd-context--release_created'] }}
-      aidd_context_version: ${{ steps.release.outputs['plugins/aidd-context--version'] }}
-      aidd_context_tag_name: ${{ steps.release.outputs['plugins/aidd-context--tag_name'] }}
-      aidd_dev_release_created: ${{ steps.release.outputs['plugins/aidd-dev--release_created'] }}
-      aidd_dev_version: ${{ steps.release.outputs['plugins/aidd-dev--version'] }}
-      aidd_dev_tag_name: ${{ steps.release.outputs['plugins/aidd-dev--tag_name'] }}
-      aidd_vcs_release_created: ${{ steps.release.outputs['plugins/aidd-vcs--release_created'] }}
-      aidd_vcs_version: ${{ steps.release.outputs['plugins/aidd-vcs--version'] }}
-      aidd_vcs_tag_name: ${{ steps.release.outputs['plugins/aidd-vcs--tag_name'] }}
-      aidd_pm_release_created: ${{ steps.release.outputs['plugins/aidd-pm--release_created'] }}
-      aidd_pm_version: ${{ steps.release.outputs['plugins/aidd-pm--version'] }}
-      aidd_pm_tag_name: ${{ steps.release.outputs['plugins/aidd-pm--tag_name'] }}
-      aidd_orchestrator_release_created: ${{ steps.release.outputs['plugins/aidd-orchestrator--release_created'] }}
-      aidd_orchestrator_version: ${{ steps.release.outputs['plugins/aidd-orchestrator--version'] }}
-      aidd_orchestrator_tag_name: ${{ steps.release.outputs['plugins/aidd-orchestrator--tag_name'] }}
-      aidd_refine_release_created: ${{ steps.release.outputs['plugins/aidd-refine--release_created'] }}
-      aidd_refine_version: ${{ steps.release.outputs['plugins/aidd-refine--version'] }}
-      aidd_refine_tag_name: ${{ steps.release.outputs['plugins/aidd-refine--tag_name'] }}
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
@@ -76,30 +71,20 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      # Auto-merge the Release PR release-please just opened/updated, with the
-      # App token. `--admin` is required: a plain `gh pr merge` is refused by the
-      # branch policy ("base branch policy prohibits the merge") even for a
-      # bypass actor (verified in a sandbox). `--admin` performs the override
-      # merge that the ruleset's bypass_actors entry permits for this App.
-      # An App-token merge also re-fires the `push: main` and `release: published`
-      # workflows that a GITHUB_TOKEN merge would not.
-      # Guard on prs_created (PR opened), not releases_created (fires on merge).
+      # `--admin` is required: the branch policy refuses a plain `gh pr merge` even for a
+      # bypass actor. The App token also re-fires the `push: main` and `release: published`
+      # workflows a GITHUB_TOKEN merge would not. Guarded on prs_created, since
+      # releases_created only fires on merge.
       - name: Auto-merge the Release PR
         if: ${{ steps.release.outputs.prs_created == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: gh pr merge "${{ fromJSON(steps.release.outputs.pr).number }}" --squash --admin --repo "${{ github.repository }}"
 
-      # Pin GitHub's "Latest" badge to the umbrella marketplace release.
-      # release-please creates the umbrella + every plugin release in one run
-      # with no ordering guarantee, and GitHub marks whichever release is created
-      # last as "Latest" (the create API defaults make_latest to true). That
-      # lets a plugin release (e.g. aidd-dev-v2.3.0) outrank the marketplace
-      # version whenever a cycle ships plugins alongside the umbrella. Bare
-      # `tag_name` is the root "." package tag (the umbrella `v*`, the tag that
-      # carries the marketplace bundle); forcing it latest auto-unsets the plugin
-      # release that held the badge. The umbrella bumps every cycle, so a
-      # release run always has a root tag to pin.
+      # GitHub marks whichever release is created last as "Latest", and release-please
+      # creates the umbrella and every plugin release in one unordered run — so a plugin
+      # release can outrank the marketplace version. Bare `tag_name` is the root tag, the one
+      # carrying the marketplace bundle, and it bumps every cycle.
       - name: Pin umbrella release as latest
         if: ${{ steps.release.outputs.release_created == 'true' }}
         env:
@@ -111,14 +96,15 @@ jobs:
     needs: [release-please]
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
+    # `gh release upload` writes a release asset, which GitHub treats as a contents change.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build clean marketplace bundle
-        # A self-contained marketplace a user can extract and register with
-        # `/plugin marketplace add ./aidd-framework-marketplace-<version>`.
-        # Contains only what the marketplace needs: the catalog manifest and
-        # the plugins. No framework-internal files (aidd_docs/, scripts/, etc.).
+        # Self-contained, for `/plugin marketplace add ./aidd-framework-marketplace-<version>`:
+        # the catalog manifest and the plugins, and no framework-internal file.
         run: |
           VERSION="${{ needs.release-please.outputs.version }}"
           STAGE_PARENT="$(mktemp -d)"
@@ -143,21 +129,24 @@ jobs:
     needs: [release-please]
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
+    # contents: write — `gh release upload` writes a release asset.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
-      # 9-cell matrix: 4 marketplace (claude/cursor/copilot/codex) + 5 flat
-      # (+opencode, which is flat-only). Mirrors the CLI golden snapshot matrix.
+      # Four marketplace plus five flat — opencode is flat-only. Mirrors the CLI golden
+      # snapshot matrix.
       matrix:
         include:
-          - { tool: claude, mode: marketplace, flag: "" }
-          - { tool: cursor, mode: marketplace, flag: "" }
-          - { tool: copilot, mode: marketplace, flag: "" }
-          - { tool: codex, mode: marketplace, flag: "" }
-          - { tool: claude, mode: flat, flag: "--flat" }
-          - { tool: cursor, mode: flat, flag: "--flat" }
-          - { tool: copilot, mode: flat, flag: "--flat" }
-          - { tool: codex, mode: flat, flag: "--flat" }
-          - { tool: opencode, mode: flat, flag: "--flat" }
+          - { tool: claude, mode: marketplace }
+          - { tool: cursor, mode: marketplace }
+          - { tool: copilot, mode: marketplace }
+          - { tool: codex, mode: marketplace }
+          - { tool: claude, mode: flat }
+          - { tool: cursor, mode: flat }
+          - { tool: copilot, mode: flat }
+          - { tool: codex, mode: flat }
+          - { tool: opencode, mode: flat }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -165,18 +154,25 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install pnpm
+        run: corepack enable
+
+      # The exact CLI this release is publishing, built from this run's own checkout: a
+      # published-version pin would need bumping by hand and can name a command that no
+      # longer exists.
+      - run: cd cli && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm build
+
       - name: Build the target-native distribution
-        # Pin the CLI version: a future CLI release must not silently change
-        # framework dist output. Bump deliberately alongside a framework change.
         run: |
           VERSION="${{ needs.release-please.outputs.version }}"
           NAME="aidd-framework-${{ matrix.tool }}-${{ matrix.mode }}-${VERSION}"
-          # --out must live outside --source: the CLI refuses to build when one
-          # path contains the other. Stage under RUNNER_TEMP, not the repo tree.
+          # --out must live outside --source: the CLI refuses to build when one path
+          # contains the other, so stage under RUNNER_TEMP rather than the repo tree.
           OUT="${RUNNER_TEMP}/dist/${{ matrix.tool }}/${{ matrix.mode }}"
           mkdir -p "$OUT"
-          npx --yes @ai-driven-dev/cli@5.1.1 framework build \
-            --source . --target ${{ matrix.tool }} --out "$OUT" ${{ matrix.flag }}
+          node cli/dist/cli.js translate . \
+            --to ${{ matrix.tool }} --out "$OUT" --as ${{ matrix.mode }}
           STAGE="$(mktemp -d)/${NAME}"
           mkdir -p "$STAGE"
           cp -R "$OUT"/. "$STAGE"/
@@ -196,10 +192,26 @@ jobs:
     needs: [release-please]
     if: needs.release-please.outputs.paths_released != '' && needs.release-please.outputs.paths_released != '[]'
     runs-on: ubuntu-latest
+    # contents: write — `gh release upload` writes a release asset.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        plugin: [aidd-context, aidd-dev, aidd-vcs, aidd-pm, aidd-orchestrator, aidd-refine]
+        # Every plugin `marketplace.json` lists, and nothing else — asserted by
+        # scripts/__tests__/release-covers-every-plugin.test.js, since a plugin missing here
+        # is tagged with no archive and nothing else notices.
+        plugin:
+          [
+            aidd-context,
+            aidd-dev,
+            aidd-vcs,
+            aidd-pm,
+            aidd-orchestrator,
+            aidd-refine,
+            aidd-ui,
+            aidd-telemetry,
+          ]
     steps:
       - name: Check if this plugin was released
         id: check
@@ -223,8 +235,7 @@ jobs:
 
       - name: Build plugin bundle
         if: steps.check.outputs.released == 'true'
-        # Clean, self-contained plugin directory. A user extracts it and
-        # installs the plugin locally. No framework-internal files.
+        # Self-contained: a user extracts it and installs the plugin locally.
         run: |
           PLUGIN="${{ matrix.plugin }}"
           VERSION="${{ steps.version.outputs.version }}"
@@ -247,17 +258,20 @@ jobs:
     needs: [release-please]
     if: needs.release-please.outputs.paths_released != '' && contains(fromJSON(needs.release-please.outputs.paths_released), 'cli')
     runs-on: ubuntu-latest
+    # id-token for npm's OIDC trusted publish, packages for the best-effort mirror.
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      # kanban/ is bundled into the CLI from source, so its dependencies must be
-      # installed before the build can resolve them.
-      - run: cd kanban && pnpm install --frozen-lockfile
+      # No kanban install: `cli/src/` names kanban nowhere and the bundle carries none of
+      # its symbols.
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
 
@@ -270,19 +284,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Real OIDC trusted publishing (npm CLI >= 11.5.1, Node >= 22.14.0), not a
-      # token — matches the npmjs.com trusted-publisher entry for
-      # ai-driven-dev/framework, workflow ci.yml. No NPM_TOKEN secret needed.
-      # `npm publish`, not `pnpm publish`: pnpm's OIDC support is unverified/
-      # buggy as of this writing (pnpm/pnpm#9812, #11513) — npm's own CLI is
-      # the reference implementation for its own feature.
+      # OIDC trusted publishing (npm CLI >= 11.5.1, Node >= 22.14.0), not a token, so no
+      # NPM_TOKEN secret is needed. `npm publish` and not `pnpm publish`: pnpm's OIDC support
+      # is unreliable, and npm's own CLI is the reference implementation for its own feature.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
       - name: Publish to npm
         working-directory: cli
+        # Pinned, not @latest: this is the release path, so an npm release breaking here
+        # breaks publishing. Bump by hand.
         run: |
           rm -f .npmrc
-          npm install -g npm@latest
+          npm install -g npm@11.19.1
           npm publish --access public

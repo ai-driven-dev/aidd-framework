@@ -70,9 +70,9 @@ pasteable artefact instead of the whole object — a convenience for copying one
 not a second way to group. Every figure `--axis` can show is already in the plain `--json`
 object; only the one-artefact-at-a-time rendering is what it adds. A name outside the twelve
 is a usage error naming the valid list (`Error: Unknown axis 'bogus'. Expected one of:
-total, day, step, model, task, backlog, flow, tool, project, person.`, exit `1`), not a
-silently empty artefact. Given both flags at once, `--json` wins and `--axis` is ignored, never the
-reverse.
+total, day, step, model, agent, prompt, task, backlog, flow, tool, project, person.`, exit
+`1`), not a silently empty artefact. Given both flags at once, `--json` wins and `--axis` is
+ignored, never the reverse.
 
 **A filter matching nothing names itself**, in `empty_selection`, rather than the object
 quietly reporting the same shape a genuinely idle period would:
@@ -330,9 +330,13 @@ interval last regardless of size, in `reason`'s own fixed order (`"no-journal"`,
 the remainder in the
 same order every time. `by_backlog` places its own named rows first, then the row for a
 known task declaring none, then the row for one whose declaration could not be read, then
-every `reason` row in that same fixed order. `by_flow` carries no such tail: the row for
-what fell in no flow interval sorts by size exactly like every named one, since there is
-only ever one such row, never a reason to place last. `by_day` is the one exception: it is
+every `reason` row in that same fixed order. `by_flow` carries no reason taxonomy the way
+`by_task`'s and `by_backlog`'s own remainders do — a flow is read from the same sequence
+either way, so there is only one fact to state about falling outside every one of them —
+but its own single row for what fell in no flow interval is pinned last exactly like
+theirs, never sorted by size with the named rows: that row is ordinarily the largest one
+in a period, and sorting it in would lead the axis with its own remainder while every axis
+beside it leads with its largest named row. `by_day` is the one exception: it is
 chronological, one row per day the period spans — a series read out of order is not a
 series, and a day nothing ran on is a row of zeros rather than an omitted day.
 
@@ -353,23 +357,31 @@ project at all - never its own row.
 permit a request with no model, and that record gets its own row rather than vanishing from
 the breakdown while staying in `totals`.
 
-### `by_task` — grouped by the closed interval a record falls in, never by a written file
+### `by_task` — grouped by the closed interval a record falls in, or a narrower inferred route of its own
 
-`by_task` groups by exactly the same declared intervals `--task` already filters on (see
-"Attributing records to a task"), and by nothing else: a record's own moment either falls
-inside one session's closed interval, or it does not. It never consults a written path the
-way the `--task` filter's own "inferred" route does, because that route decides for a whole
-session at once and could place one session's records under two task rows at
-once — the opposite of what a breakdown promises. A record's session is closed, sequential
-intervals never overlap (see "Attributing records to a task"), so at most one interval
-ever matches, and a record lands in exactly one row.
+`by_task` groups first by exactly the same declared intervals `--task` already filters on
+(see "Attributing records to a task"): a record's own moment either falls inside one
+session's closed interval, or it does not. A record's session is closed, sequential
+intervals never overlap (see "Attributing records to a task"), so at most one declared
+interval ever matches.
 
-`attribution` is present, and always `"declared"`, on every row that carries a `task` —
-travelling with the row rather than assumed, so a consumer never has to know which route a
-breakdown reads. A row for what fell in no declared interval carries `reason` instead of
-`task` and `attribution`, naming which distinct fact applies — never one label standing in
-for all of them, and never more than one row per reason. The first names a fact about the
-read, the rest facts about the work:
+Since `cost_report_version` `12`, a record no declared interval covers can still land under
+a task through a second, narrower route of its own — never the `--task` filter's own
+"inferred" route wholesale, because that route decides for a whole session at once and, for
+a session that wrote into two task folders, would place the same undeclared record under
+both — the opposite of what a breakdown promises, which is a partition. `by_task`'s own
+route only fires when the session wrote into exactly **one** task folder and the record's
+own moment falls inside what that session's journal actually witnessed; a record from a
+session that touched two task folders, or one outside the witnessed window, gets no
+task and a `reason` row instead. Bounded this way, one task can hold two rows — one per
+route — but a record is never placed under two different tasks.
+
+`attribution` is present on every row that carries a `task`, naming which route placed it
+there — travelling with the row rather than assumed, so a consumer never has to know which
+route a breakdown reads. A row for what fell in no declared interval and no inferred one
+carries `reason` instead of `task` and `attribution`, naming which distinct fact applies —
+never one label standing in for all of them, and never more than one row per reason. The
+first names a fact about the read, the rest facts about the work:
 
 `attribution` says which route named the task, and is present only on a row that names one:
 
@@ -397,12 +409,16 @@ the whole object.
 `by_task` sums to `totals.requests` exactly like every other breakdown.
 
 **Alongside a `--task` filter, a row carrying `reason` can still appear, and is not a
-contradiction of the header naming that task.** `--task` also keeps a session's records
-through its own "inferred" route - the whole-session written-file fallback - for a record
-no declared interval covers. `by_task` does not read that route at all, so that same
-record lands in whichever `reason` row applies. Read the row as it is named: no *declared
-interval* covers this record, not "this session never touched a task." Cross-check against
-`task_attribution`'s own `declared`/`inferred` split when the distinction matters.
+contradiction of the header naming that task.** `--task` keeps a session's records through
+its own "inferred" route for a record no declared interval covers — whole-session and
+unbounded by time, so a session that wrote into that task's folder at any point keeps every
+one of its otherwise-undeclared records, whichever task is being filtered for. `by_task`'s
+own inferred route is narrower — bounded to a session that wrote into exactly **one** task
+folder and to a record inside what that session's journal actually witnessed — so a record
+`--task` would keep can still land in a `reason` row here. Read the row as it is named: no
+*declared interval, and no bounded inferred route,* covers this record — not "this session
+never touched a task." Cross-check against `task_attribution`'s own `declared`/`inferred`
+split when the broader, whole-session reading is what is wanted.
 
 ### `by_backlog` — grouped by what each task's own folder declares
 
@@ -565,11 +581,12 @@ empty, which is a different fact from the tool never producing this figure at al
 
 ### Attribution
 
-`attribution` always has exactly three rows, in this order:
+`attribution` always has exactly four rows, in this order:
 
 | `attribution` | Means |
 | --- | --- |
 | `tool-stated` | The tool named the running skill itself, on the line with the counters. Exact. |
+| `prompt-matched` | The record's own prompt opened a step, and both sides name the same one — an identifier two sources agree on, stronger than an inference from moments and the one reading that stays true when two tasks advance at once. |
 | `journal-interval` | Derived from the interval between two boundaries the framework recorded. An inference. |
 | `unattributed` | Neither source could say. |
 

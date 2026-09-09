@@ -1,0 +1,69 @@
+{
+  "version": 8,
+  "tools": {
+    "claude": {
+      "toolId": "claude",
+      "version": "1.2.3",
+      "files": [
+        {
+          "relativePath": ".claude/CLAUDE.md",
+          "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "frameworkPath": "framework/claude/CLAUDE.md"
+        },
+        {
+          "relativePath": ".claude/settings.json",
+          "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "mergeFiles": [
+        {
+          "relativePath": ".claude/settings.json",
+          "sectionKey": "mcpServers",
+          "entries": {
+            "aidd-server": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        }
+      ],
+      "excludedMcp": [
+        {
+          "configPath": ".claude/settings.json",
+          "entryKey": "old-server"
+        }
+      ],
+      "plugins": [
+        {
+          "name": "aidd-dev",
+          "source": {
+            "kind": "github",
+            "repo": "ai-driven-dev/aidd-dev",
+            "ref": "main"
+          },
+          "version": "1.0.0",
+          "strict": true,
+          "files": {
+            "commands/foo.md": "11111111111111111111111111111111"
+          },
+          "scope": "project",
+          "componentPaths": {
+            "commands/foo.md": "commands/foo.md"
+          },
+          "mcpEntries": {
+            "aidd-server": "22222222222222222222222222222222"
+          },
+          "marketplace": "aidd-framework"
+        }
+      ]
+    },
+    "cursor": {
+      "toolId": "cursor",
+      "version": "4.5.6",
+      "files": [
+        {
+          "relativePath": ".cursor/rules/naming.mdc",
+          "hash": "cccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "mergeFiles": []
+    }
+  }
+}

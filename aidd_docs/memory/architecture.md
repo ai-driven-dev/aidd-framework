@@ -9,22 +9,21 @@ The macro technical shape: the stack, how the pieces fit, and the decisions behi
 | Part | What |
 | --- | --- |
 | Product | markdown — skills, agents, rules, templates. No framework runtime; an LLM interprets them. |
-| Delivery | Node `>=22.12`, pnpm. `cli/` (the `aidd` binary) and `kanban/` (bundled into it from source). |
-| Manifest | `.claude-plugin/marketplace.json`, 7 plugins, versioned per plugin. |
+| Delivery | Node `>=22.12`, pnpm. `cli/` is the `aidd` binary; `kanban/` is a private package. |
+| Manifest | `.claude-plugin/marketplace.json`, the plugin manifest: 8 plugins, no version among them. Versions are release-please's, in `deployment.md`. |
 
 ## How it fits together
 
 ```mermaid
 flowchart LR
-    Manifest[".claude-plugin/marketplace.json"] -->|lists| Plugins["plugins/ · 7"]
+    Manifest[".claude-plugin/marketplace.json"] -->|lists| Plugins["plugins/ · 8"]
     Plugins -->|ships| Surfaces["skills · agents · commands · hooks · rules"]
     CLI["cli/ · aidd"] -->|reads| Manifest
     CLI -->|installs| Target["a project's AI tool dir"]
-    Kanban["kanban/"] -->|bundled from source| CLI
     Editor["AI coding tool"] -->|invokes| Surfaces
 ```
 
-`cli/` and `kanban/` are workspaces of this repo, not outside consumers: type-checked, tested and released here.
+`cli/` and `kanban/` are self-contained projects with their own lockfiles, not pnpm workspace members — `pnpm-workspace.yaml` declares no `packages:` list on purpose, because membership would change how their dependencies resolve. Each installs on its own, and both are type-checked, linted and tested by this repository's CI. Only `cli/` is published.
 
 ## Key decisions
 
@@ -34,13 +33,13 @@ flowchart LR
 | Concern decides placement, not existence | a missing capability goes to the plugin whose concern owns it; the caller delegates |
 | A skill is a router | `SKILL.md` dispatches to actions or protocols; the only place a capability is addressed by name |
 | Recipe skills discover providers at runtime | by description matching. Only agent permission lists and orchestration references name a provider |
-| `kanban/` never imports `cli/` | the host injects through `KanbanCommandDeps` (`kanban/src/presentation/kanban-deps.ts`) |
+| Observation is its own layer | `aidd-telemetry` journals what a session did; it never reads or writes application source |
+| A launcher runs an external binary, never embeds it | `kanban` broke that and was unwired. Detail in the CLI bank |
 
 The concern-to-plugin taxonomy is canonical in [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md).
 
 ## Gotchas
 
-- A plugin never contains its own tests — `hooks/` ships recursively into user projects.
+- 8 plugins ship, 2 off the curated install path: `aidd-ui` is alpha, `aidd-telemetry` beta and opt-in.
 - A skill never links outside itself: the tree ships both flat and as a marketplace, so no relative path survives both.
-- Bundled hooks run Node. No `node` on `PATH`, no memory refresh.
-- `cli/` reaches into `kanban/src/` by relative path, so `kanban/`'s deps must be installed before any `cli` typecheck, test or build.
+- Bundled hooks run Node. No `node` on `PATH`, no memory refresh and no run journal.

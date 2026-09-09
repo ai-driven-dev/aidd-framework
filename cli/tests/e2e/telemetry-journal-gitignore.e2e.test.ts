@@ -3,11 +3,12 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
+import { environmentWithoutGitVariables } from "../../src/runtime/git/git-environment.js";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, runCliFast } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const JOURNAL_HOOK = resolve(REPO_ROOT, "plugins/aidd-telemetry/hooks/journal.cjs");
 const SETUP_ARGS = [
   "setup",
@@ -22,12 +23,6 @@ const SETUP_ARGS = [
   "--yes",
 ] as const;
 
-/**
- * The defect this closes: `aidd setup` installing the telemetry plugin wrote exactly one
- * gitignore entry, `.aidd/cache/`, and left `aidd_docs/runs/` offered to `git status` the
- * moment a session journalled into it. Proven end to end, through `git status` itself,
- * because reading the use-case is not the proof the task asked for.
- */
 describe("aidd setup never offers the run journal to a commit", () => {
   let projectDir: string;
   let fakeHome: string;

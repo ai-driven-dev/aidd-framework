@@ -1,7 +1,7 @@
 import type {
   PersonIdentity,
   PersonIdentityReader,
-} from "../../../src/domain/ports/person-identity-reader.js";
+} from "../../../src/contexts/telemetry/domain/ports/person-identity-reader.js";
 
 /** In-memory double for `PersonIdentityReader` — one identity, set once, or `null`. */
 export class InMemoryPersonIdentityReader implements PersonIdentityReader {

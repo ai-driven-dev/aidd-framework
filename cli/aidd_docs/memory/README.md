@@ -1,6 +1,6 @@
 # memory/ - Project Memory
 
-Structured context the AI assistant reads at the start of a session, so it does not rediscover the project each time.
+The `cli/` bank. What a memory bank is: [`aidd_docs/memory/README.md`](../../../aidd_docs/memory/README.md).
 
 ## How it loads
 
@@ -18,12 +18,19 @@ The list below is refreshed automatically by the memory hook. Do not edit it by 
 - [codebase-map.md](codebase-map.md)
 - [coding-assertions.md](coding-assertions.md)
 - [deployment.md](deployment.md)
+- [ecosystem.md](ecosystem.md)
 - [project-brief.md](project-brief.md)
+- [telemetry.md](telemetry.md)
 - [testing.md](testing.md)
 - [vcs.md](vcs.md)
 
 Read on demand:
 
+- [internal/smoke-real.md](internal/smoke-real.md)
+- [internal/decisions/clean-drives-the-host-cli.md](internal/decisions/clean-drives-the-host-cli.md)
+- [internal/decisions/framework-source-is-machine-scope.md](internal/decisions/framework-source-is-machine-scope.md)
+- [internal/decisions/marketplace-identity-is-name-plus-plugins.md](internal/decisions/marketplace-identity-is-name-plus-plugins.md)
+- [internal/decisions/plugin-enablement-carries-its-scope.md](internal/decisions/plugin-enablement-carries-its-scope.md)
 - [internal/decisions/self-update-version-source-npm.md](internal/decisions/self-update-version-source-npm.md)
 <!-- files:end -->
 

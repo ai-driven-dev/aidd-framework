@@ -12,16 +12,10 @@ function executable(path, body) {
   chmodSync(path, 0o755);
 }
 
-/** What the stubs below are put in front of.
- *
- * On POSIX this stays the strict pair the isolation depends on: nothing but the stubs and
- * the platform's own utilities, so a real `opencode` or `claude` installed on the machine
- * running these tests can never answer in their place.
- *
- * Windows has neither directory, and the shell utilities `dev-sync.sh` calls — `find`,
- * `cp`, `basename` — live wherever Git for Windows put them, which only that runner's own
- * `PATH` names. So there it keeps the inherited `PATH` and merely puts the stubs first,
- * which shadows anything real by the same mechanism. */
+/** On POSIX, nothing but the stubs and the platform's own utilities, so a real `opencode` or
+ * `claude` installed on the machine running these tests can never answer in their place.
+ * Windows has neither directory, and the utilities `dev-sync.sh` calls live wherever Git for
+ * Windows put them, so there the inherited `PATH` is kept with the stubs merely first. */
 const BASE_PATH =
   process.platform === "win32" ? (process.env.PATH ?? "") : ["/usr/bin", "/bin"].join(delimiter);
 

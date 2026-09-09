@@ -3,15 +3,6 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./helpers.js";
 
-/**
- * `aidd telemetry identity` — the CLI's own mint/name/forget of the person identifier that
- * `aidd telemetry read` may stamp onto a record. Three concerns, three describe blocks:
- * the journey and its edge cases (phase-2.md's own Test Scope), the two suites phase 1
- * moved out of the plugin's own test file once its reporter was deleted, and the on-disk
- * format the deleted script pinned — phase 3 deletes `telemetry-identity.cjs` itself, so
- * this is captured as a fixture rather than a live comparison. See `measurements.md`'s
- * "Phase 3" section for what each of the six former parity tests became.
- */
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
@@ -45,10 +36,8 @@ async function seedJournal(
   );
 }
 
-// `aidd telemetry read` now refuses the same way `report` and `check` already did (finding
-// 4, review.md "one route, and every sentence about it true") — a sweep this file runs to
-// prove what identity a record carries has to turn measurement on first, the same as a real
-// project would, rather than exploit the gap that let it run unmeasured.
+// `telemetry read` refuses unless measurement is on, so every sweep here turns it on
+// first, the same as a real project would.
 async function writeSwitch(projectDir: string, enabled: boolean): Promise<void> {
   await mkdir(join(projectDir, ".aidd"), { recursive: true });
   await writeFile(
@@ -121,10 +110,6 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  // These four lines are what a person reads before deciding, and what 04-identify.md and
-  // 05-forget.md require the skill to relay. Nothing held them: all four could be deleted
-  // from telemetry-display.ts and the suite stayed green. In a feature whose whole value is
-  // that consent is explicit, the consent text is the last thing that should be unguarded.
   it("a minted identity discloses what it attaches to, and what it never attaches to", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-disclosure-on");
     try {
@@ -192,10 +177,8 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
   });
 
   it("mints for a name given before anything stands, rather than refusing", async () => {
-    // The separate `name` verb refused here and had to: it could only decorate an identity
-    // that already existed. `use` is the verb that opts in, so a name given to it with
-    // nothing standing is a person saying who they are, not asking to rename a thing that
-    // is not there. One command, one intent, no error to route around.
+    // `use` is the verb that opts in, so a name given with nothing standing is a person
+    // saying who they are, not renaming a thing that is not there.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-name-first");
     try {
       const result = await runCli(
@@ -230,9 +213,8 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  // Pins the adapter half of `forget()`'s answer, which the use-case tests cannot reach:
-  // with `force: true` restored on the `rm`, this prints the withdrawal message for a
-  // profile that never had a file, and every unit test stays green.
+  // Pins the adapter half of `forget()`, out of the use-case tests' reach: with `force: true`
+  // on the `rm`, a profile that never had a file still prints the withdrawal message.
   it("off on a profile that never had an identity says there was nothing to withdraw", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-absent");
     try {
@@ -246,8 +228,7 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  // A file naming nobody parses to "nobody chose" while still sitting on disk. Deciding
-  // removal from that read left it there with no verb able to remove it.
+  // A file naming nobody parses to "nobody chose" while still sitting on disk.
   it("off removes an identity file that exists but names nobody", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-nameless");
     try {
@@ -265,9 +246,8 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  // `status`, `on` and `name` are right to error on a damaged file — the edge case above.
-  // `off` is not: it is how a person gets out, and there must be no state a damaged file
-  // can put someone in that withdrawing cannot get them out of.
+  // `off` is how a person gets out: no state a damaged file can put someone in may be one
+  // withdrawing cannot get them out of.
   it("off still withdraws a damaged identity file, and says it was discarded", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-damaged");
     try {
@@ -307,12 +287,8 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  // The test above seeds both the OS profile and the decoy, so an implementation that
-  // merely *prefers* the OS profile when both exist — falling back to
-  // AIDD_USER_CONFIG_DIR only when the profile is empty — would still pass it. This is
-  // the shape the deleted script suite actually asserted ("the choice belongs to the
-  // person, not the repository"): an empty OS profile beside a populated
-  // AIDD_USER_CONFIG_DIR must still read as no identity, never as the decoy's.
+  // The test above seeds both profiles, so an implementation that merely prefers the OS one
+  // would pass it too: an empty OS profile beside a populated AIDD_USER_CONFIG_DIR reads off.
   it("an empty OS profile beside a populated AIDD_USER_CONFIG_DIR still reads off", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv(
       "identity-env-override-empty"
@@ -424,14 +400,8 @@ describe("a choice made today does not reach backwards", () => {
   });
 });
 
-// What `telemetry-identity.cjs` wrote to disk, captured 2026-08-26 — the run that produced
-// each literal below is recorded in measurements.md's "Phase 3" section, before the script
-// was deleted in this same phase. `off`, `status` (both states) and `on` against an
-// existing identity are already asserted by the journey block above through the CLI alone;
-// re-running them against the script here would be the duplication plan.md's own Decision
-// forbids ("one equivalence pin, not a suite watching two implementations agree with
-// themselves"). What survives is the one claim nothing else in this file owns: the exact
-// on-disk byte format, and the file/directory modes.
+// The one claim nothing else in this file owns: the exact on-disk byte format, and the
+// file and directory modes.
 describe("the on-disk format the deleted script produced", () => {
   it("name: matches the exact bytes the script wrote from the same starting identity", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-format-name");
@@ -446,11 +416,8 @@ describe("the on-disk format the deleted script produced", () => {
 
       expect(result.exitCode, result.stderr).toBe(0);
       const file = await readFile(identityFileIn(fakeHome), "utf8");
-      // `seedIdentity` wrote the script's own no-`origin` shape; reading it back defaults
-      // `origin` to `"minted"` (phase 2 of the identity-is-the-person rework), and every
-      // write from here on carries it - byte parity with the deleted script's own output
-      // ends here by design, not by regression: `origin` is new, required information the
-      // old shape never carried at all.
+      // `seedIdentity` writes the no-`origin` shape; reading it back defaults `origin` to
+      // `"minted"`, and every write from here on carries it.
       expect(file).toBe(
         '{\n  "person_id": "shared-person-id",\n  "origin": "minted",\n  "display_name": "Baptiste"\n}\n'
       );
@@ -468,8 +435,8 @@ describe("the on-disk format the deleted script produced", () => {
       const file = await readFile(identityFileIn(fakeHome), "utf8");
       const personId = (JSON.parse(file) as { person_id: string }).person_id;
       expect(personId).toMatch(UUID_V4);
-      // `mint()` records `origin: "minted"` - the only checkable fact about an identity,
-      // knowable only at the moment it is created, per the identity-is-the-person rework.
+      // `mint()` records `origin: "minted"`: how an identity was obtained is knowable only at
+      // the moment it is created.
       expect(file.replace(personId, "<uuid>")).toBe(
         '{\n  "person_id": "<uuid>",\n  "origin": "minted"\n}\n'
       );

@@ -1,0 +1,220 @@
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { claude } from "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+
+describe("claude", () => {
+  describe("capabilities.mcp", () => {
+    it("outputs to .mcp.json", () => {
+      expect(claude.capabilities.mcp.params.outputPath).toBe(".mcp.json");
+    });
+
+    it("consumes the mcp config name", () => {
+      expect(claude.capabilities.mcp.consumes).toContain("mcp");
+    });
+
+    it("does not consume unknown config names", () => {
+      expect(claude.capabilities.mcp.consumes).not.toContain("vscodeDir");
+    });
+
+    it("mcp config preserves user customizations during update", () => {
+      expect(claude.capabilities.mcp.params.mergeStrategy ?? "user-prime").toBe("user-prime");
+    });
+  });
+
+  describe("capabilities.rules.convertFrontmatter()", () => {
+    it("preserves paths: list when already in Claude format", () => {
+      const fm = { paths: ["src/**/*.ts"] };
+      const result = claude.capabilities.rules?.convertFrontmatter(fm);
+      expect(result).toEqual({ paths: ["src/**/*.ts"] });
+    });
+
+    it("strips extra fields when paths key is present", () => {
+      const fm = { paths: ["src/**/*.ts"], description: "extra", alwaysApply: false };
+      const result = claude.capabilities.rules?.convertFrontmatter(fm);
+      expect(result).toEqual({ paths: ["src/**/*.ts"] });
+    });
+
+    it("converts cursor-style globs to paths", () => {
+      const fm = { globs: ["src/**/*.ts"], alwaysApply: false, description: "desc" };
+      const result = claude.capabilities.rules?.convertFrontmatter(fm);
+      expect(result).toEqual({ paths: ["src/**/*.ts"] });
+    });
+
+    it("returns empty frontmatter for always-apply rules (no paths field = unconditional load)", () => {
+      const fm = { description: "desc", alwaysApply: true };
+      const result = claude.capabilities.rules?.convertFrontmatter(fm);
+      expect(result).toEqual({});
+    });
+
+    it("keeps description when alwaysApply is false and no paths are specified", () => {
+      const fm = { description: "Apply when editing command files.", alwaysApply: false };
+      const result = claude.capabilities.rules?.convertFrontmatter(fm);
+      expect(result).toEqual({ description: "Apply when editing command files." });
+    });
+
+    it("returns empty frontmatter for a rule whose paths list is empty", () => {
+      const result = claude.capabilities.rules?.convertFrontmatter({ paths: [] });
+      expect(result).toStrictEqual({});
+    });
+
+    it("returns empty frontmatter for a rule that opts out of always-apply and names no description", () => {
+      const result = claude.capabilities.rules?.convertFrontmatter({ alwaysApply: false });
+      expect(result).toStrictEqual({});
+    });
+  });
+
+  describe("capabilities.skills.buildInstallPath()", () => {
+    it("builds path under .claude/skills/ without the tool suffix", () => {
+      expect(claude.capabilities.skills.buildInstallPath("commit.claude.md")).toBe(
+        ".claude/skills/commit.md"
+      );
+    });
+  });
+
+  it("names the one config file Claude reads, and where it goes", () => {
+    expect(claude.configOutputPaths).toStrictEqual({ "settings.json": ".claude/settings.json" });
+  });
+
+  describe("rewriteContent()", () => {
+    it("routes a numbered command folder under commands/aidd/<phase>/, with or without the @ prefix", () => {
+      expect(
+        claude.rewriteContent?.(
+          "Run .claude/commands/04_code/implement.md, then @.claude/commands/02_context/plan.md.\n"
+        )
+      ).toBe(
+        "Run .claude/commands/aidd/04/implement.md, then @.claude/commands/aidd/02/plan.md.\n"
+      );
+    });
+  });
+
+  describe("capabilities.agents.convertFrontmatter()", () => {
+    it("strips extra fields for agents sections — only name and description", () => {
+      const fm = { name: "alexia", description: "Agent", model: "opus" };
+      const result = claude.capabilities.agents.convertFrontmatter(fm);
+      expect(result).toEqual({ name: "alexia", description: "Agent" });
+    });
+  });
+
+  describe("capabilities.commands.convertFrontmatter()", () => {
+    it("prefixes name with aidd:{phase}:", () => {
+      const fm = { name: "implement", description: "Implement a plan" };
+      const result = claude.capabilities.commands?.convertFrontmatter(fm, "04_code/implement.md");
+      expect(result).toEqual({ name: "aidd:04:implement", description: "Implement a plan" });
+    });
+
+    it("preserves argument-hint when present", () => {
+      const fm = { name: "implement", description: "Implement a plan", "argument-hint": "task" };
+      const result = claude.capabilities.commands?.convertFrontmatter(fm, "04_code/implement.md");
+      expect(result).toEqual({
+        name: "aidd:04:implement",
+        description: "Implement a plan",
+        "argument-hint": "task",
+      });
+    });
+  });
+
+  describe("capabilities.agents.buildInstallPath()", () => {
+    it("builds path for agents section", () => {
+      const path = claude.capabilities.agents.buildInstallPath("code-reviewer.md");
+      expect(path).toBe(".claude/agents/code-reviewer.md");
+    });
+  });
+
+  describe("capabilities.rules.buildInstallPath()", () => {
+    it("builds path for rules section with subdirectory", () => {
+      const path = claude.capabilities.rules?.buildInstallPath("01-standards/naming.md");
+      expect(path).toBe(".claude/rules/01-standards/naming.md");
+    });
+  });
+
+  describe("capabilities.commands.buildInstallPath()", () => {
+    it("builds commands path with aidd brand prefix and phase number", () => {
+      const path = claude.capabilities.commands?.buildInstallPath("04_code/implement.md");
+      expect(path).toBe(".claude/commands/aidd/04/implement.md");
+    });
+
+    it("handles two-digit phase in commands", () => {
+      const path = claude.capabilities.commands?.buildInstallPath(
+        "02_context/create_user_stories.md"
+      );
+      expect(path).toBe(".claude/commands/aidd/02/create_user_stories.md");
+    });
+  });
+
+  describe("capabilities.plugins", () => {
+    it("has a plugins capability", () => {
+      expect("plugins" in claude.capabilities).toBe(true);
+    });
+
+    it("is native mode", () => {
+      expect(claude.capabilities.plugins.mode).toBe("native");
+    });
+
+    it("uses .claude/plugins/ as plugins directory", () => {
+      expect(claude.capabilities.plugins.pluginsDir).toBe(".claude/plugins/");
+    });
+
+    it("uses plugin.json as plugin manifest path", () => {
+      expect(claude.capabilities.plugins.pluginManifestRelativePath).toBe("plugin.json");
+    });
+
+    it("pluginOutputDir returns correct path for a plugin name", () => {
+      expect(claude.capabilities.plugins.pluginOutputDir("my-plugin")).toBe(
+        ".claude/plugins/my-plugin/"
+      );
+    });
+
+    it("declares its own marketplace registry and plugin cache root, for clean's own purge", () => {
+      const activation = claude.capabilities.plugins.nativeActivation;
+      expect(activation?.marketplaceRegistry?.("/home/tester")).toBe(
+        join("/home/tester", ".claude", "plugins", "known_marketplaces.json")
+      );
+      expect(activation?.pluginCacheDir?.("/home/tester")).toBe(
+        join("/home/tester", ".claude", "plugins", "cache")
+      );
+    });
+
+    it("declares where claude's own user-scope settings file lives, for --scope user", () => {
+      const activation = claude.capabilities.plugins.nativeActivation;
+      expect(activation?.userSettingsPath?.("/home/tester", () => undefined)).toBe(
+        join("/home/tester", ".claude", "settings.json")
+      );
+    });
+
+    it("drives the claude binary at local scope, with the verbs claude uses and nothing else", () => {
+      // Exhaustive, not `toMatchObject`: a field added by mistake must fail here.
+      expect(claude.capabilities.plugins.nativeActivation).toStrictEqual({
+        binary: "claude",
+        scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },
+        enableVerb: "install",
+        disableVerb: "uninstall",
+        upgradeVerb: "update",
+        pluginArgs: ["--yes"],
+        marketplaceRegistry: expect.any(Function),
+        pluginCacheDir: expect.any(Function),
+        userSettingsPath: expect.any(Function),
+      });
+    });
+
+    it("registers a marketplace in the file claude writes itself, and enables plugins in the tracked one", () => {
+      const settings = claude.capabilities.plugins.marketplaceSettings;
+
+      expect({
+        settingsPath: settings?.settingsPath,
+        settingsKey: settings?.settingsKey,
+        marketplacesSettingsPath: settings?.marketplacesSettingsPath,
+        enabledPluginsKey: settings?.enabledPluginsKey,
+        entryKey: settings?.toEntryKey?.({
+          name: "aidd-framework",
+          source: { kind: "local", path: "/abs/cache" },
+        }),
+      }).toStrictEqual({
+        settingsPath: ".claude/settings.json",
+        settingsKey: "extraKnownMarketplaces",
+        marketplacesSettingsPath: ".claude/settings.local.json",
+        enabledPluginsKey: "enabledPlugins",
+        entryKey: "aidd-framework",
+      });
+    });
+  });
+});

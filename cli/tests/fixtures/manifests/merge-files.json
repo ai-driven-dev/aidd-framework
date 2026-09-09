@@ -1,0 +1,31 @@
+{
+  "version": 8,
+  "tools": {
+    "claude": {
+      "toolId": "claude",
+      "version": "1.0.0",
+      "files": [
+        {
+          "relativePath": ".claude/settings.json",
+          "hash": "dddddddddddddddddddddddddddddddd"
+        }
+      ],
+      "mergeFiles": [
+        {
+          "relativePath": ".claude/settings.json",
+          "sectionKey": "mcpServers",
+          "entries": {
+            "aidd-server": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        },
+        {
+          "relativePath": ".claude/config.json",
+          "sectionKey": null,
+          "entries": {
+            "top": "ffffffffffffffffffffffffffffffff"
+          }
+        }
+      ]
+    }
+  }
+}

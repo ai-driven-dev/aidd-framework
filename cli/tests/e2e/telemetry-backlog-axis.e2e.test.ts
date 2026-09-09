@@ -4,14 +4,9 @@ import { join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
-/**
- * The upward link, end to end: a task folder's `backlog-link.json` changes what
- * `aidd telemetry report` groups by, through the real CLI binary and real disk — never the
- * in-memory doubles the domain unit tests exercise. Two properties this level alone can
- * prove: the report never writes into a task folder while reading it, and two tasks
- * declaring the same item merge into one row through the real adapter, not just the pure
- * function.
- */
+/** The upward link, end to end, through the real CLI binary and real disk. Two properties this
+ * level alone proves: the report never writes into a task folder while reading it, and two
+ * tasks declaring the same item merge into one row through the real adapter. */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FBX";
 const VENDOR_ID = "55555555-5555-4555-8555-555555555555";
 const PROJECT_ID = "acme/widgets";
@@ -90,9 +85,8 @@ function backlogLink(backlog: string, writtenBy: string): string {
   )}\n`;
 }
 
-/** Every file under `dir`, hashed by its own bytes — the whole set, not only files a caller
- * already knows about, so a file the report *created* is caught exactly as one it modified
- * would be. */
+/** Every file under `dir`, hashed by its bytes: the whole set, not only files a caller knows
+ * about, so a file the report *created* is caught exactly as a modified one would be. */
 async function snapshot(dir: string): Promise<ReadonlyMap<string, string>> {
   const files = new Map<string, string>();
   const walk = async (current: string): Promise<void> => {

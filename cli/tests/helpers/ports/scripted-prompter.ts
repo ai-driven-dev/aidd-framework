@@ -1,4 +1,4 @@
-import type { Prompter } from "../../../src/domain/ports/prompter.js";
+import type { Prompter } from "../../../src/kernel/ports/prompter.js";
 
 type PromptAnswer =
   | { type: "conflict"; value: "keep" | "overwrite" }
@@ -8,10 +8,7 @@ type PromptAnswer =
   | { type: "select"; value: string }
   | { type: "checkbox"; value: string[] };
 
-/**
- * Scripted prompter that returns pre-defined answers in order.
- * Throws on unexpected prompt calls (queue exhausted).
- */
+/** Returns pre-defined answers in order, throwing once the queue is exhausted. */
 export class ScriptedPrompter implements Prompter {
   private readonly queue: PromptAnswer[];
   private index = 0;
@@ -94,8 +91,6 @@ export class ScriptedPrompter implements Prompter {
     return answer;
   }
 
-  // ── Builder helpers ────────────────────────────────────────────────────────
-
   static answer = {
     conflict(value: "keep" | "overwrite"): PromptAnswer {
       return { type: "conflict", value };
@@ -118,9 +113,7 @@ export class ScriptedPrompter implements Prompter {
   };
 }
 
-/**
- * Always-overwrite variant — convenience for tests that don't care about conflicts.
- */
+/** Always-overwrite variant, for tests that do not care about conflicts. */
 export class OverwritePrompter implements Prompter {
   async resolveConflict(
     _relativePath: string,
@@ -161,9 +154,7 @@ export class OverwritePrompter implements Prompter {
   }
 }
 
-/**
- * Always-keep variant — convenience for tests that preserve user files.
- */
+/** Always-keep variant, for tests that preserve user files. */
 export class KeepPrompter implements Prompter {
   async resolveConflict(
     _relativePath: string,

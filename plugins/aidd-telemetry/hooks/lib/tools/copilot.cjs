@@ -11,14 +11,12 @@ module.exports = {
   // builder's - both are Copilot's own, never a fallback guess.
   readSessionId: (payload) => payload.sessionId ?? payload.session_id,
   readCwd: (payload) => payload.cwd,
-  // Measured 2026-08-13, on the invoke_agent span.
+  // Measured on the invoke_agent span.
   vendorField: "gen_ai.conversation.id",
   stepStart: {
-    // Canonical builder: toolName/toolArgs, toolArgs a JSON string. _vsCodeCompat builder,
-    // captured 2026-08-22 against a real @github/copilot@1.0.80 skill call: tool_name
-    // stays the canonical "skill" spelling, but tool_input arrives as an object keyed
-    // like Claude Code's own tool_input.skill, not like the canonical builder's
-    // JSON-string toolArgs. Neither was guessed; both came from a captured payload.
+    // The canonical builder spells them toolName/toolArgs, toolArgs a JSON string. The
+    // _vsCodeCompat one keeps the "skill" tool name but delivers tool_input as an object,
+    // keyed like Claude Code's. Neither was guessed; both came from a captured payload.
     skillName: skillNameFromAnyArgument([
       skillNameFromArgument({
         toolField: "toolName",
