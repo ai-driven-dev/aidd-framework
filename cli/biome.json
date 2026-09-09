@@ -16,12 +16,15 @@
         "noReExportAll": "error"
       },
       "suspicious": {
-        "noImportCycles": "error"
+        "noImportCycles": "error",
+        "noTsIgnore": "error"
       },
       "correctness": {
         "noUnresolvedImports": "error"
       },
-      "style": {}
+      "style": {
+        "noExportedImports": "error"
+      }
     }
   },
   "formatter": {
@@ -78,7 +81,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "kernel must not import any context \u2014 it is the shared vocabulary contexts speak, not a consumer of one"
+                    "message": "kernel must not import any context — it is the shared vocabulary contexts speak, not a consumer of one"
                   }
                 ]
               }
@@ -123,7 +126,7 @@
                   },
                   {
                     "group": ["**/telemetry/**"],
-                    "message": "framework may import translate, tools and distribution, never telemetry \u2014 see context-graph.arch.test.ts"
+                    "message": "framework may import translate, tools and distribution, never telemetry — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -143,11 +146,11 @@
                 "patterns": [
                   {
                     "group": ["**/infrastructure/**"],
-                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                    "message": "application must not import infrastructure — take a port and let the composition root supply the adapter"
                   },
                   {
                     "group": ["**/telemetry/**"],
-                    "message": "framework may import translate, tools and distribution, never telemetry \u2014 see context-graph.arch.test.ts"
+                    "message": "framework may import translate, tools and distribution, never telemetry — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -167,7 +170,7 @@
                 "patterns": [
                   {
                     "group": ["**/telemetry/**", "**/presentation/**", "**/runtime/**"],
-                    "message": "framework/infrastructure may import translate, tools and distribution, never telemetry, presentation or runtime \u2014 see context-graph.arch.test.ts"
+                    "message": "framework/infrastructure may import translate, tools and distribution, never telemetry, presentation or runtime — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -196,7 +199,7 @@
                   },
                   {
                     "group": ["**/framework/**", "**/distribution/**", "**/telemetry/**"],
-                    "message": "translate may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                    "message": "translate may import only the kernel and contexts/tools — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -216,7 +219,7 @@
                 "patterns": [
                   {
                     "group": ["**/infrastructure/**"],
-                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                    "message": "application must not import infrastructure — take a port and let the composition root supply the adapter"
                   },
                   {
                     "group": [
@@ -226,7 +229,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "translate may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                    "message": "translate may import only the kernel and contexts/tools — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -252,7 +255,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "translate may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                    "message": "translate may import only the kernel and contexts/tools — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -286,7 +289,7 @@
                       "**/distribution/**",
                       "**/telemetry/**"
                     ],
-                    "message": "tools imports no other context \u2014 every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
+                    "message": "tools imports no other context — every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
                   }
                 ]
               }
@@ -306,7 +309,7 @@
                 "patterns": [
                   {
                     "group": ["**/infrastructure/**"],
-                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                    "message": "application must not import infrastructure — take a port and let the composition root supply the adapter"
                   },
                   {
                     "group": [
@@ -317,7 +320,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "tools imports no other context \u2014 every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
+                    "message": "tools imports no other context — every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
                   }
                 ]
               }
@@ -344,7 +347,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "tools imports no other context \u2014 every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
+                    "message": "tools imports no other context — every context that needs it imports tools, not the reverse (context-graph.arch.test.ts)"
                   }
                 ]
               }
@@ -379,7 +382,7 @@
                       "**/telemetry/**",
                       "**/manifest.js"
                     ],
-                    "message": "distribution knows no tool, no translation and no installation record \u2014 it says where content comes from, not what is done with it (context-graph.arch.test.ts)"
+                    "message": "distribution knows no tool, no translation and no installation record — it says where content comes from, not what is done with it (context-graph.arch.test.ts)"
                   }
                 ]
               }
@@ -399,7 +402,7 @@
                 "patterns": [
                   {
                     "group": ["**/infrastructure/**"],
-                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                    "message": "application must not import infrastructure — take a port and let the composition root supply the adapter"
                   },
                   {
                     "group": [
@@ -413,7 +416,7 @@
                   },
                   {
                     "group": ["**/manifest.js"],
-                    "message": "distribution reads a marketplace, never framework's installation record \u2014 marketplace-add-use-case.ts's own MarketplaceRemoveUseCase dependency is the one grandfathered exception (context-graph.arch.test.ts BASELINE), not a licence to read manifest.js too"
+                    "message": "distribution reads a marketplace, never framework's installation record — marketplace-add-use-case.ts's own MarketplaceRemoveUseCase dependency is the one grandfathered exception (context-graph.arch.test.ts BASELINE), not a licence to read manifest.js too"
                   }
                 ]
               }
@@ -468,7 +471,7 @@
                   },
                   {
                     "group": ["**/framework/**", "**/translate/**", "**/distribution/**"],
-                    "message": "telemetry may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                    "message": "telemetry may import only the kernel and contexts/tools — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -488,7 +491,7 @@
                 "patterns": [
                   {
                     "group": ["**/infrastructure/**"],
-                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                    "message": "application must not import infrastructure — take a port and let the composition root supply the adapter"
                   },
                   {
                     "group": [
@@ -498,7 +501,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "telemetry may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                    "message": "telemetry may import only the kernel and contexts/tools — see context-graph.arch.test.ts"
                   }
                 ]
               }
@@ -524,7 +527,7 @@
                       "**/presentation/**",
                       "**/runtime/**"
                     ],
-                    "message": "telemetry may import only the kernel and contexts/tools \u2014 see context-graph.arch.test.ts"
+                    "message": "telemetry may import only the kernel and contexts/tools — see context-graph.arch.test.ts"
                   }
                 ]
               }

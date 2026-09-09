@@ -44,7 +44,7 @@ export const noGit: VersionControl = {
   }),
 };
 
-export { SilentPrompterAdapter as OverwritePrompter };
+export const OverwritePrompter = SilentPrompterAdapter;
 
 export class KeepPrompter implements Prompter {
   async resolveConflict(
