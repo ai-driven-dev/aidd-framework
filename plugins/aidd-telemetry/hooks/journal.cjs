@@ -40,9 +40,11 @@ function resolveEventName(argvEvent, payload) {
 
 // Only on session-start or turn-end - never tool-used, which fires on every tool call and
 // would otherwise pay handleUnrecognisedPayload's git shellout once per call for the life
-// of the session. Every declared host fires session-start at least once (see hooks.json),
-// so an undeclared one wired the same way is caught at parity with a declared host's own
-// per-session cost, not worse; one that fires tool-used alone would go untraced.
+// of the session. Every declared host fires session-start at least once - four of them
+// through hooks.json, OpenCode through the session-start its plugin synthesizes, having
+// none of its own to announce - so an undeclared one wired the same way is caught at parity
+// with a declared host's own per-session cost, not worse; one that fires tool-used alone
+// would go untraced.
 function maybeRecordUnrecognisedPayload(payload, event) {
   if (!payload || typeof payload !== "object") return;
   const resolvedEvent = resolveEventName(event, payload);

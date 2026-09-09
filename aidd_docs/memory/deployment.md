@@ -8,8 +8,8 @@ Where the project runs and how it ships: CI/CD, environments, and release.
 
 | Workflow | Runs |
 | --- | --- |
-| `ci.yml` | commitlint on pull requests and on `main`'s tip, release-please on `main`, then the release jobs |
-| `cli-ci.yml` | the `cli` and `kanban` gates — job list in the CLI bank. Filtered on `cli/**`, `kanban/**`, the telemetry plugin and `scripts/__tests__/**` |
+| `ci.yml` | commitlint on pull requests and on `main`'s tip, plus the PR title itself — the subject a squash merge uses — then release-please on `main` and the release jobs |
+| `cli-ci.yml` | the `cli` and `kanban` gates — job list in the CLI bank. No `paths:` filter, deliberately: it runs on every push and pull request, and a `changes` job decides in bash whether the rest has anything to do — `cli/**`, `kanban/**`, `scripts/__tests__/**`, `README.md`, the workflow file itself, and `plugins/aidd-telemetry/**` except its `*.md` prose |
 | `validate.yml` | plugin and marketplace manifests against their schemas, plus the whole pre-commit over the whole tree |
 | `codeql.yml` | code scanning |
 | `promote.yml` | opens the `next` to `main` promote PR, merge auto-merge |

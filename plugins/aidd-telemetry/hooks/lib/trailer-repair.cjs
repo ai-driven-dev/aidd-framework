@@ -6,17 +6,21 @@ const path = require("node:path");
 /**
  * Puts back the one line that makes a commit carry its session, when something removed it.
  *
- * `aidd telemetry on` installs two things: a delegate script, which is ours outright and
- * which nobody regenerates, and a single line in `prepare-commit-msg` that calls it. Only
- * the second is fragile — in a repository where lefthook or husky owns that file, it is
- * generated, and a generated file is rewritten. Measured on the repository this was built
- * in: lefthook rewrote three hooks on 2026-09-02 and spared `prepare-commit-msg` only
- * because its config declared no job for that event.
+ * `aidd telemetry on` installs a delegate script, which is ours outright and which nobody
+ * regenerates. It installs a line calling it into `prepare-commit-msg` **only where no hook
+ * manager owns that file**: where lefthook or husky owns it, the CLI writes no line at all
+ * and prints the manager's own job instead, because a generated file is rewritten. That line
+ * is the fragile half, and it is the half this puts back — so this declines wherever the CLI
+ * would have declined, or the delegate gains a second caller per commit, the manager's job
+ * and a direct call nobody installed. Measured on the repository this was built in: lefthook
+ * rewrote three hooks on 2026-09-02 and spared `prepare-commit-msg` then only because its
+ * config declared no job for that event; it has since gained one.
  *
  * So this does not defend the call site, it re-establishes it. **It never asks why the line
  * is gone**, and that is what lets one path cover every cause — a regenerated hook, an
- * overwrite by hand, a `core.hooksPath` that moved, a hook that never existed. No
- * third-party tool is named anywhere here, so nothing rots when one of them changes format.
+ * overwrite by hand, a `core.hooksPath` that moved, a hook that never existed. The two
+ * managers are named in one place only, as root marker filenames (`HOOK_MANAGER_MARKERS`),
+ * so nothing here rots when either changes the format of what it generates.
  *
  * The opt-out is the one a person already knows. `aidd telemetry off` deletes the delegate,
  * and this only ever runs when the delegate is present, so nothing is ever resurrected after
@@ -45,12 +49,43 @@ function hookLine(delegatePath) {
 }
 
 /**
+ * Root marker names that mean a hook manager owns `prepare-commit-msg` here: every spelling
+ * lefthook accepts for its own config, in the order it looks for them, then husky's
+ * directory. Mirrors `LEFTHOOK_MARKER_NAMES` and `HUSKY_MARKER_NAME` in
+ * `cli/src/contexts/telemetry/domain/telemetry-setup.ts`, which `detectHookManager` decides
+ * by — spelled again here for the reason `DELEGATE_FILE` is, and pinned to that file's own
+ * reading by `scripts/__tests__/aidd-telemetry-trailer-repair.test.js`.
+ */
+const HOOK_MANAGER_MARKERS = Object.freeze([
+  "lefthook.yml",
+  "lefthook.yaml",
+  ".lefthook.yml",
+  ".lefthook.yaml",
+  ".husky",
+]);
+
+/**
+ * Decided from the repository root's marker files alone, never from the hook's contents: a
+ * manager regenerates that file from its own config, so by the time anything reads it the
+ * append is already gone and the marker is all that is left to read. The root is the
+ * worktree's own (`git rev-parse --show-toplevel`, carried by `resolveWriteTarget`), not the
+ * git directory — in a linked worktree those are not the same place, and only the first is
+ * where a manager's config sits. A caller that supplies no root gets the pre-manager
+ * behaviour, which is what the module-level tests exercise.
+ */
+function hookManagerOwns(repoRoot) {
+  if (typeof repoRoot !== "string" || repoRoot === "") return false;
+  return HOOK_MANAGER_MARKERS.some((marker) => fs.existsSync(path.join(repoRoot, marker)));
+}
+
+/**
  * Answers what it did, in a word. Nothing in the hook reads it — a session start has no
  * business reporting on a repair — and it exists for the tests, which are the only reader
  * that needs to tell "declined" from "nothing to do" without inspecting the filesystem
  * twice:
  *
  *   `"no-delegate"`   nothing to call, so nothing to repair — the state `off` leaves
+ *   `"manager-owned"` a hook manager owns the file and already reaches the delegate itself
  *   `"not-ours-to-write"` the hook is version-controlled or a symlink; see `isOursToWrite`
  *   `"present"`       the hook already calls it
  *   `"repaired"`      the line was missing and has been put back
@@ -60,9 +95,11 @@ function hookLine(delegatePath) {
  * Never throws. This runs inside a hook, and a hook that throws is a session that reports an
  * error for something no session did.
  */
-function repairCommitTrailerHook(hooksDir, gitDir) {
+function repairCommitTrailerHook(hooksDir, gitDir, repoRoot) {
   if (typeof hooksDir !== "string" || hooksDir === "") return "no-delegate";
   if (!fs.existsSync(path.join(hooksDir, DELEGATE_FILE))) return "no-delegate";
+
+  if (hookManagerOwns(repoRoot)) return "manager-owned";
   // The physical directory, and everything below is built from it: the guard compares
   // realpaths, so a line built from the unresolved spelling would name a path the guard
   // never approved. On macOS, where `/tmp` is a link to `/private/tmp`, that put two call
@@ -207,4 +244,11 @@ function isSymbolicLink(target) {
   }
 }
 
-module.exports = { repairCommitTrailerHook, hookLine, DELEGATE_FILE, HOOK_FILE, HOOK_HEADER };
+module.exports = {
+  repairCommitTrailerHook,
+  hookLine,
+  DELEGATE_FILE,
+  HOOK_FILE,
+  HOOK_HEADER,
+  HOOK_MANAGER_MARKERS,
+};

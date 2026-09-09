@@ -9,8 +9,8 @@ The macro technical shape: the stack, how the pieces fit, and the decisions behi
 | Part | What |
 | --- | --- |
 | Product | markdown — skills, agents, rules, templates. No framework runtime; an LLM interprets them. |
-| Delivery | Node `>=22.12`, pnpm. `cli/` is the `aidd` binary; `kanban/` is a private workspace. |
-| Manifest | `.claude-plugin/marketplace.json`, 8 plugins, versioned per plugin. |
+| Delivery | Node `>=22.12`, pnpm. `cli/` is the `aidd` binary; `kanban/` is a private package. |
+| Manifest | `.claude-plugin/marketplace.json`, the plugin manifest: 8 plugins, no version among them. Versions are release-please's, in `deployment.md`. |
 
 ## How it fits together
 
@@ -23,7 +23,7 @@ flowchart LR
     Editor["AI coding tool"] -->|invokes| Surfaces
 ```
 
-`cli/` and `kanban/` are workspaces of this repo: type-checked, linted and tested here. Only `cli/` is published.
+`cli/` and `kanban/` are self-contained projects with their own lockfiles, not pnpm workspace members — `pnpm-workspace.yaml` declares no `packages:` list on purpose, because membership would change how their dependencies resolve. Each installs on its own, and both are type-checked, linted and tested by this repository's CI. Only `cli/` is published.
 
 ## Key decisions
 

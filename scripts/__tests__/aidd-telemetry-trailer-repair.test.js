@@ -22,10 +22,13 @@ const CLEAN_ENV = Object.fromEntries(
 /**
  * The trailer's call site, put back after something removed it.
  *
- * Every case here reproduces the failure by its **shape** — a `prepare-commit-msg` replaced
- * between two commits — and never by its brand. Nothing installs lefthook or husky, and
- * nothing here names them: the repair asks only whether the line is there, so a test that
- * needed a particular tool would be testing something narrower than the code.
+ * Every repair case here reproduces the failure by its **shape** — a `prepare-commit-msg`
+ * replaced between two commits — and never by its brand: the repair asks only whether the
+ * line is there, so a test that needed a particular tool would be testing something narrower
+ * than the code. The two cases that do name lefthook and husky are the opposite assertion —
+ * that a manager's marker file makes the repair decline — and a brand is the whole subject
+ * there. Nothing installs either tool even then; a marker file at the root is the entire
+ * fixture, because it is the entire fact the code reads.
  */
 function withRepo(run, nested = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-trailer-repair-"));
@@ -416,4 +419,61 @@ test("a git that rejects --git-path still journals the session", () => {
       "the session is journalled even though git refused --git-path"
     );
   });
+});
+
+/**
+ * Where a hook manager owns `prepare-commit-msg`, the repair adds nothing.
+ *
+ * These are the two cases that do name a brand, and they have to: the fault is not a
+ * missing line, it is a line that must never be added. `aidd telemetry on` installs no call
+ * site in such a repository — it prints the manager's own job instead — so a repair that
+ * appended one would give the delegate two callers per commit, the manager's job and a
+ * direct call the CLI never wrote. The marker file is the only fact that survives a
+ * regeneration, which is why the decision is taken from it and not from the hook's contents.
+ */
+const MANAGER_MARKERS = [
+  ["lefthook", (root) => fs.writeFileSync(path.join(root, "lefthook.yml"), "pre-commit:\n")],
+  ["husky", (root) => fs.mkdirSync(path.join(root, ".husky"))],
+];
+
+for (const [manager, plant] of MANAGER_MARKERS) {
+  test(`nothing is written where ${manager} owns the hook`, () => {
+    withRepo(({ root, hooksDir }) => {
+      plant(root);
+      const line = installDelegate(hooksDir);
+      regenerateHook(hooksDir);
+      const before = hookText(hooksDir);
+
+      assert.equal(sessionStart(root).status, 0);
+
+      assert.equal(hookText(hooksDir), before, "the manager's own file is left untouched");
+      assert.equal(hookText(hooksDir).includes(line), false, "and no second caller was added");
+    });
+  });
+}
+
+/**
+ * The marker list is spelled twice — here and in the CLI's `detectHookManager` — for the
+ * reason the call site's own line is: this hook is zero-dependency CommonJS copied into a
+ * person's repository and can import nothing from `cli/`. Pinned against the CLI's own
+ * declaration read as text, never against a third copy typed into this file, so a spelling
+ * added on one side fails here rather than making the two sides disagree in silence.
+ */
+test("the manager markers are the ones the CLI decides by", () => {
+  const declaration = fs.readFileSync(
+    path.join(repo, "cli", "src", "contexts", "telemetry", "domain", "telemetry-setup.ts"),
+    "utf8"
+  );
+  const lefthook = declaration
+    .split("export const LEFTHOOK_MARKER_NAMES = [")[1]
+    .split("]")[0]
+    .match(/"([^"]+)"/gu)
+    .map((quoted) => quoted.slice(1, -1));
+  const husky = declaration.match(/HUSKY_MARKER_NAME = "([^"]+)"/u)[1];
+
+  const { HOOK_MANAGER_MARKERS } = require(
+    path.join(repo, "plugins", "aidd-telemetry", "hooks", "lib", "trailer-repair.cjs")
+  );
+
+  assert.deepEqual([...HOOK_MANAGER_MARKERS], [...lefthook, husky]);
 });

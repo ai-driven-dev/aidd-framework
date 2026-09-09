@@ -24,7 +24,7 @@ What this project is, the problem it solves, and its domain language. The non-de
 | Agent | isolated executor; own context, returns only a result |
 | Rule | coding standard injected into the tool's context automatically |
 | Memory | the bank under `aidd_docs/memory/`, loaded every session |
-| Marketplace | `.claude-plugin/marketplace.json`, the plugin and version registry |
+| Marketplace | `.claude-plugin/marketplace.json`, the plugin registry |
 | Concern | what a plugin owns; decides where a capability lives |
 | Run journal | what a session did, appended by a hook under `aidd_docs/runs/` |
 | Promote | sending `next` to `main`, which opens the release |

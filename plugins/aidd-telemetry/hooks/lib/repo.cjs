@@ -43,7 +43,7 @@ const GIT_DIR_NAME = ".git";
 // A plain checkout gets NEITHER field: absent, never null and never "". An absent value is
 // the only one a reader cannot mistake for a worktree that happens to be called something;
 // an empty string would gather every plain checkout on earth into one group as though they
-// were the same worktree. That is the error `cost-report.ts`'s `NO_KNOWN_PROJECT` symbol
+// were the same worktree. That is the error `record-stated-rows.ts`'s `NO_KNOWN_PROJECT` symbol
 // exists to prevent for a record naming no project, and it is prevented here the same way -
 // by the field not being there at all.
 //

@@ -31,9 +31,9 @@ Never state in a commit message or a report anything not just observed in output
 
 Same hook regenerates each plugin's `CATALOG.md`, the README counts and `docs/prompts-documentation.md`, and stages them.
 
-Every `cli` job is globbed on `cli/**`. A change under `kanban/` alone fires none of them; run `cd kanban && pnpm test` by hand.
+Every `cli` job is globbed on `cli/**`. A change under `kanban/` alone fires no local job; run `cd kanban && pnpm test` by hand. CI does cover it — `cli-ci.yml`'s `kanban-checks`, see `deployment.md`.
 
-`context-reference-form` reads only the repository-root `CLAUDE.md`/`AGENTS.md`/`copilot-instructions.md` (`scripts/check-context-reference-form.js`'s `readFileIfPresent` joins straight onto the repo root); it never walks the tree, so `cli/CLAUDE.md`'s memory block is not checked by it. `context-imports` does walk the whole tree (`scripts/check-context-imports.js`'s `collectContextFiles`), so the two checks cover different scopes despite running on the same glob.
+`context-reference-form` reads only the three files `update_memory.js`'s `TARGET_FILES` names — `CLAUDE.md` and `AGENTS.md` at the repository root, and the `copilot-instructions.md` under `.github/`, which this repository does not have (`scripts/check-context-reference-form.js`'s `readFileIfPresent` joins straight onto the repo root); it never walks the tree, so `cli/CLAUDE.md`'s memory block is not checked by it. `context-imports` does walk the whole tree (`scripts/check-context-imports.js`'s `collectContextFiles`), so the two checks cover different scopes on overlapping globs — `context-reference-form` carries a third pattern, `plugins/aidd-context/hooks/update_memory.js`, because it reads that hook's table as its source of truth.
 
 ## Before push
 

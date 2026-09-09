@@ -69,7 +69,6 @@ Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha and `aidd-telemetry` 🧪
 /plugin install aidd-vcs@aidd-framework
 /plugin install aidd-pm@aidd-framework
 /plugin install aidd-orchestrator@aidd-framework
-/plugin install aidd-ui@aidd-framework # 🚧 alpha, install separately
 ```
 
 
@@ -84,7 +83,6 @@ claude plugin install aidd-dev@aidd-framework
 claude plugin install aidd-vcs@aidd-framework
 claude plugin install aidd-pm@aidd-framework
 claude plugin install aidd-orchestrator@aidd-framework
-claude plugin install aidd-ui@aidd-framework # 🚧 alpha, install separately
 ```
 </details
 

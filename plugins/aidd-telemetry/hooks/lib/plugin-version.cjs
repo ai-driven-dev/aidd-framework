@@ -41,7 +41,8 @@ const MANIFEST_DIRS = Object.freeze([
 // the real manifest, so it cannot drift from the name it stands for.
 const PLUGIN_NAME = "aidd-telemetry";
 
-// Mirrors `telemetryJournalHost` across cli/src/domain/tools/ai/*.ts — the journal's own host
+// Mirrors `telemetryJournalHost` across cli/src/contexts/tools/domain/profiles/*/profile.ts,
+// declared by cli/src/contexts/tools/domain/contracts.ts — the journal's own host
 // names on the left, the tool ids `.aidd/manifest.json` keys on the right. Only Claude Code
 // spells them differently; the other four are the same word twice, and are listed anyway so
 // a fifth host is a line here rather than a silent `undefined`.

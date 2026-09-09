@@ -76,7 +76,7 @@ Versions live in `.release-please-manifest.json`. Forcing a version / pre-releas
 
 The weekly `next` → `main` promotion **must be a merge commit, never a squash and never a rebase**:
 
-- A squash collapses the batch's conventional commits into one subject from the PR title. If that title isn't a valid conventional type, `Commitlint` fails on `main` and **release-please is skipped** — no release. release-please attributes each commit to a package by the **path it touched** (`release-please-config.json`'s `packages` map), not by its scope, and a squash hides which paths the batch actually touched.
+- A squash collapses the batch's conventional commits into one subject from the PR title. If that title isn't a valid conventional type, `Commitlint` fails on `main` and **release-please is skipped** — no release. `ci.yml` now lints the PR title itself on every pull request, the promote PR included, so a bad subject fails the promote PR's own `Commitlint` check before merge; the recovery below is the fallback, not the expected path. release-please attributes each commit to a package by the **path it touched** (`release-please-config.json`'s `packages` map), not by its scope, and a squash hides which paths the batch actually touched.
 - A rebase keeps the commits but recopies them under new hashes, so git never records that the branches were reconciled. The merge base between `main` and `next` then goes stale, and every later back-merge conflicts on the release metadata release-please rewrites each time — a conflict with no real content behind it.
 - A merge commit does both jobs: the commits land verbatim, and its second parent keeps a shared merge base so the back-merge stays clean.
 - Use the **Promote next to main** workflow (it merges); merging by hand, pick **Create a merge commit** and give it a conventional subject.
@@ -100,7 +100,7 @@ The protection policy (PR-only, CODEOWNERS review, required checks) is defined i
 
 Two bypass actors (both `pull_request` mode, so neither can push directly to `main`):
 - the **aidd-bot GitHub App** (`Integration`) - release-please and the Dependabot auto-merge mint a token from it (`actions/create-github-app-token`), so their PRs trigger the required checks *and* the App merges them past the human-review rule.
-- the **`admin` team** - lead maintainers can merge their own PR without a second review. Everyone else needs a code-owner review.
+- the org's **`admin` team** (team id `11783938`, the actor the rulesets record) - lead maintainers can merge their own PR without a second review. Everyone else needs a code-owner review. It is a separate team from the three `GOVERNANCE.md` maps roles to, and confers no role of its own.
 
 The App: ID in secret `AIDD_BOT_APP_ID`, key in `AIDD_BOT_PRIVATE_KEY`. If the App is broken/uninstalled, release and Dependabot PRs stop merging - fix the App rather than re-adding an admin bypass.
 

@@ -34,7 +34,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 | Command | Scope |
 | --- | --- |
 | `pnpm test:changed` | only the specs a change can break — vitest resolves the CLI's import graph, and the plugin specs are selected by the paths their own text names. What to run while working |
-| `node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/*.test.js'` | repository scripts and hooks |
+| `node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/**/*.test.js'` | repository scripts and hooks |
 | `cd cli && pnpm test` | the four CLI projects. It does not build |
 | `cd cli && pnpm smoke` | built binary against `cli/scripts/smoke-tools.sh` |
 | `cd kanban && pnpm test` | the board |

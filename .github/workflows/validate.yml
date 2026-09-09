@@ -33,6 +33,10 @@ jobs:
       # (--no-verify, a fork PR, a web edit), which is exactly what this workflow exists
       # to catch. Everything else pre-commit owns stays too, including cli-knip/cli-test
       # (pre-push commands, never part of this `pre-commit` invocation regardless).
+      # This exclusion is also why no `cli/` install runs below: the three hooks that need
+      # cli/node_modules are the three dropped here, and every hook that stays — including
+      # cli-type-honesty and the scripts suite — reads `cli/` as text from the repository
+      # root, on the root install alone.
       LEFTHOOK_EXCLUDE: "cli-biome,cli-architecture,cli-typecheck"
     steps:
       - name: Checkout
@@ -50,18 +54,11 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/share/pnpm/store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'cli/pnpm-lock.yaml') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Install cli dependencies
-        # cli/ is a self-contained project (own lockfile, not a pnpm workspace
-        # member) — the root install above never touches it, but the
-        # cli-biome/cli-typecheck pre-commit hooks below need cli/node_modules
-        # to exist or they fail outright ("biome: not found").
-        run: cd cli && pnpm install --frozen-lockfile
 
       - name: Run pre-commit hooks against the full tree
         run: pnpm exec lefthook run pre-commit --all-files --force

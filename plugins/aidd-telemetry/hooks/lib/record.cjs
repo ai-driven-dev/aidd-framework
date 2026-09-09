@@ -233,7 +233,7 @@ function handleSessionStart(payload, host, sessionId) {
   // already holds an *enabled* repository's hooks directory - `resolveWriteTarget` gated on
   // that and paid the `rev-parse` for it - and buying a module boundary with a second
   // process on every session start is not a trade this hook makes.
-  repairCommitTrailerHook(target.hooksDir, target.gitDir);
+  repairCommitTrailerHook(target.hooksDir, target.gitDir, repoRoot);
 
   // SessionStart is not documented to fire once per session_id - `source` takes values
   // beyond `startup` - so this guard prevents a second file for one vendor_id.

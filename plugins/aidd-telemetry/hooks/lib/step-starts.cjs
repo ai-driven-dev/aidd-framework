@@ -11,8 +11,8 @@ const { SKILL_FILE_PATTERN } = require("./tools/skill-detection.cjs");
 // Gathered from the per-host declarations for a caller that wants every host covered
 // rather than one at a time (see cli/tests/helpers/telemetry-journal-hook.ts and
 // scripts/__tests__/aidd-telemetry-journal.test.js). A host with no stepStart - OpenCode,
-// whose plugin forwards no tool call at all - is simply absent, the same shape a
-// hand-maintained table gave before this moved.
+// which declares none though its plugin does forward tool calls - is simply absent, the same
+// shape a hand-maintained table gave before this moved.
 const STEP_START_BY_HOST = Object.freeze(
   Object.fromEntries(
     Object.entries(TOOLS_BY_HOST)
