@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import {
   buildCostReport,
   type CostReportInput,
@@ -15,17 +17,7 @@ import {
   isArtefactAxis,
 } from "../../../src/presentation/display/cost-report-artefact.js";
 import { printCostReport } from "../../../src/presentation/display/cost-report-display.js";
-import { CLIOutput } from "../../../src/presentation/output.js";
-
-/** Extends the real output rather than standing in for it — same reasoning as
- * cost-report-display.unit.test.ts's own `CapturingOutput`. */
-class CapturingOutput extends CLIOutput {
-  readonly lines: string[] = [];
-
-  override print(message: string): void {
-    this.lines.push(message);
-  }
-}
+import { CapturingOutput } from "../../helpers/ports/capturing-output.js";
 
 const NO_CAPABILITY = {
   localRead: null,
@@ -454,5 +446,595 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
     for (const axis of ARTEFACT_AXES.filter((name) => name !== "flow")) {
       expect(buildCostReportArtefact(envelope, axis)).not.toContain("counted inside it");
     }
+  });
+});
+
+const THREE_TOOLS = [
+  {
+    tool: "claude",
+    coverage: "covered",
+    capability: {
+      localRead: { tokenCounters: true, amount: true, toolStatedStep: true, agentName: true },
+      export: null,
+      journalAttributable: true,
+      taskAttributable: true,
+    },
+  },
+  { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+  {
+    tool: "cursor",
+    coverage: "not-covered",
+    reason: "It writes no token count.",
+    capability: NO_CAPABILITY,
+  },
+] as const satisfies CostReportInput["declaredTools"];
+
+function threeDayInput(overrides: Partial<CostReportInput> = {}): CostReportInput {
+  return {
+    fromDay: "2026-08-17",
+    toDay: "2026-08-19",
+    declaredTools: [...THREE_TOOLS],
+    records: [],
+    journals: [],
+    undatedRecords: 0,
+    unreadableLines: 0,
+    measurementEnabled: true,
+    ...overrides,
+  };
+}
+
+function threeDayRich(overrides: Partial<CostReportInput> = {}): CostReportInput {
+  return threeDayInput({
+    records: [
+      request({
+        turn_id: "a",
+        prompt_id: "p-1",
+        cost_usd: 6,
+        input_tokens: 600,
+        model: "opus",
+        project_id: "acme/widgets",
+        person_id: "machine-1",
+        step: "aidd-dev:02-implement",
+        step_attribution: "tool-stated",
+        event_timestamp: "2026-08-17T10:00:00Z",
+      }),
+      request({
+        turn_id: "b",
+        cost_usd: 3,
+        input_tokens: 300,
+        person_id: "a-stranger",
+        step: "aidd-dev:02-implement",
+        step_attribution: "journal-interval",
+        event_timestamp: "2026-08-18T10:00:00Z",
+      }),
+      request({
+        turn_id: "c",
+        cost_usd: 1,
+        input_tokens: 100,
+        event_timestamp: "2026-08-18T11:00:00Z",
+      }),
+    ],
+    journals: [
+      {
+        vendorId: "s-1",
+        tool: "claude-code",
+        writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_17_reporting/plan.md"],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T09:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+            closedBy: "boundary",
+          },
+        ],
+      },
+    ],
+    identity: onePersonMapping(),
+    undatedRecords: 3,
+    unreadableLines: 2,
+    ...overrides,
+  });
+}
+
+function axisLines(from: CostReportInput, axis: string): string[] {
+  return buildCostReportArtefact(toCostReportEnvelope(buildCostReport(from)), axis).split("\n");
+}
+
+const RICH_CAVEATS = [
+  "3 records carry no moment and are in no period",
+  "2 lines could not be read",
+];
+
+describe("buildCostReportArtefact — one period, every axis rendered whole", () => {
+  it("answers the total axis with the period, the one figure and what the read could not do", () => {
+    expect(axisLines(threeDayRich(), "total")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: total",
+      "",
+      "$10.00 — 1,000 tokens, 3 requests",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("gives the day axis a row per day the period spans, the empty one included", () => {
+    expect(axisLines(threeDayRich(), "day")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by day",
+      "",
+      "| Day | Total |",
+      "| --- | --- |",
+      "| 2026-08-17 | $6.00 — 600 tokens, 1 requests |",
+      "| 2026-08-18 | $4.00 — 400 tokens, 2 requests |",
+      "| 2026-08-19 | nothing in this period |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("keeps two rows sharing one step name apart by their attribution column", () => {
+    expect(axisLines(threeDayRich(), "step")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by step",
+      "",
+      "| Step | Attribution | Total |",
+      "| --- | --- | --- |",
+      "| aidd-dev:02-implement | stated by the tool | $6.00 — 600 tokens, 1 requests |",
+      "| aidd-dev:02-implement | from a journal interval | $3.00 — 300 tokens, 1 requests |",
+      "| unattributed | unattributed | $1.00 — 100 tokens, 1 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("names the model axis's unnamed row rather than dropping it", () => {
+    expect(axisLines(threeDayRich(), "model")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by model",
+      "",
+      "| Model | Total |",
+      "| --- | --- |",
+      "| opus | $6.00 — 600 tokens, 1 requests |",
+      "| no known model | $4.00 — 400 tokens, 2 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("calls the agent axis's own row the main thread when the tool names agents", () => {
+    expect(axisLines(threeDayRich(), "agent")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by agent",
+      "",
+      "| Agent | Total |",
+      "| --- | --- |",
+      "| the main thread | $10.00 — 1,000 tokens, 3 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("dates a named prompt row and em-dashes the one drawn from many turns", () => {
+    expect(axisLines(threeDayRich(), "prompt")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by prompt",
+      "",
+      "| Prompt | Started at | Total |",
+      "| --- | --- | --- |",
+      "| p-1 | 2026-08-17T10:00:00Z | $6.00 — 600 tokens, 1 requests |",
+      "| no prompt named | — | $4.00 — 400 tokens, 2 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("gives an unattributed task row its reason and no attribution", () => {
+    expect(axisLines(threeDayRich(), "task")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by task",
+      "",
+      "| Task | Attribution | Total |",
+      "| --- | --- | --- |",
+      "| no usable task declaration in this session | — | $10.00 — 1,000 tokens, 3 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("gives the backlog axis two columns, never the task axis's third", () => {
+    expect(axisLines(threeDayRich(), "backlog")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by backlog",
+      "",
+      "| Backlog item | Total |",
+      "| --- | --- |",
+      "| no usable task declaration in this session | $10.00 — 1,000 tokens, 3 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("carries the flow axis's two journal limits under its rows", () => {
+    expect(axisLines(threeDayRich(), "flow")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by flow",
+      "",
+      "| Flow | Attribution | Opened at | Total |",
+      "| --- | --- | --- | --- |",
+      "| aidd-orchestrator:01-sdlc | from a journal interval | 2026-08-17T09:00:00Z | $6.00 — 600 tokens, 1 requests |",
+      "| outside any flow | unattributed | — | $4.00 — 400 tokens, 2 requests |",
+      "a skill run by hand while a flow was open is counted inside it: the orchestrator's own call and a person's write the identical step_start line",
+      "a skill of this project named 00-async-dev, 01-sdlc or 02-backlog opens a flow of its own: outside a plugin a host names a skill by its folder alone, and this axis has only that name to go on",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("gives every declared tool a row, the unread one included", () => {
+    expect(axisLines(threeDayRich(), "tool")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by tool",
+      "",
+      "| Tool | Total |",
+      "| --- | --- |",
+      "| Claude Code | $10.00 — 1,000 tokens, 3 requests |",
+      "| Codex | nothing in this period |",
+      "| Cursor | not covered — It writes no token count. |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("names the project axis's unnamed row rather than dropping it", () => {
+    expect(axisLines(threeDayRich(), "project")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by project",
+      "",
+      "| Project | Total |",
+      "| --- | --- |",
+      "| acme/widgets | $6.00 — 600 tokens, 1 requests |",
+      "| no known project | $4.00 — 400 tokens, 2 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+
+  it("carries the identities behind every person row as that row's own evidence", () => {
+    expect(axisLines(threeDayRich(), "person")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by person",
+      "",
+      "| Person | Identities | Total |",
+      "| --- | --- | --- |",
+      "| Ada | person-a, machine-1 | $6.00 — 600 tokens, 1 requests |",
+      "| Ada | person-a, machine-1 | $1.00 — 100 tokens, 1 requests |",
+      "| unresolved — not mapped to anyone (a-stranger) | a-stranger | $3.00 — 300 tokens, 1 requests |",
+      ...RICH_CAVEATS,
+    ]);
+  });
+});
+
+describe("buildCostReportArtefact — what the header carries", () => {
+  it("appends the switch being off to the axis it names, in full", () => {
+    expect(axisLines(threeDayRich({ measurementEnabled: false }), "total")[0]).toBe(
+      "period 2026-08-17 to 2026-08-19 — axis: total — this project's switch is off, figures are the whole sink, not scoped to it"
+    );
+  });
+
+  it("names the task and every filter that narrowed the period, before the axis", () => {
+    expect(
+      axisLines(
+        threeDayRich({
+          task: "2026_08/2026_08_17_reporting",
+          filters: { project: "acme/widgets" },
+        }),
+        "total"
+      )[0]
+    ).toBe(
+      "period 2026-08-17 to 2026-08-19, task 2026_08/2026_08_17_reporting, filters: project=acme/widgets — axis: total"
+    );
+  });
+
+  it("names the filter that emptied a selection, with why its value was never seen", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [request({ turn_id: "a", cost_usd: 1 })],
+          filters: { project: "never-worked-here" },
+        }),
+        "total"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19, filters: project=never-worked-here — axis: total",
+      "",
+      "nothing in this selection",
+      "project 'never-worked-here' matched nothing — no record has ever named this project",
+    ]);
+  });
+});
+
+describe("buildCostReportArtefact — a figure a row cannot state", () => {
+  it("prints an empty period's one figure as nothing measured, never as a zero", () => {
+    expect(axisLines(threeDayInput(), "total")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: total",
+      "",
+      "nothing in this period",
+    ]);
+  });
+
+  it("prints an unknown amount beside the tokens a tool did count", () => {
+    expect(
+      axisLines(
+        threeDayInput({ records: [request({ tool: "codex", input_tokens: 8898 })] }),
+        "tool"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by tool",
+      "",
+      "| Tool | Total |",
+      "| --- | --- |",
+      "| Claude Code | nothing in this period |",
+      "| Codex | amount unknown — 8,898 tokens, 1 requests |",
+      "| Cursor | not covered — It writes no token count. |",
+    ]);
+  });
+
+  it("prints a session total on its own tool row, never as nothing in this period", () => {
+    expect(
+      axisLines(
+        {
+          fromDay: "2026-08-17",
+          toDay: "2026-08-17",
+          declaredTools: [
+            {
+              tool: "copilot",
+              coverage: "covered",
+              capability: {
+                localRead: {
+                  tokenCounters: true,
+                  amount: false,
+                  toolStatedStep: false,
+                  agentName: false,
+                },
+                export: null,
+                journalAttributable: true,
+                taskAttributable: false,
+              },
+            },
+          ],
+          records: [
+            request({
+              tool: "copilot",
+              kind: "session",
+              input_tokens: 10,
+              output_tokens: 42,
+              cache_creation_tokens: 21070,
+            }),
+          ],
+          journals: [],
+          undatedRecords: 0,
+          unreadableLines: 0,
+          measurementEnabled: true,
+        },
+        "tool"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-17 — axis: by tool",
+      "",
+      "| Tool | Total |",
+      "| --- | --- |",
+      "| GitHub Copilot | 21,122 tokens (session total, not requests) |",
+    ]);
+  });
+
+  it("tells a tool that named no agent from the main thread, row for row", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          declaredTools: [THREE_TOOLS[0], THREE_TOOLS[1]],
+          records: [
+            request({ turn_id: "a", input_tokens: 10 }),
+            request({ turn_id: "b", tool: "codex", vendor_id: "s-codex", input_tokens: 10 }),
+          ],
+        }),
+        "agent"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by agent",
+      "",
+      "| Agent | Total |",
+      "| --- | --- |",
+      "| the main thread | amount unknown — 10 tokens, 1 requests |",
+      "| the tool names no agent | amount unknown — 10 tokens, 1 requests |",
+    ]);
+  });
+
+  it("em-dashes the identities column of the row nobody opted into", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [request({ turn_id: "a", cost_usd: 1 })],
+          identityUnusableCause: "absent",
+        }),
+        "person"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by person",
+      "",
+      "| Person | Identities | Total |",
+      "| --- | --- | --- |",
+      "| no identity — nobody opted in | — | $1.00 — 0 tokens, 1 requests |",
+      "no identity was declared; every identifier is reported unresolved",
+    ]);
+  });
+
+  it("reports every identifier unresolved when this machine's identity could not be read", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [request({ turn_id: "a", cost_usd: 1, person_id: "machine-1" })],
+          identityUnusableCause: "unreadable",
+        }),
+        "person"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by person",
+      "",
+      "| Person | Identities | Total |",
+      "| --- | --- | --- |",
+      "| unresolved — not mapped to anyone (machine-1) | machine-1 | $1.00 — 0 tokens, 1 requests |",
+      "this machine's own identity could not be read; every identifier is reported unresolved",
+    ]);
+  });
+
+  it("em-dashes the opening moment of a flow only a tool's own record named, and says why", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [
+            request({
+              turn_id: "a",
+              input_tokens: 10,
+              step_attribution: "tool-stated",
+              step: "aidd-orchestrator:01-sdlc",
+              event_timestamp: "2026-08-17T10:00:00Z",
+            }),
+          ],
+        }),
+        "flow"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by flow",
+      "",
+      "| Flow | Attribution | Opened at | Total |",
+      "| --- | --- | --- | --- |",
+      "| aidd-orchestrator:01-sdlc | stated by the tool | — | amount unknown — 10 tokens, 1 requests |",
+      "a flow only a record's own tool named is every run of that skill at once: its journal opened no flow to bound one run from the next, so the row has no opening moment and its total is not one orchestration's",
+    ]);
+  });
+});
+
+describe("buildCostReportArtefact — a task the journal declared", () => {
+  const DECLARED_TASK = threeDayInput({
+    records: [
+      request({ turn_id: "a", cost_usd: 2, event_timestamp: "2026-08-17T10:00:00Z" }),
+      request({ turn_id: "b", cost_usd: 1, event_timestamp: "2026-08-18T10:00:00Z" }),
+    ],
+    journals: [
+      {
+        vendorId: "s-1",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [
+          {
+            path: "aidd_docs/tasks/2026_08/2026_08_17_reporting/plan.md",
+            startMs: Date.parse("2026-08-17T09:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+        ],
+        flowIntervals: [],
+      },
+    ],
+  });
+
+  it("says a named task row rests on a declaration, and gives the rest its reason", () => {
+    expect(axisLines(DECLARED_TASK, "task")).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by task",
+      "",
+      "| Task | Attribution | Total |",
+      "| --- | --- | --- |",
+      "| 2026_08/2026_08_17_reporting | declared by the flow | $2.00 — 0 tokens, 1 requests |",
+      "| the journal falls silent before this record | — | $1.00 — 0 tokens, 1 requests |",
+    ]);
+  });
+
+  it("names a task whose backlog declaration could not be read, never leaving the row blank", () => {
+    expect(
+      axisLines(
+        {
+          ...DECLARED_TASK,
+          taskBacklogDeclarations: new Map([
+            ["2026_08/2026_08_17_reporting", { kind: "unreadable" as const }],
+          ]),
+        },
+        "backlog"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by backlog",
+      "",
+      "| Backlog item | Total |",
+      "| --- | --- |",
+      "| this task's backlog declaration could not be read | $2.00 — 0 tokens, 1 requests |",
+      "| the journal falls silent before this record | $1.00 — 0 tokens, 1 requests |",
+    ]);
+  });
+});
+
+describe("buildCostReportArtefact — a fact a row carries beside its figure", () => {
+  it("keeps a covered tool's own reason after the figure it qualifies", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          declaredTools: [
+            THREE_TOOLS[0],
+            {
+              tool: "codex",
+              coverage: "covered",
+              capability: NO_CAPABILITY,
+              reason: "Partial read.",
+            },
+          ],
+          records: [request({ turn_id: "a", cost_usd: 1, tool: "codex" })],
+        }),
+        "tool"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19 — axis: by tool",
+      "",
+      "| Tool | Total |",
+      "| --- | --- |",
+      "| Claude Code | nothing in this period |",
+      "| Codex | $1.00 — 0 tokens, 1 requests — Partial read. |",
+    ]);
+  });
+
+  it("sums all four token counters into a row's own figure", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [
+            request({
+              turn_id: "a",
+              cost_usd: 4,
+              input_tokens: 10,
+              output_tokens: 20,
+              cache_read_tokens: 30,
+              cache_creation_tokens: 40,
+            }),
+          ],
+        }),
+        "total"
+      )[2]
+    ).toBe("$4.00 — 100 tokens, 1 requests");
+  });
+
+  it("names an agent a record's own tool stated, above the main thread's own row", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [
+            request({ turn_id: "a", cost_usd: 4, input_tokens: 100, agent_name: "reviewer" }),
+            request({ turn_id: "b", cost_usd: 1, input_tokens: 5 }),
+          ],
+        }),
+        "agent"
+      ).slice(4)
+    ).toEqual([
+      "| reviewer | $4.00 — 100 tokens, 1 requests |",
+      "| the main thread | $1.00 — 5 tokens, 1 requests |",
+    ]);
+  });
+
+  it("says a filter emptied a selection only in combination with the rest of it", () => {
+    expect(
+      axisLines(
+        threeDayInput({
+          records: [
+            request({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets", model: "opus" }),
+            request({ turn_id: "b", cost_usd: 1, project_id: "acme/gadgets", model: "haiku" }),
+          ],
+          knownValues: {
+            projects: new Set(["acme/widgets"]),
+            steps: new Set(),
+            models: new Set(["haiku"]),
+          },
+          filters: { project: "acme/widgets", model: "haiku" },
+        }),
+        "total"
+      )
+    ).toEqual([
+      "period 2026-08-17 to 2026-08-19, filters: project=acme/widgets, model=haiku — axis: total",
+      "",
+      "nothing in this selection",
+      "model 'haiku' matched nothing combined with the rest of this selection",
+    ]);
   });
 });

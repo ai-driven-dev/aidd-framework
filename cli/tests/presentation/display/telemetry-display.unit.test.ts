@@ -21,30 +21,11 @@ import {
   printTelemetryOnReport,
   warnIfFiguresMoveTheTokenToo,
 } from "../../../src/presentation/display/telemetry-display.js";
-import { CLIOutput } from "../../../src/presentation/output.js";
+import { CapturingOutput } from "../../helpers/ports/capturing-output.js";
 import { InMemoryTelemetrySink } from "../../helpers/ports/in-memory-telemetry-sink.js";
 
-/** Extends the real output rather than standing in for it: a widened double stops failing
- * the day the class grows a method the printer calls. */
-class CapturingOutput extends CLIOutput {
-  readonly lines: string[] = [];
-
-  override print(message: string): void {
-    this.lines.push(message);
-  }
-  override info(message: string): void {
-    this.lines.push(message);
-  }
-  override success(message: string): void {
-    this.lines.push(message);
-  }
-  override warn(message: string): void {
-    this.lines.push(message);
-  }
-
-  get text(): string {
-    return this.lines.join("\n");
-  }
+function textOf(output: CapturingOutput): string {
+  return output.lines.join("\n");
 }
 
 function toolReport(overrides: Partial<LocalCostToolReport> = {}): LocalCostToolReport {
@@ -101,7 +82,7 @@ describe("what `telemetry read` says about each tool", () => {
       })
     );
 
-    expect(output.text).not.toMatch(/nothing found/u);
+    expect(textOf(output)).not.toMatch(/nothing found/u);
   });
 
   // A sweep that read nineteen sessions and failed the twentieth still reports the figures
@@ -125,8 +106,8 @@ describe("what `telemetry read` says about each tool", () => {
       })
     );
 
-    expect(output.text).toContain("1 session could not be read");
-    expect(output.text).toContain("EACCES");
+    expect(textOf(output)).toContain("1 session could not be read");
+    expect(textOf(output)).toContain("EACCES");
   });
 
   // A refusal read nothing and stored nothing. "No session journalled yet" is a fact about
@@ -138,9 +119,9 @@ describe("what `telemetry read` says about each tool", () => {
     const empty = new CapturingOutput();
     printLocalCostReadReport(empty, readResult());
 
-    expect(refused.text).toContain("measurement is off");
-    expect(empty.text).toContain("No session journalled yet");
-    expect(refused.text).not.toContain("No session journalled yet");
+    expect(textOf(refused)).toContain("measurement is off");
+    expect(textOf(empty)).toContain("No session journalled yet");
+    expect(textOf(refused)).not.toContain("No session journalled yet");
   });
 
   it("leads with how many sessions it covered, not one line per tool per session", () => {
@@ -167,7 +148,7 @@ describe("what the switch says when it is flipped", () => {
 
     printTelemetryOnReport(output, { switchPath: "/repo/.aidd/config.json", switchChanged: true });
 
-    expect(output.text).toContain("git-tracked");
+    expect(textOf(output)).toContain("git-tracked");
   });
 
   it("tells an already-on project from one it just turned on", () => {
@@ -176,8 +157,8 @@ describe("what the switch says when it is flipped", () => {
     const unchanged = new CapturingOutput();
     printTelemetryOnReport(unchanged, { switchPath: "/p/.aidd/config.json", switchChanged: false });
 
-    expect(changed.text).not.toContain("already on");
-    expect(unchanged.text).toContain("already on");
+    expect(textOf(changed)).not.toContain("already on");
+    expect(textOf(unchanged)).toContain("already on");
   });
 
   // Turning recording off is not erasing what was recorded, and a person who wanted the
@@ -187,8 +168,8 @@ describe("what the switch says when it is flipped", () => {
 
     printTelemetryOffReport(output, { switchPath: "/p/.aidd/config.json", switchChanged: true });
 
-    expect(output.text).toContain("stops new recording only");
-    expect(output.text).toContain("aidd telemetry forget");
+    expect(textOf(output)).toContain("stops new recording only");
+    expect(textOf(output)).toContain("aidd telemetry forget");
   });
 });
 
@@ -198,7 +179,7 @@ describe("what the identity commands say", () => {
 
     printPersonIdentityStatus(output, { filePath: "/h/identity.json", identity: null });
 
-    expect(output.text).toContain("records carry no person");
+    expect(textOf(output)).toContain("records carry no person");
   });
 
   it("tells an identifier minted here from one taken from another machine", () => {
@@ -213,8 +194,8 @@ describe("what the identity commands say", () => {
       identity: { personId: "p-1", origin: "adopted", alsoMe: [] },
     });
 
-    expect(minted.text).toContain("minted on this machine");
-    expect(adopted.text).toContain("taken from another machine");
+    expect(textOf(minted)).toContain("minted on this machine");
+    expect(textOf(adopted)).toContain("taken from another machine");
   });
 
   // Taking a different identifier does not rewrite what is already stored, and a person
@@ -229,7 +210,7 @@ describe("what the identity commands say", () => {
       replacedPersonId: "p-1",
     });
 
-    expect(output.text).toContain("p-1");
+    expect(textOf(output)).toContain("p-1");
   });
 
   it("says withdrawing takes the added identifiers with it", () => {
@@ -242,7 +223,7 @@ describe("what the identity commands say", () => {
       addedIdentifiersRemoved: 2,
     });
 
-    expect(output.text).toMatch(/2/u);
+    expect(textOf(output)).toMatch(/2/u);
   });
 });
 
@@ -262,7 +243,7 @@ describe("the warning about where the figures land", () => {
 
     warnIfFiguresMoveTheTokenToo(output, sink("user-config-dir"));
 
-    expect(output.text).toContain("auth.json");
+    expect(textOf(output)).toContain("auth.json");
   });
 
   it("says nothing when the directory was named outright, or defaulted", () => {
@@ -287,8 +268,8 @@ describe("linking an identifier this person could not simply take as their own",
       alreadyListed: false,
     });
 
-    expect(output.text).toContain("linked 'machine-2'");
-    expect(output.text).toContain("cannot check");
+    expect(textOf(output)).toContain("linked 'machine-2'");
+    expect(textOf(output)).toContain("cannot check");
   });
 
   // Already listed is a no-op, not a second write, and a caller that links before reporting
@@ -303,8 +284,8 @@ describe("linking an identifier this person could not simply take as their own",
       alreadyListed: true,
     });
 
-    expect(output.text).toContain("already listed");
-    expect(output.text).not.toContain("linked 'machine-2'");
+    expect(textOf(output)).toContain("already listed");
+    expect(textOf(output)).not.toContain("linked 'machine-2'");
   });
 
   it("reports unlinking one nobody listed as nothing to remove, never a failure", () => {
@@ -316,7 +297,7 @@ describe("linking an identifier this person could not simply take as their own",
       removed: false,
     });
 
-    expect(output.text).toContain("nothing to remove");
+    expect(textOf(output)).toContain("nothing to remove");
   });
 
   it("names the identifier it withdrew", () => {
@@ -328,7 +309,7 @@ describe("linking an identifier this person could not simply take as their own",
       removed: true,
     });
 
-    expect(output.text).toContain("unlinked 'machine-2'");
+    expect(textOf(output)).toContain("unlinked 'machine-2'");
   });
 });
 
@@ -343,8 +324,8 @@ describe("what minting says it does, and does not do", () => {
       outcome: "minted",
     });
 
-    expect(output.text).toContain("records this machine reads locally");
-    expect(output.text).toContain("Never attaches to");
+    expect(textOf(output)).toContain("records this machine reads locally");
+    expect(textOf(output)).toContain("Never attaches to");
   });
 
   // "Already in effect" is true of the identifier and false of the file once a name came
@@ -359,8 +340,8 @@ describe("what minting says it does, and does not do", () => {
       displayNameSet: "Ada",
     });
 
-    expect(output.text).toContain("display name set");
-    expect(output.text).toContain("Ada");
+    expect(textOf(output)).toContain("display name set");
+    expect(textOf(output)).toContain("Ada");
   });
 
   it("says withdrawing never gives the same identifier back", () => {
@@ -373,7 +354,7 @@ describe("what minting says it does, and does not do", () => {
       addedIdentifiersRemoved: 0,
     });
 
-    expect(output.text).toContain("mints a fresh identifier, never this one back");
+    expect(textOf(output)).toContain("mints a fresh identifier, never this one back");
   });
 
   it("reports nothing to withdraw when nobody had chosen", () => {
@@ -386,7 +367,7 @@ describe("what minting says it does, and does not do", () => {
       addedIdentifiersRemoved: 0,
     });
 
-    expect(output.text).toContain("already off");
+    expect(textOf(output)).toContain("already off");
   });
 
   // Withdrawing has to work exactly when the file is too damaged to read, and say that it
@@ -401,6 +382,436 @@ describe("what minting says it does, and does not do", () => {
       addedIdentifiersRemoved: 0,
     });
 
-    expect(output.text).toContain("discarded rather than left behind");
+    expect(textOf(output)).toContain("discarded rather than left behind");
+  });
+});
+
+const DISCLAIMER =
+  "  This is a declaration the tool cannot check - it never verifies who is running it.";
+const IDENTITY_FILE = "/h/identity.json";
+
+function printed(print: (output: CapturingOutput) => void): string[] {
+  const output = new CapturingOutput();
+  print(output);
+  return output.lines;
+}
+
+describe("printTelemetryOnReport", () => {
+  it("names the switch file it wrote, then that everyone who clones gets it", () => {
+    expect(
+      printed((output) =>
+        printTelemetryOnReport(output, {
+          switchPath: "/repo/.aidd/config.json",
+          switchChanged: true,
+        })
+      )
+    ).toEqual([
+      "AIDD telemetry: on (/repo/.aidd/config.json)",
+      "/repo/.aidd/config.json is git-tracked — this applies to everyone who clones.",
+    ]);
+  });
+
+  it("says already on where nothing was written", () => {
+    expect(
+      printed((output) =>
+        printTelemetryOnReport(output, {
+          switchPath: "/repo/.aidd/config.json",
+          switchChanged: false,
+        })
+      )[0]
+    ).toBe("AIDD telemetry: already on (/repo/.aidd/config.json)");
+  });
+});
+
+describe("printTelemetryOffReport", () => {
+  it("names what stops and what stays, and the command that removes the rest", () => {
+    expect(
+      printed((output) =>
+        printTelemetryOffReport(output, {
+          switchPath: "/p/.aidd/config.json",
+          switchChanged: true,
+        })
+      )
+    ).toEqual([
+      "AIDD telemetry: off (/p/.aidd/config.json)",
+      "This stops new recording only — sessions already journalled stay in aidd_docs/runs/ " +
+        "and whatever `aidd telemetry read` already stored, and `aidd telemetry report` still " +
+        "reports them. Run `aidd telemetry forget` to remove what was already measured.",
+    ]);
+  });
+
+  it("says already off where nothing was written", () => {
+    expect(
+      printed((output) =>
+        printTelemetryOffReport(output, {
+          switchPath: "/p/.aidd/config.json",
+          switchChanged: false,
+        })
+      )[0]
+    ).toBe("AIDD telemetry: already off (/p/.aidd/config.json)");
+  });
+});
+
+describe("printLocalCostReadReport — the line each tool gets", () => {
+  function toolLine(overrides: Partial<LocalCostToolReport>): string {
+    return printed((output) =>
+      printLocalCostReadReport(
+        output,
+        readResult({
+          sessions: [{ sessionId: "s-1", toolReports: [] }],
+          toolReports: [toolReport(overrides)],
+        })
+      )
+    )[1] as string;
+  }
+
+  it("counts what was stored against what was found, on a tool that read something", () => {
+    expect(toolLine({ status: "found", recordsFound: 5, recordsStored: 3 })).toBe(
+      "  Claude Code: read (3 new of 5)"
+    );
+  });
+
+  it("counts nothing on a status other than found, whose counts would mean nothing", () => {
+    expect(toolLine({ status: "empty", recordsFound: 5, recordsStored: 3 })).toBe(
+      "  Claude Code: read, nothing found"
+    );
+  });
+
+  it("gives each status its own words, none of them readable as another", () => {
+    expect([
+      toolLine({ status: "not-found" }),
+      toolLine({ status: "unreadable" }),
+      toolLine({ status: "not-covered" }),
+      toolLine({ status: "not-asked" }),
+    ]).toEqual([
+      "  Claude Code: no session found",
+      "  Claude Code: could not be read",
+      "  Claude Code: not covered",
+      "  Claude Code: no session read belongs to it",
+    ]);
+  });
+
+  it("carries a reason after the status, and a failed-session count after that", () => {
+    expect(
+      toolLine({
+        status: "found",
+        recordsFound: 5,
+        recordsStored: 3,
+        reason: "one transcript was truncated",
+        sessionsFailed: 2,
+        failureReason: "EACCES",
+      })
+    ).toBe(
+      "  Claude Code: read (3 new of 5) — one transcript was truncated " +
+        "[2 sessions could not be read: EACCES]"
+    );
+  });
+
+  it("counts one failed session in the singular", () => {
+    expect(toolLine({ status: "found", sessionsFailed: 1, failureReason: "EACCES" })).toBe(
+      "  Claude Code: read (0 new of 0) [1 session could not be read: EACCES]"
+    );
+  });
+});
+
+describe("printLocalCostReadReport — the line the sweep leads with", () => {
+  it("counts the sessions it read and how many of them yielded a record", () => {
+    expect(
+      printed((output) =>
+        printLocalCostReadReport(
+          output,
+          readResult({
+            sessions: [
+              { sessionId: "s-1", toolReports: [toolReport({ recordsFound: 2 })] },
+              { sessionId: "s-2", toolReports: [toolReport({ recordsFound: 0 })] },
+            ],
+            toolReports: [],
+          })
+        )
+      )
+    ).toEqual(["  2 sessions read, 1 with records"]);
+  });
+
+  it("counts every session that yielded a record, not the ones that yielded none", () => {
+    expect(
+      printed((output) =>
+        printLocalCostReadReport(
+          output,
+          readResult({
+            sessions: [
+              { sessionId: "s-1", toolReports: [toolReport({ recordsFound: 2 })] },
+              { sessionId: "s-2", toolReports: [toolReport({ recordsFound: 4 })] },
+            ],
+            toolReports: [],
+          })
+        )
+      )
+    ).toEqual(["  2 sessions read, 2 with records"]);
+  });
+
+  it("counts one session in the singular", () => {
+    expect(
+      printed((output) =>
+        printLocalCostReadReport(
+          output,
+          readResult({ sessions: [{ sessionId: "s-1", toolReports: [] }], toolReports: [] })
+        )
+      )
+    ).toEqual(["  1 session read, 0 with records"]);
+  });
+
+  it("says nothing was journalled rather than that nothing was read", () => {
+    expect(printed((output) => printLocalCostReadReport(output, readResult()))).toEqual([
+      "  No session journalled yet — nothing to read.",
+    ]);
+  });
+
+  it("prints a refusal alone, never the journal's own count beside it", () => {
+    expect(
+      printed((output) =>
+        printLocalCostReadReport(
+          output,
+          readResult({
+            refusedReason: "measurement is off for this project",
+            sessions: [{ sessionId: "s-1", toolReports: [] }],
+            toolReports: [toolReport({})],
+          })
+        )
+      )
+    ).toEqual(["  measurement is off for this project"]);
+  });
+});
+
+describe("printPersonIdentityStatus", () => {
+  it("says off, in the words the switch beside it never uses", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityStatus(output, { filePath: IDENTITY_FILE, identity: null })
+      )
+    ).toEqual(["AIDD identity: off - records carry no person"]);
+  });
+
+  it("names the identifier, where it came from and the file holding it", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityStatus(output, {
+          filePath: IDENTITY_FILE,
+          identity: { personId: "p-1", origin: "minted", alsoMe: [] },
+        })
+      )
+    ).toEqual([`AIDD identity: on, p-1 (minted on this machine) (${IDENTITY_FILE})`]);
+  });
+
+  it("quotes a display name between the origin and the file, and lists the added identifiers", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityStatus(output, {
+          filePath: IDENTITY_FILE,
+          identity: {
+            personId: "p-1",
+            origin: "adopted",
+            alsoMe: ["machine-1", "machine-2"],
+            displayName: "Ada",
+          },
+        })
+      )
+    ).toEqual([
+      `AIDD identity: on, p-1 (taken from another machine), display name "Ada" (${IDENTITY_FILE})`,
+      "  Identifiers added onto this person: machine-1, machine-2",
+    ]);
+  });
+});
+
+describe("printPersonIdentityUse", () => {
+  it("discloses what a minted identifier attaches to, and what it never attaches to", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUse(output, {
+          filePath: IDENTITY_FILE,
+          identity: { personId: "p-1", origin: "minted", alsoMe: [] },
+          outcome: "minted",
+        })
+      )
+    ).toEqual([
+      `AIDD identity: on, p-1 (${IDENTITY_FILE})`,
+      "  Attaches to: records this machine reads locally, from now on.",
+      "  Never attaches to: the run journal, a session already recorded, or a tool's own export.",
+    ]);
+  });
+
+  it("names what an adopted identifier replaced, and what the old records keep", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUse(output, {
+          filePath: IDENTITY_FILE,
+          identity: { personId: "p-2", origin: "adopted", alsoMe: [] },
+          outcome: "adopted",
+          replacedPersonId: "p-1",
+        })
+      )
+    ).toEqual([
+      `AIDD identity: now p-2 (replacing p-1) (${IDENTITY_FILE})`,
+      "  Records already written keep the identifier they were written with.",
+      DISCLAIMER,
+    ]);
+  });
+
+  it("says nothing about replacing when the identifier taken was nobody's before", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUse(output, {
+          filePath: IDENTITY_FILE,
+          identity: { personId: "p-2", origin: "adopted", alsoMe: [] },
+          outcome: "adopted",
+        })
+      )
+    ).toEqual([`AIDD identity: now p-2 (${IDENTITY_FILE})`, DISCLAIMER]);
+  });
+
+  it("claims nothing was written for an unchanged identifier with no name alongside", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUse(output, {
+          filePath: IDENTITY_FILE,
+          identity: { personId: "p-1", origin: "minted", alsoMe: [] },
+          outcome: "unchanged",
+        })
+      )
+    ).toEqual([`AIDD identity: p-1 already in effect (${IDENTITY_FILE})`]);
+  });
+
+  it("says a display name was set on the same line, then prints it", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUse(output, {
+          filePath: IDENTITY_FILE,
+          identity: { personId: "p-1", origin: "minted", alsoMe: [], displayName: "Ada" },
+          outcome: "unchanged",
+          displayNameSet: "Ada",
+        })
+      )
+    ).toEqual([
+      `AIDD identity: p-1 already in effect, display name set (${IDENTITY_FILE})`,
+      "  Display name: Ada",
+    ]);
+  });
+});
+
+describe("printPersonIdentityOff", () => {
+  it("says already off without claiming a file was removed", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityOff(output, {
+          filePath: IDENTITY_FILE,
+          removed: false,
+          discardedDamaged: false,
+          addedIdentifiersRemoved: 0,
+        })
+      )
+    ).toEqual(["AIDD identity: already off - nothing to withdraw"]);
+  });
+
+  it("names the file, what stays, that opting in again mints afresh, and the count removed", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityOff(output, {
+          filePath: IDENTITY_FILE,
+          removed: true,
+          discardedDamaged: false,
+          addedIdentifiersRemoved: 2,
+        })
+      )
+    ).toEqual([
+      `AIDD identity: off (${IDENTITY_FILE} removed)`,
+      "  New records carry no person, from now on.",
+      "  Records already stored keep the identifier they were written with - none are changed.",
+      "  Opting in again later mints a fresh identifier, never this one back.",
+      "  2 added identifiers removed with it.",
+    ]);
+  });
+
+  it("says a damaged file was discarded rather than read, and counts one in the singular", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityOff(output, {
+          filePath: IDENTITY_FILE,
+          removed: true,
+          discardedDamaged: true,
+          addedIdentifiersRemoved: 1,
+        })
+      ).filter((line) => line.includes("discarded") || line.includes("added identifier"))
+    ).toEqual([
+      "  The identity file could not be read, so it was discarded rather than left behind.",
+      "  1 added identifier removed with it.",
+    ]);
+  });
+});
+
+describe("printPersonIdentityLink and printPersonIdentityUnlink", () => {
+  it("names the identifier, the person it joined and the file, then the disclaimer", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityLink(output, {
+          filePath: IDENTITY_FILE,
+          personId: "p-1",
+          identity: "machine-2",
+          alreadyListed: false,
+        })
+      )
+    ).toEqual([`AIDD identity: linked 'machine-2' to p-1 (${IDENTITY_FILE})`, DISCLAIMER]);
+  });
+
+  it("says an identifier already listed is already listed, and adds no disclaimer", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityLink(output, {
+          filePath: IDENTITY_FILE,
+          personId: "p-1",
+          identity: "machine-2",
+          alreadyListed: true,
+        })
+      )
+    ).toEqual([`AIDD identity: 'machine-2' is already listed under p-1 (${IDENTITY_FILE})`]);
+  });
+
+  it("names the identifier it withdrew, with the file it left", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUnlink(output, {
+          filePath: IDENTITY_FILE,
+          identity: "machine-2",
+          removed: true,
+        })
+      )
+    ).toEqual([`AIDD identity: unlinked 'machine-2' (${IDENTITY_FILE})`]);
+  });
+
+  it("says one nobody listed was never listed, never that removal failed", () => {
+    expect(
+      printed((output) =>
+        printPersonIdentityUnlink(output, {
+          filePath: IDENTITY_FILE,
+          identity: "machine-9",
+          removed: false,
+        })
+      )
+    ).toEqual(["AIDD identity: 'machine-9' was not listed - nothing to remove"]);
+  });
+});
+
+describe("warnIfFiguresMoveTheTokenToo", () => {
+  it("names the directory, the variable and the token it also moves, on stderr", () => {
+    const output = new CapturingOutput();
+    const sink = new InMemoryTelemetrySink();
+    sink.locatedBy = "user-config-dir";
+
+    warnIfFiguresMoveTheTokenToo(output, sink);
+
+    expect(output.at("warn")).toEqual([
+      "Figures are kept at /fake/telemetry, located through AIDD_USER_CONFIG_DIR — which also " +
+        "moves auth.json, this machine's GitHub token. If that directory is shared, the token " +
+        "is in it. Set AIDD_TELEMETRY_DIR to the same path instead: it moves the figures and " +
+        "nothing else.",
+    ]);
   });
 });

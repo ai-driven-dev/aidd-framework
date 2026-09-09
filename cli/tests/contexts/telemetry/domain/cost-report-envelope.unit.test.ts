@@ -19,7 +19,7 @@ import {
 } from "../../../../src/contexts/telemetry/domain/cost-report-envelope.js";
 import type { TelemetrySinkRecord } from "../../../../src/contexts/telemetry/domain/telemetry-sink-record.js";
 import { printCostReport } from "../../../../src/presentation/display/cost-report-display.js";
-import { CLIOutput } from "../../../../src/presentation/output.js";
+import { CapturingOutput } from "../../../helpers/ports/capturing-output.js";
 
 const DECLARED: readonly CostReportToolDeclaration[] = [
   {
@@ -311,16 +311,6 @@ describe("toCostReportEnvelope", () => {
     expect(contract).toContain(`currently \`${COST_REPORT_ENVELOPE_VERSION}\``);
   });
 });
-
-/** Extends the real output rather than standing in for it, so a widened double cannot stop
- * failing the day the class grows a method the printer starts calling. */
-class CapturingOutput extends CLIOutput {
-  readonly lines: string[] = [];
-
-  override print(message: string): void {
-    this.lines.push(message);
-  }
-}
 
 describe("the two renderings are one computation", () => {
   const RECORDS: readonly TelemetrySinkRecord[] = [

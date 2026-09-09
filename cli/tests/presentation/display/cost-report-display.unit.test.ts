@@ -10,17 +10,7 @@ import {
 } from "../../../src/contexts/telemetry/domain/cost-report.js";
 import type { TelemetrySinkRecord } from "../../../src/contexts/telemetry/domain/telemetry-sink-record.js";
 import { padTo, printCostReport } from "../../../src/presentation/display/cost-report-display.js";
-import { CLIOutput } from "../../../src/presentation/output.js";
-
-/** Extends the real output rather than standing in for it: a widened double stops failing
- * the day the class grows a method the printer starts calling. */
-class CapturingOutput extends CLIOutput {
-  readonly lines: string[] = [];
-
-  override print(message: string): void {
-    this.lines.push(message);
-  }
-}
+import { CapturingOutput } from "../../helpers/ports/capturing-output.js";
 
 function record(overrides: Partial<TelemetrySinkRecord>): TelemetrySinkRecord {
   return {
@@ -475,5 +465,524 @@ describe("printCostReport — measurement is off", () => {
     expect(out).toMatch(/not scoped to it/u);
     expect(out).toContain("$4.20");
     expect(out).toMatch(/\bcost\s+\$4\.20/u);
+  });
+});
+
+const THREE_DAY_TOOLS: CostReportInput["declaredTools"] = [
+  {
+    tool: "claude",
+    coverage: "covered",
+    capability: {
+      localRead: { tokenCounters: true, amount: true, toolStatedStep: true, agentName: true },
+      export: null,
+      journalAttributable: true,
+      taskAttributable: true,
+    },
+  },
+  { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+  {
+    tool: "cursor",
+    coverage: "not-covered",
+    reason: "It writes no token count.",
+    capability: NO_CAPABILITY,
+  },
+];
+
+function threeDay(overrides: Partial<CostReportInput> = {}): string[] {
+  const output = new CapturingOutput();
+  printCostReport(
+    output,
+    buildCostReport({
+      fromDay: "2026-08-17",
+      toDay: "2026-08-19",
+      declaredTools: THREE_DAY_TOOLS,
+      records: [],
+      journals: [],
+      undatedRecords: 0,
+      unreadableLines: 0,
+      measurementEnabled: true,
+      ...overrides,
+    })
+  );
+  return output.lines;
+}
+
+const THREE_TOOL_ROWS = [
+  "",
+  "  by tool",
+  "    Claude Code               nothing in this period",
+  "    Codex                     nothing in this period",
+  "    Cursor                    not covered — It writes no token count.",
+];
+
+describe("printCostReport — one period, rendered whole", () => {
+  it("prints every heading and every row of a period holding work", () => {
+    expect(
+      threeDay({
+        records: [
+          record({
+            turn_id: "a",
+            prompt_id: "p-1",
+            cost_usd: 6,
+            input_tokens: 600,
+            model: "opus",
+            project_id: "acme/widgets",
+            step: "aidd-dev:02-implement",
+            step_attribution: "tool-stated",
+            event_timestamp: "2026-08-17T10:00:00Z",
+          }),
+          record({
+            turn_id: "b",
+            cost_usd: 3,
+            input_tokens: 300,
+            step: "aidd-dev:02-implement",
+            step_attribution: "journal-interval",
+            event_timestamp: "2026-08-18T10:00:00Z",
+          }),
+          record({
+            turn_id: "c",
+            cost_usd: 1,
+            input_tokens: 100,
+            event_timestamp: "2026-08-18T11:00:00Z",
+          }),
+        ],
+        undatedRecords: 3,
+        unreadableLines: 2,
+      })
+    ).toEqual([
+      "period    2026-08-17 to 2026-08-19",
+      "",
+      "  sessions                  1",
+      "  requests                  3",
+      "  tokens                    1,000    0% cache",
+      "  cost                      $10.00",
+      "",
+      "  by step    of cost",
+      "    aidd-dev:02-implement      60%   $6.00    stated by the tool",
+      "    aidd-dev:02-implement      30%   $3.00    from a journal interval",
+      "    unattributed               10%   $1.00",
+      "",
+      "  attribution    of cost",
+      "    stated by the tool         60%",
+      "    matched on the prompt       0%",
+      "    from a journal interval    30%",
+      "    unattributed               10%",
+      "",
+      "  by agent    of cost",
+      "    the main thread           100%   $10.00",
+      "",
+      "  by prompt   of cost",
+      "    p-1                                   2026-08-17T10:00:00Z   60%   $6.00",
+      "    no prompt named                                              40%   $4.00",
+      "",
+      "  by model    of cost",
+      "    opus                       60%   $6.00",
+      "    no known model             40%   $4.00",
+      "",
+      "  by project    of cost",
+      "    acme/widgets               60%   $6.00",
+      "    no known project           40%   $4.00",
+      "",
+      "  by task    of cost",
+      "    no usable run journal for this session 100%   $10.00",
+      "",
+      "  by backlog item    of cost",
+      "    no usable run journal for this session 100%   $10.00",
+      "",
+      "  by tool",
+      "    Claude Code               $10.00   1,000 tokens",
+      "    Codex                     nothing in this period",
+      "    Cursor                    not covered — It writes no token count.",
+      "",
+      "  by day",
+      "    2026-08-17                $6.00   600 tokens",
+      "    2026-08-18                $4.00   400 tokens",
+      "    2026-08-19                nothing in this period",
+      "  3 records carry no moment and are in no period",
+      "  2 lines could not be read",
+    ]);
+  });
+
+  it("prints an empty period as its two totals and its zero rows, under the off line", () => {
+    expect(threeDay({ measurementEnabled: false })).toEqual([
+      "period    2026-08-17 to 2026-08-19",
+      "this project's own switch is off — the figures below are not scoped to it, they are the whole sink; turn this project's measurement on with `aidd telemetry on`",
+      "",
+      "  sessions                  nothing in this period",
+      "  requests                  nothing in this period",
+      ...THREE_TOOL_ROWS,
+      "",
+      "  by day",
+      "    2026-08-17                nothing in this period",
+      "    2026-08-18                nothing in this period",
+      "    2026-08-19                nothing in this period",
+    ]);
+  });
+
+  it("breaks a period with no amount anywhere down by tokens, naming the basis on every heading", () => {
+    expect(
+      threeDay({ records: [record({ tool: "codex", model: "gpt-5", input_tokens: 10 })] })
+    ).toEqual([
+      "period    2026-08-17 to 2026-08-19",
+      "",
+      "  sessions                  1",
+      "  requests                  1",
+      "  tokens                    10    0% cache",
+      "  cost                      amount unknown",
+      "",
+      "  by step    of tokens",
+      "    unattributed              100%   10 tokens",
+      "",
+      "  attribution    of tokens",
+      "    stated by the tool          0%",
+      "    matched on the prompt       0%",
+      "    from a journal interval     0%",
+      "    unattributed              100%",
+      "",
+      "  by agent    of tokens",
+      "    the tool names no agent   100%   10 tokens",
+      "",
+      "  by prompt   of tokens",
+      "    no prompt named                                             100%   10 tokens",
+      "",
+      "  by model    of tokens",
+      "    gpt-5                     100%   10 tokens",
+      "",
+      "  by project    of tokens",
+      "    no known project          100%   10 tokens",
+      "",
+      "  by task    of tokens",
+      "    no usable run journal for this session 100%   10 tokens",
+      "",
+      "  by backlog item    of tokens",
+      "    no usable run journal for this session 100%   10 tokens",
+      "",
+      "  by tool",
+      "    Claude Code               nothing in this period",
+      "    Codex                     amount unknown   10 tokens",
+      "    Cursor                    not covered — It writes no token count.",
+      "",
+      "  by day",
+      "    2026-08-17                nothing in this period",
+      "    2026-08-18                nothing in this period",
+      "    2026-08-19                nothing in this period",
+    ]);
+  });
+});
+
+describe("printCostReport — a share with nothing to divide", () => {
+  it("prints a dash in place of every share when the basis is zero", () => {
+    const lines = threeDay({ records: [record({ turn_id: "a", cost_usd: 0 })] });
+
+    expect(lines).toContain("    unattributed                -    $0.00");
+    expect(lines).toContain("    stated by the tool          - ");
+    expect(lines).toContain("    the main thread             -    $0.00");
+  });
+});
+
+describe("printCostReport — the lines a period only sometimes carries", () => {
+  it("prints active time as its own row, after the cost", () => {
+    const lines = threeDay({
+      records: [
+        record({ turn_id: "a", cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" }),
+        record({ kind: "session", active_time_s: 2820 }),
+      ],
+    });
+
+    expect(lines.slice(0, 7)).toEqual([
+      "period    2026-08-17 to 2026-08-19",
+      "",
+      "  sessions                  1",
+      "  requests                  1",
+      "  tokens                    0    0% cache",
+      "  cost                      $1.00",
+      "  active time               47 min    per session; not attributable to steps",
+    ]);
+  });
+
+  it("names how many prompts it withheld, under the ten it printed", () => {
+    const lines = threeDay({
+      records: Array.from({ length: 12 }, (_, i) =>
+        record({ turn_id: `t-${i}`, prompt_id: `p-${i}`, cost_usd: 12 - i })
+      ),
+    });
+    const first = lines.indexOf("  by prompt   of cost");
+
+    expect(lines.slice(first, first + 12)).toEqual([
+      "  by prompt   of cost",
+      "    p-0                                                          15%   $12.00",
+      "    p-1                                                          14%   $11.00",
+      "    p-2                                                          13%   $10.00",
+      "    p-3                                                          12%   $9.00",
+      "    p-4                                                          10%   $8.00",
+      "    p-5                                                           9%   $7.00",
+      "    p-6                                                           8%   $6.00",
+      "    p-7                                                           6%   $5.00",
+      "    p-8                                                           5%   $4.00",
+      "    p-9                                                           4%   $3.00",
+      "    2 more prompts — see --json for all of them",
+    ]);
+  });
+
+  it("replaces a long period's daily rows with their count, never a partial series", () => {
+    const lines = threeDay({
+      fromDay: "2026-01-01",
+      toDay: "2026-02-09",
+      records: [record({ turn_id: "a", cost_usd: 1, event_timestamp: "2026-01-05T00:00:00Z" })],
+    });
+
+    expect(lines.slice(-2)).toEqual([
+      "  by day",
+      "    40 days in this period — see --json for the daily breakdown",
+    ]);
+  });
+
+  it("prints a session total on its own tool row, never as nothing in this period", () => {
+    const output = new CapturingOutput();
+    printCostReport(
+      output,
+      buildCostReport({
+        fromDay: "2026-08-17",
+        toDay: "2026-08-17",
+        declaredTools: [
+          {
+            tool: "copilot",
+            coverage: "covered",
+            capability: {
+              localRead: {
+                tokenCounters: true,
+                amount: false,
+                toolStatedStep: false,
+                agentName: false,
+              },
+              export: null,
+              journalAttributable: true,
+              taskAttributable: false,
+            },
+          },
+        ],
+        records: [
+          record({
+            tool: "copilot",
+            kind: "session",
+            input_tokens: 10,
+            output_tokens: 42,
+            cache_creation_tokens: 21070,
+          }),
+        ],
+        journals: [],
+        undatedRecords: 0,
+        unreadableLines: 0,
+        measurementEnabled: true,
+      })
+    );
+
+    expect(output.lines).toEqual([
+      "period    2026-08-17 to 2026-08-17",
+      "",
+      "  sessions                  1",
+      "  requests                  nothing in this period",
+      "",
+      "  by tool",
+      "    GitHub Copilot            21,122 tokens (session total, not requests)",
+      "",
+      "  by day",
+      "    2026-08-17                nothing in this period",
+    ]);
+  });
+});
+
+describe("printCostReport — a task the journal declared", () => {
+  it("says which route named a task row, and gives the rest its own reason", () => {
+    const lines = threeDay({
+      records: [
+        record({ turn_id: "a", cost_usd: 2, event_timestamp: "2026-08-17T10:00:00Z" }),
+        record({ turn_id: "b", cost_usd: 1, event_timestamp: "2026-08-18T10:00:00Z" }),
+      ],
+      journals: [
+        {
+          vendorId: "s-1",
+          tool: "claude-code",
+          writtenPaths: [],
+          taskIntervals: [
+            {
+              path: "aidd_docs/tasks/2026_08/2026_08_17_reporting/plan.md",
+              startMs: Date.parse("2026-08-17T09:00:00Z"),
+              endMs: Date.parse("2026-08-17T11:00:00Z"),
+            },
+          ],
+          flowIntervals: [],
+        },
+      ],
+    });
+    const first = lines.indexOf("  by task    of cost");
+
+    expect(lines.slice(first, first + 7)).toEqual([
+      "  by task    of cost",
+      "    2026_08/2026_08_17_reporting  67%   $2.00    declared by the flow",
+      "    the journal falls silent before this record  33%   $1.00",
+      "",
+      "  by backlog item    of cost",
+      "    this task declares no backlog item  67%   $2.00",
+      "    the journal falls silent before this record  33%   $1.00",
+    ]);
+  });
+});
+
+describe("printCostReport — a selection a filter emptied", () => {
+  it("says a filter's value was never seen anywhere, and prints no breakdown under it", () => {
+    expect(
+      threeDay({
+        records: [record({ turn_id: "a", cost_usd: 1 })],
+        filters: { project: "never-worked-here" },
+      })
+    ).toEqual([
+      "period    2026-08-17 to 2026-08-19    filters: project=never-worked-here",
+      "",
+      "  project 'never-worked-here' matched nothing — no record has ever named this project",
+      "",
+      "  sessions                  nothing in this selection",
+      "  requests                  nothing in this selection",
+    ]);
+  });
+
+  it("says a known value simply did no work here, rather than never being seen", () => {
+    expect(
+      threeDay({
+        records: [record({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" })],
+        knownValues: { projects: new Set(["gone"]), steps: new Set(), models: new Set() },
+        filters: { project: "gone" },
+      })[2]
+    ).toBe("  project 'gone' matched nothing in this selection — known, but no work here");
+  });
+});
+
+const CODEX_WITH_REASON: CostReportInput["declaredTools"] = [
+  { tool: "claude", coverage: "covered", capability: NO_CAPABILITY },
+  { tool: "codex", coverage: "covered", capability: NO_CAPABILITY, reason: "Partial read." },
+];
+
+describe("printCostReport — a fact a row carries beside its figure", () => {
+  it("keeps a covered tool's own reason after the figure it qualifies", () => {
+    const output = new CapturingOutput();
+    printCostReport(
+      output,
+      buildCostReport({
+        fromDay: "2026-08-17",
+        toDay: "2026-08-17",
+        declaredTools: CODEX_WITH_REASON,
+        records: [record({ turn_id: "a", cost_usd: 1, tool: "codex" })],
+        journals: [],
+        undatedRecords: 0,
+        unreadableLines: 0,
+        measurementEnabled: true,
+      })
+    );
+
+    expect(output.lines).toContain(
+      "    Codex                     $1.00   0 tokens — Partial read."
+    );
+  });
+
+  it("sums all four token counters into the headline, and reports the cache share of them", () => {
+    const lines = threeDay({
+      records: [
+        record({
+          turn_id: "a",
+          cost_usd: 4,
+          input_tokens: 10,
+          output_tokens: 20,
+          cache_read_tokens: 30,
+          cache_creation_tokens: 40,
+        }),
+      ],
+    });
+
+    expect(lines[4]).toBe("  tokens                    100    30% cache");
+  });
+
+  it("names an agent a record's own tool stated, above the main thread's own row", () => {
+    const lines = threeDay({
+      records: [
+        record({ turn_id: "a", cost_usd: 4, agent_name: "reviewer" }),
+        record({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+    const first = lines.indexOf("  by agent    of cost");
+
+    expect(lines.slice(first, first + 3)).toEqual([
+      "  by agent    of cost",
+      "    reviewer                   80%   $4.00",
+      "    the main thread            20%   $1.00",
+    ]);
+  });
+});
+
+describe("printCostReport — a report narrowed to one task", () => {
+  it("names the task in the header, and breaks down which route knew it", () => {
+    const lines = threeDay({
+      records: [record({ turn_id: "a", cost_usd: 2, event_timestamp: "2026-08-17T10:00:00Z" })],
+      journals: [
+        {
+          vendorId: "s-1",
+          tool: "claude-code",
+          writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_17_reporting/plan.md"],
+          taskIntervals: [],
+          flowIntervals: [],
+        },
+      ],
+      task: "2026_08/2026_08_17_reporting",
+    });
+
+    expect(lines[0]).toBe("task 2026_08/2026_08_17_reporting    2026-08-17 to 2026-08-19");
+    expect(lines.slice(7, 11)).toEqual([
+      "  ticket known    of cost",
+      "    declared by the flow        0%",
+      "    inferred from a written file 100%",
+      "",
+    ]);
+  });
+
+  it("says a filter emptied a selection only in combination with the rest of it", () => {
+    const lines = threeDay({
+      records: [
+        record({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets", model: "opus" }),
+        record({ turn_id: "b", cost_usd: 1, project_id: "acme/gadgets", model: "haiku" }),
+      ],
+      knownValues: {
+        projects: new Set(["acme/widgets"]),
+        steps: new Set(),
+        models: new Set(["haiku"]),
+      },
+      filters: { project: "acme/widgets", model: "haiku" },
+    });
+
+    expect(lines[2]).toBe(
+      "  model 'haiku' matched nothing combined with the rest of this selection"
+    );
+  });
+});
+
+describe("printCostReport — the boundary each cap sits on", () => {
+  it("withholds nothing, and says nothing about withholding, at exactly ten prompts", () => {
+    const lines = threeDay({
+      records: Array.from({ length: 10 }, (_, i) =>
+        record({ turn_id: `t-${i}`, prompt_id: `p-${i}`, cost_usd: 10 - i })
+      ),
+    });
+
+    expect(lines.filter((line) => line.includes("p-"))).toHaveLength(10);
+    expect(lines.some((line) => line.includes("more prompts"))).toBe(false);
+  });
+
+  it("still prints every daily row at exactly thirty-one days", () => {
+    const lines = threeDay({
+      fromDay: "2026-01-01",
+      toDay: "2026-01-31",
+      records: [record({ turn_id: "a", cost_usd: 1, event_timestamp: "2026-01-01T00:00:00Z" })],
+    });
+
+    expect(lines.at(-1)).toBe("    2026-01-31                nothing in this period");
+    expect(lines.some((line) => line.includes("days in this period"))).toBe(false);
   });
 });

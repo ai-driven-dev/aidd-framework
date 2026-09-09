@@ -2,24 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { TelemetrySetup } from "../../../src/contexts/telemetry/domain/telemetry-setup.js";
 import type { HostRegistrationEntry } from "../../../src/contexts/tools/domain/host-plugin-registration.js";
 import { printTelemetryCheckReport } from "../../../src/presentation/display/telemetry-check-display.js";
-import { CLIOutput } from "../../../src/presentation/output.js";
+import { CapturingOutput } from "../../helpers/ports/capturing-output.js";
 
 /** Everything here is about not sending a person to the wrong place: a gated run must not
  * look like a judged one, nor an unreadable thing like an absent one. */
-class CapturingOutput extends CLIOutput {
-  readonly lines: string[] = [];
-  readonly warnings: string[] = [];
-
-  override print(message: string): void {
-    this.lines.push(message);
-  }
-  override warn(message: string): void {
-    this.warnings.push(message);
-  }
-
-  get text(): string {
-    return this.lines.join("\n");
-  }
+function reportText(output: CapturingOutput): string {
+  return output.at("print").join("\n");
 }
 
 function setup(overrides: Partial<TelemetrySetup> = {}): TelemetrySetup {
@@ -63,9 +51,9 @@ describe("the setup a person reads before any claim", () => {
       leftoverExportConfig: [],
     });
 
-    expect(output.text).toContain("measurement allowed");
-    expect(output.text).toContain("records kept at");
-    expect(output.text).toContain("measurement is off");
+    expect(reportText(output)).toContain("measurement allowed");
+    expect(reportText(output)).toContain("records kept at");
+    expect(reportText(output)).toContain("measurement is off");
   });
 
   // The person's own refusal is a different fact from a project that never turned it on,
@@ -86,7 +74,7 @@ describe("the setup a person reads before any claim", () => {
       leftoverExportConfig: [],
     });
 
-    expect(output.text).toContain("this person's own refusal");
+    expect(reportText(output)).toContain("this person's own refusal");
   });
 
   // Nothing declared is a person's cue to go and declare it somewhere, so the row lists
@@ -108,8 +96,8 @@ describe("the setup a person reads before any claim", () => {
       leftoverExportConfig: [],
     });
 
-    expect(output.text).toContain("nowhere this build checks");
-    expect(output.text).toContain("/repo/.claude/settings.json");
+    expect(reportText(output)).toContain("nowhere this build checks");
+    expect(reportText(output)).toContain("/repo/.claude/settings.json");
   });
 
   // A damaged file is something to fix; an absent declaration is an ordinary state. The row
@@ -131,8 +119,8 @@ describe("the setup a person reads before any claim", () => {
       leftoverExportConfig: [],
     });
 
-    expect(output.text).toContain("could not be read");
-    expect(output.text).not.toContain("nowhere this build checks");
+    expect(reportText(output)).toContain("could not be read");
+    expect(reportText(output)).not.toContain("nowhere this build checks");
   });
 
   it("names a plugin version nothing journalled apart from one that was never stamped", () => {
@@ -151,7 +139,8 @@ describe("the setup a person reads before any claim", () => {
       leftoverExportConfig: [],
     });
 
-    const line = (o: CapturingOutput) => o.lines.find((l) => l.includes("plugin version")) ?? "";
+    const line = (o: CapturingOutput) =>
+      o.at("print").find((l) => l.includes("plugin version")) ?? "";
     expect(line(nothing)).not.toBe(line(unstamped));
   });
 });
@@ -180,8 +169,8 @@ describe("the claims, and what is deliberately not one", () => {
       leftoverExportConfig: [],
     });
 
-    expect(output.text).toContain("2 run file(s)");
-    expect(output.text).toContain("nothing joined");
+    expect(reportText(output)).toContain("2 run file(s)");
+    expect(reportText(output)).toContain("nothing joined");
   });
 
   it("names a tool nothing can read with its own reason, never as a failing claim", () => {
@@ -194,8 +183,8 @@ describe("the claims, and what is deliberately not one", () => {
       leftoverExportConfig: [],
     });
 
-    expect(output.text).toContain("not covered: cursor");
-    expect(output.text).toContain("no token count");
+    expect(reportText(output)).toContain("not covered: cursor");
+    expect(reportText(output)).toContain("no token count");
   });
 
   // A stale export lives in a tool's own settings file, which no claim here can see — so it
@@ -220,8 +209,8 @@ describe("the claims, and what is deliberately not one", () => {
     });
 
     for (const output of [judged, gated]) {
-      expect(output.warnings.join("\n")).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
-      expect(output.text).not.toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+      expect(output.at("warn").join("\n")).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+      expect(reportText(output)).not.toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
     }
   });
 });
@@ -234,7 +223,7 @@ describe("the row saying whether the host will load what aidd installed", () => 
       setup: setup({ hostRegistration }),
       leftoverExportConfig: [],
     });
-    return output.text;
+    return reportText(output);
   }
 
   const REGISTRY = "/home/dev/.claude/plugins/installed_plugins.json";
@@ -304,7 +293,7 @@ describe("the row saying whether commits carry their session", () => {
       setup: setup({ commitTrailer }),
       leftoverExportConfig: [],
     });
-    return output.text;
+    return reportText(output);
   }
 
   const HEALTHY = {
@@ -512,5 +501,368 @@ describe("the row saying whether commits carry their session", () => {
 
     expect(text).toContain("no commit history to read");
     expect(text).not.toContain("0 of the last");
+  });
+});
+
+const RECORDS_ROW =
+  "  records kept at       /home/.config/aidd/telemetry (override with AIDD_TELEMETRY_DIR)";
+const BY_DESIGN_TRAILER_ROW =
+  "  commit trailer        3 of the last 5 commits carry it — a commit no session made " +
+  "carries none, by design\n    hooks run from /repo/.git/hooks";
+
+function reportLines(result: Parameters<typeof printTelemetryCheckReport>[1]): string[] {
+  const output = new CapturingOutput();
+  printTelemetryCheckReport(output, result);
+  return output.at("print");
+}
+
+describe("printTelemetryCheckReport — the setup block, whole", () => {
+  it("prints eight labelled rows, a blank line, then the gate that stopped the run", () => {
+    expect(
+      reportLines({
+        gate: "measurement is off — nothing to check until it is turned on",
+        setup: setup(),
+        leftoverExportConfig: [],
+      })
+    ).toEqual([
+      "  measurement allowed   yes — /repo/.aidd/config.json",
+      "  identity attached     no — /home/.config/aidd/identity.json",
+      RECORDS_ROW,
+      "  recorder declared     yes — /repo/.aidd/manifest.json",
+      "  plugins registered    no plugin recorded for any tool",
+      BY_DESIGN_TRAILER_ROW,
+      "  cli version           5.2.2",
+      "  plugin version        1.0.0 (as the hook recorded it)",
+      "",
+      "  measurement is off — nothing to check until it is turned on",
+    ]);
+  });
+
+  it("reads every unreadable location as unreadable, never as an absent one", () => {
+    expect(
+      reportLines({
+        gate: "off",
+        setup: setup({
+          allowed: {
+            allowed: false,
+            readable: false,
+            location: "/repo/.aidd/config.json",
+            decidedBy: "project-switch",
+          },
+          identity: { attached: false, path: "/h/identity.json", readable: false },
+          recorderDeclaration: {
+            declared: false,
+            declaredAt: [],
+            locationsChecked: [],
+            unreadable: ["/repo/.aidd/manifest.json"],
+          },
+          hostRegistration: { entries: [], manifestUnreadable: "boom" },
+          versions: { cli: "5.2.2", plugin: { kind: "nothing-journalled" } },
+        }),
+        leftoverExportConfig: [],
+      }).slice(0, 8)
+    ).toEqual([
+      "  measurement allowed   could not be read — /repo/.aidd/config.json",
+      "  identity attached     could not be read — /h/identity.json",
+      RECORDS_ROW,
+      "  recorder declared     could not be read — /repo/.aidd/manifest.json",
+      "  plugins registered    AIDD's own manifest could not be read — boom",
+      BY_DESIGN_TRAILER_ROW,
+      "  cli version           5.2.2",
+      "  plugin version        no session journalled yet",
+    ]);
+  });
+
+  it("names a person's own refusal, an attached identity and the locations it looked in", () => {
+    expect(
+      reportLines({
+        gate: "off",
+        setup: setup({
+          allowed: {
+            allowed: false,
+            readable: true,
+            location: "AIDD_TELEMETRY",
+            decidedBy: "person-refusal",
+          },
+          identity: { attached: true, path: "/h/identity.json", readable: true },
+          recorderDeclaration: {
+            declared: false,
+            declaredAt: [],
+            locationsChecked: ["/repo/.aidd/manifest.json", "/repo/.claude/settings.json"],
+            unreadable: [],
+          },
+          versions: { cli: "5.2.2", plugin: { kind: "unrecorded" } },
+        }),
+        leftoverExportConfig: [],
+      }).slice(0, 8)
+    ).toEqual([
+      "  measurement allowed   no — this person's own refusal (AIDD_TELEMETRY)",
+      "  identity attached     yes — /h/identity.json",
+      RECORDS_ROW,
+      "  recorder declared     nowhere this build checks — looked in:\n" +
+        "    /repo/.aidd/manifest.json\n    /repo/.claude/settings.json",
+      "  plugins registered    no plugin recorded for any tool",
+      BY_DESIGN_TRAILER_ROW,
+      "  cli version           5.2.2",
+      "  plugin version        unknown — no journalled session names one. The plugin's own " +
+        "manifest was not beside its hooks and no `aidd` install recorded it; `aidd plugin " +
+        "install aidd-telemetry` would make it known.",
+    ]);
+  });
+});
+
+describe("printTelemetryCheckReport — every claim, in its own column", () => {
+  it("prints each claim's own name and verdict token, then its detail", () => {
+    expect(
+      reportLines({
+        setup: setup(),
+        claims: [
+          {
+            claim: "hook-fired",
+            verdict: "ok",
+            reason: "session-anchored",
+            detail: "2 run file(s)",
+          },
+          {
+            claim: "session-journalled",
+            verdict: "unknown",
+            reason: "no-session-named",
+            detail: "none yet",
+          },
+          {
+            claim: "tool-files-readable",
+            verdict: "fail",
+            reason: "no-run-file-to-read",
+            detail: "EACCES",
+          },
+          { claim: "records-join", verdict: "fail", reason: "all-unattributed", detail: "none" },
+        ],
+        uncovered: [{ tool: "cursor", reason: "It writes no token count." }],
+        leftoverExportConfig: [],
+      }).slice(9)
+    ).toEqual([
+      "  hook fired            ok    2 run file(s)",
+      "  session journalled    --    none yet",
+      "  tool files readable   FAIL  EACCES",
+      "  records join          FAIL  none",
+      "  not covered: cursor   --    It writes no token count.",
+    ]);
+  });
+
+  it("names every key of a leftover export, and what to do about it, on stderr", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      gate: "off",
+      setup: setup(),
+      leftoverExportConfig: [
+        { path: "/repo/.claude/settings.json", keys: ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_A"] },
+      ],
+    });
+
+    expect(output.at("warn")).toEqual([
+      "/repo/.claude/settings.json still sets OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_A — delete " +
+        "these keys from its `env` block by hand to stop that export; nothing here can do it " +
+        "for you.",
+    ]);
+  });
+});
+
+describe("printTelemetryCheckReport — the plugins-registered headline", () => {
+  function pluginsRow(hostRegistration: TelemetrySetup["hostRegistration"]): string {
+    return (
+      reportLines({
+        gate: "off",
+        setup: setup({ hostRegistration }),
+        leftoverExportConfig: [],
+      })[4] ?? ""
+    );
+  }
+
+  it("counts what will not load against the total, worst first", () => {
+    expect(
+      pluginsRow({
+        entries: [
+          { tool: "claude", plugin: "fine", answer: "registered", detail: "R" },
+          { tool: "claude", plugin: "broken", answer: "not-registered", detail: "R" },
+        ],
+      })
+    ).toBe(
+      "  plugins registered    1 of 2 will not load, or could not be answered\n" +
+        "    claude/broken: not-registered — R\n    claude/fine: registered — R"
+    );
+  });
+
+  it("says all of them will load when none is in trouble", () => {
+    expect(
+      pluginsRow({
+        entries: [
+          { tool: "claude", plugin: "a", answer: "registered", detail: "R" },
+          { tool: "codex", plugin: "b", answer: "registered", detail: "R" },
+        ],
+      })
+    ).toBe(
+      "  plugins registered    all 2 will load\n    claude/a: registered — R\n" +
+        "    codex/b: registered — R"
+    );
+  });
+});
+
+describe("printTelemetryCheckReport — the commit-trailer row, word for word", () => {
+  const HEALTHY_ROW = {
+    delegate: "executable",
+    callSite: "present",
+    hookHasOtherContent: false,
+    hooksDir: "/repo/.git/hooks",
+  } as const;
+  const HOOKS_FROM = "\n    hooks run from /repo/.git/hooks";
+
+  function trailerRow(commitTrailer: TelemetrySetup["commitTrailer"]): string {
+    return (
+      reportLines({ gate: "off", setup: setup({ commitTrailer }), leftoverExportConfig: [] })[5] ??
+      ""
+    );
+  }
+
+  it("says only the count when every commit carries it", () => {
+    expect(trailerRow({ ...HEALTHY_ROW, recentlyCarrying: { carrying: 20, examined: 20 } })).toBe(
+      `  commit trailer        20 of the last 20 commits carry it${HOOKS_FROM}`
+    );
+  });
+
+  it("excuses a shortfall only where some commits carry it and every part is in place", () => {
+    expect(trailerRow({ ...HEALTHY_ROW, recentlyCarrying: { carrying: 4, examined: 20 } })).toBe(
+      "  commit trailer        4 of the last 20 commits carry it — a commit no session made " +
+        `carries none, by design${HOOKS_FROM}`
+    );
+  });
+
+  it("never excuses zero, however healthy every part is", () => {
+    expect(trailerRow({ ...HEALTHY_ROW, recentlyCarrying: { carrying: 0, examined: 20 } })).toBe(
+      `  commit trailer        0 of the last 20 commits carry it${HOOKS_FROM}`
+    );
+  });
+
+  it("says there is no history to read rather than reporting a zero", () => {
+    expect(trailerRow(HEALTHY_ROW)).toBe(
+      `  commit trailer        no commit history to read${HOOKS_FROM}`
+    );
+  });
+
+  it("names every broken piece after the count, in one sentence", () => {
+    expect(
+      trailerRow({
+        ...HEALTHY_ROW,
+        delegate: "absent",
+        callSite: "missing",
+        hookExecutable: false,
+        hookHasOtherContent: true,
+        recentlyCarrying: { carrying: 0, examined: 20 },
+      })
+    ).toBe(
+      "  commit trailer        0 of the last 20 commits carry it — nothing installed to write " +
+        "it; prepare-commit-msg does not call it; prepare-commit-msg is not executable, so git " +
+        `ignores it; that hook is somebody else's too${HOOKS_FROM}`
+    );
+  });
+
+  it("says a delegate git cannot run is not executable", () => {
+    expect(trailerRow({ ...HEALTHY_ROW, delegate: "not-executable" })).toBe(
+      "  commit trailer        no commit history to read — its script is not executable, so " +
+        `git will not run it${HOOKS_FROM}`
+    );
+  });
+
+  it("says there is no hook file at all, rather than that one does not call the delegate", () => {
+    expect(trailerRow({ ...HEALTHY_ROW, callSite: "no-hook-file" })).toBe(
+      `  commit trailer        no commit history to read — there is no prepare-commit-msg${HOOKS_FROM}`
+    );
+  });
+
+  it("says there is no repository, and names no hooks directory it does not have", () => {
+    expect(
+      trailerRow({
+        delegate: "absent",
+        callSite: "no-hook-file",
+        hookHasOtherContent: false,
+        hooksDirMissing: "no-repository",
+      })
+    ).toBe("  commit trailer        no repository here, so no hook to carry it");
+  });
+
+  it("keeps the count when git would not say where it runs hooks from", () => {
+    expect(
+      trailerRow({
+        delegate: "absent",
+        callSite: "no-hook-file",
+        hookHasOtherContent: false,
+        hooksDirMissing: "unresolved",
+        recentlyCarrying: { carrying: 1, examined: 4 },
+      })
+    ).toBe(
+      "  commit trailer        1 of the last 4 commits carry it — git could not say where it " +
+        "runs hooks from"
+    );
+  });
+});
+
+describe("printTelemetryCheckReport — where lefthook or husky owns the hook", () => {
+  const HOOKS_FROM = "\n    hooks run from /repo/.git/hooks";
+
+  function trailerRow(commitTrailer: TelemetrySetup["commitTrailer"]): string {
+    return (
+      reportLines({ gate: "off", setup: setup({ commitTrailer }), leftoverExportConfig: [] })[5] ??
+      ""
+    );
+  }
+
+  it("reports the chain wired through the manager once its config calls the delegate", () => {
+    expect(
+      trailerRow({
+        delegate: "executable",
+        callSite: "missing",
+        hookHasOtherContent: true,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "lefthook",
+        managerCallsDelegate: true,
+        recentlyCarrying: { carrying: 2, examined: 4 },
+      })
+    ).toBe(
+      "  commit trailer        2 of the last 4 commits carry it — a commit no session made " +
+        "carries none, by design — wired through lefthook's own prepare-commit-msg" +
+        HOOKS_FROM
+    );
+  });
+
+  it("refuses to call a checkout wired when nothing was installed to answer the call", () => {
+    expect(
+      trailerRow({
+        delegate: "absent",
+        callSite: "missing",
+        hookHasOtherContent: false,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "lefthook",
+        managerCallsDelegate: true,
+      })
+    ).toBe(
+      "  commit trailer        no commit history to read — wired through lefthook, but nothing " +
+        `installed to write it; run \`aidd telemetry on\`${HOOKS_FROM}`
+    );
+  });
+
+  it("names an unrunnable script rather than reporting the manager as wired", () => {
+    expect(
+      trailerRow({
+        delegate: "not-executable",
+        callSite: "missing",
+        hookHasOtherContent: false,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "husky",
+        managerCallsDelegate: true,
+      })
+    ).toBe(
+      "  commit trailer        no commit history to read — wired through husky, but its script " +
+        `is not executable, so git will not run it; run \`aidd telemetry on\`${HOOKS_FROM}`
+    );
   });
 });
