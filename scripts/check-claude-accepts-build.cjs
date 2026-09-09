@@ -26,8 +26,8 @@ function verdict(text) {
   return "unknown";
 }
 
-/** Translates `root` for claude under a fresh directory and asks `claudeBin` about it. */
-function check({ root, cli, claudeBin, log }) {
+/** Translates `root` for claude under a fresh directory and asks `host` (an argv) about it. */
+function check({ root, cli, host, log }) {
   if (!fs.existsSync(cli)) {
     log(`NO VERDICT: the CLI is not built at ${cli}\n`);
     return NO_VERDICT;
@@ -40,13 +40,14 @@ function check({ root, cli, claudeBin, log }) {
     log(`${build.stdout}${build.stderr}\nNO VERDICT: translate exited ${build.status}\n`);
     return NO_VERDICT;
   }
-  const asked = spawnSync(claudeBin, ["plugin", "validate", out], { encoding: "utf8" });
+  const [bin, ...leading] = host;
+  const asked = spawnSync(bin, [...leading, "plugin", "validate", out], { encoding: "utf8" });
   const text = `${asked.stdout ?? ""}${asked.stderr ?? ""}`;
   log(text);
   const said = verdict(text);
   if (said === "passed") return 0;
   if (said === "failed") return REFUSED;
-  log(`\nNO VERDICT: ${claudeBin} said neither passed nor failed (exit ${asked.status ?? asked.error})\n`);
+  log(`\nNO VERDICT: ${host.join(" ")} said neither passed nor failed (exit ${asked.status ?? asked.error})\n`);
   return NO_VERDICT;
 }
 
@@ -58,7 +59,7 @@ if (require.main === module) {
     check({
       root,
       cli: path.join(root, "cli", "dist", "cli.js"),
-      claudeBin: "claude",
+      host: ["claude"],
       log: (text) => process.stdout.write(text),
     }),
   );
