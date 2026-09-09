@@ -21,6 +21,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -29,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.filter.outputs.relevant }}
+      trusted_promotion: ${{ steps.promotion.outputs.trusted }}
       mutation_scopes: ${{ steps.mutation.outputs.scopes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,25 +83,72 @@ jobs:
 
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
 
+      # A promotion branch is a snapshot of next, not the live next branch. Reusing its
+      # mutation result is safe only when this exact snapshot already passed this workflow's
+      # required gate from a push to next. API trouble deliberately reads as untrusted.
+      - name: Check whether a promotion snapshot passed next
+        id: promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          trusted=false
+          reason="not a promotion snapshot"
+
+          if [[ "$EVENT_NAME" == "pull_request" && "$BASE_REF" == "main" && "$HEAD_REF" =~ ^promote/next-to-main-[0-9]+$ ]]; then
+            reason="no successful cli CI push run found for the snapshot SHA"
+            if run_ids="$(gh api --paginate "/repos/$REPO/actions/workflows/cli-ci.yml/runs?branch=next&event=push&status=completed&head_sha=$HEAD_SHA&per_page=100" \
+              --jq '.workflow_runs[] | select(.conclusion == "success") | .id' 2>/dev/null)"; then
+              while IFS= read -r run_id; do
+                [[ -z "$run_id" ]] && continue
+                if gate="$(gh api "/repos/$REPO/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+                  --jq 'any(.jobs[]; .name == "cli / gate" and .conclusion == "success")' 2>/dev/null)"; then
+                  if [[ "$gate" == "true" ]]; then
+                    trusted=true
+                    reason="reusing the successful cli CI gate from next run $run_id"
+                    break
+                  fi
+                  reason="cli / gate did not pass in next run $run_id"
+                else
+                  reason="could not inspect cli CI run $run_id"
+                fi
+              done <<< "$run_ids"
+            else
+              reason="could not list successful cli CI push runs"
+            fi
+          fi
+
+          echo "promotion mutation reuse: $reason"
+          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
+
       - name: Decide which mutation scopes a change can move
         id: mutation
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
+          if [[ "${{ steps.promotion.outputs.trusted }}" == "true" ]]; then
+            scopes='[]'
           else
-            BASE="${{ github.event.before }}"
-            HEAD="${{ github.sha }}"
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              BASE="${{ github.event.pull_request.base.sha }}"
+              HEAD="${{ github.event.pull_request.head.sha }}"
+            else
+              BASE="${{ github.event.before }}"
+              HEAD="${{ github.sha }}"
+            fi
+            if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+              changed=""
+              all=true
+            else
+              changed="$(git diff --name-only "$BASE" "$HEAD")"
+              all=false
+            fi
+            scopes="$(ALL="$all" CHANGED="$changed" node cli/scripts/mutation-scopes-to-run.mjs)"
           fi
-          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
-            changed=""
-            all=true
-          else
-            changed="$(git diff --name-only "$BASE" "$HEAD")"
-            all=false
-          fi
-          scopes="$(ALL="$all" CHANGED="$changed" node cli/scripts/mutation-scopes-to-run.mjs)"
           echo "mutation scopes: $scopes"
           echo "scopes=$scopes" >> "$GITHUB_OUTPUT"
 
