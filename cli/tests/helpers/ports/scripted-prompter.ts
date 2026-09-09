@@ -10,6 +10,8 @@ type PromptAnswer =
 
 /** Returns pre-defined answers in order, throwing once the queue is exhausted. */
 export class ScriptedPrompter implements Prompter {
+  readonly askedSelects: Array<{ message: string; names: string[] }> = [];
+  readonly askedInputs: Array<{ message: string; defaultValue: string | undefined }> = [];
   private readonly queue: PromptAnswer[];
   private index = 0;
 
@@ -42,6 +44,7 @@ export class ScriptedPrompter implements Prompter {
   }
 
   async input(message: string, defaultValue?: string): Promise<string> {
+    this.askedInputs.push({ message, defaultValue });
     if (this.index >= this.queue.length) {
       return defaultValue ?? "";
     }
@@ -53,6 +56,7 @@ export class ScriptedPrompter implements Prompter {
     message: string,
     choices: Array<{ name: string; value: T; disabled?: boolean | string; description?: string }>
   ): Promise<T> {
+    this.askedSelects.push({ message, names: choices.map((c) => c.name) });
     const answer = this.next("select", message);
     const stringValue = answer.value as string;
     const match = choices.find((c) => !c.disabled && String(c.value) === stringValue);

@@ -22,6 +22,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   private readonly state: "live" | "dead" | "unknown";
   private readonly failOnUninstall: ReadonlySet<string>;
   private readonly crashOnAddMarketplace: boolean;
+  private readonly crashOnUninstall: boolean;
   private readonly installedAtScope: ReadonlyMap<string, MarketplaceScope>;
 
   constructor(
@@ -36,6 +37,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       registrationState?: "live" | "dead" | "unknown";
       failOnUninstall?: readonly string[];
       crashOnAddMarketplace?: boolean;
+      crashOnUninstall?: boolean;
       installedAtScope?: ReadonlyMap<string, MarketplaceScope>;
     } = {}
   ) {
@@ -47,6 +49,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.state = options.registrationState ?? "unknown";
     this.failOnUninstall = new Set(options.failOnUninstall ?? []);
     this.crashOnAddMarketplace = options.crashOnAddMarketplace ?? false;
+    this.crashOnUninstall = options.crashOnUninstall ?? false;
     this.installedAtScope = options.installedAtScope ?? new Map();
   }
 
@@ -97,6 +100,9 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   }
 
   uninstallPlugin(pluginRef: string, scope: MarketplaceScope = "project"): void {
+    if (this.crashOnUninstall) {
+      throw new Error("activator crashed uninstalling a plugin");
+    }
     this.uninstalledPluginScopes.push(scope);
     if (this.failOnUninstall.has(pluginRef)) {
       throw new NativePluginCliError(`plugin \`${pluginRef}\` is not installed`);
