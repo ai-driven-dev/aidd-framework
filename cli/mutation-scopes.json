@@ -14,7 +14,7 @@
         "!src/contexts/tools/domain/profiles/cursor/**/*.ts",
         "!src/contexts/tools/domain/profiles/opencode/**/*.ts"
       ],
-      "break": 76
+      "break": 94
     },
     "telemetry": {
       "mutate": "src/contexts/telemetry/**/*.ts",
