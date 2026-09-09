@@ -184,4 +184,49 @@ describe("marketplaceNames narrows a sync run to the marketplaces named", () => 
     expect(activator.addedMarketplaces.sort()).toEqual(["/built/market-a", "/built/market-b"]);
     expect(activator.enabledPlugins.sort()).toEqual(["plugin-a@market-a", "plugin-b@market-b"]);
   });
+
+  it("records exactly the named marketplace and its ref on a first narrowed run", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry, manifestRepo } = build(activator);
+    await registry.save(PROJECT_ROOT, marketplace("market-a"));
+    await registry.save(PROJECT_ROOT, marketplace("market-b"));
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, marketplaceNames: ["market-b"] });
+
+    expect((await manifestRepo.load())?.getNativeRegistrations("claude")).toStrictEqual({
+      binary: "claude",
+      marketplaces: [{ alias: "market-b", hostName: "market-b" }],
+      pluginRefs: ["plugin-b@market-b"],
+    });
+  });
+
+  it("drops a stale ref of either touched marketplace when narrowed to both", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry, manifest, manifestRepo } = build(activator);
+    manifest.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [
+        { alias: "market-a", hostName: "market-a" },
+        { alias: "market-b", hostName: "market-b" },
+      ],
+      pluginRefs: ["plugin-a@market-a", "plugin-b-old@market-b"],
+    });
+    await manifestRepo.save(manifest);
+    await registry.save(PROJECT_ROOT, marketplace("market-a"));
+    await registry.save(PROJECT_ROOT, marketplace("market-b"));
+
+    await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      marketplaceNames: ["market-a", "market-b"],
+    });
+
+    expect((await manifestRepo.load())?.getNativeRegistrations("claude")).toStrictEqual({
+      binary: "claude",
+      marketplaces: [
+        { alias: "market-a", hostName: "market-a" },
+        { alias: "market-b", hostName: "market-b" },
+      ],
+      pluginRefs: ["plugin-a@market-a", "plugin-b@market-b"],
+    });
+  });
 });

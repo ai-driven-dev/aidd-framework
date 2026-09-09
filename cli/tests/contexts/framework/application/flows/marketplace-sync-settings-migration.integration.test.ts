@@ -2,13 +2,18 @@ import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MarketplaceRegisterFrameworkUseCase } from "../../../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
+import {
+  type MarketplaceRegisterFramework,
+  type MarketplaceRegisterFrameworkOptions,
+  MarketplaceRegisterFrameworkUseCase,
+} from "../../../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
 import {
   FRAMEWORK_MARKETPLACE_NAME,
   Marketplace,
 } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { DoctorRegistrationUseCase } from "../../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import type { EnsureBuiltMarketplace } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import type { UserSourceReferences } from "../../../../../src/contexts/framework/domain/ports/user-source-references.js";
 import type { NativePluginActivator } from "../../../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
@@ -44,6 +49,12 @@ function catalogFixture(builtDir: string): Record<string, string> {
       plugins: [],
     }),
   };
+}
+
+function manifestWithClaude(): Manifest {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "test", []);
+  return manifest;
 }
 
 function projectScopeEntry(source: Marketplace["source"]): Marketplace {
@@ -165,6 +176,42 @@ describe("MarketplaceSyncSettingsUseCase — codex and copilot refuse the same n
 
     expect(activator.removedMarketplaces).toEqual([FRAMEWORK_MARKETPLACE_NAME]);
     expect(activator.addedMarketplaces).toEqual([CODEX_BUILT_DIR]);
+  });
+
+  it("warns with the reclaim message naming the tool that refuses the overwrite", async () => {
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(PROJECT_ROOT, frameworkAtUserScope());
+    const manifest = Manifest.create();
+    manifest.addTool("codex", "test", []);
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      enablesPlugins: false,
+      conflictOnAdd: true,
+    });
+    const fs = new InMemoryFileAdapter({
+      [`${CODEX_BUILT_DIR}/.agents/plugins/marketplace.json`]: JSON.stringify({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        version: "1.0.0",
+        plugins: [],
+      }),
+    });
+    const logger = new CapturingLogger();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifest),
+      registry,
+      new DeterministicHasher(),
+      logger,
+      new Map([["codex", activator]]),
+      fakeEnsureBuiltMarketplace(() => CODEX_BUILT_DIR)
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const reclaim =
+      "Marketplace 'aidd-framework' is registered from a different source and codex refuses to overwrite it in place; removing and re-registering it from the shared, machine-scope build. Plugins installed from it are removed and the ones this CLI manages are put back.";
+    expect(result.warnings).toStrictEqual([reclaim]);
+    expect(logger.warnMessages).toStrictEqual([reclaim]);
   });
 
   it("never reclaims an arbitrary, non-reserved marketplace name this way — only the framework's own", async () => {
@@ -378,6 +425,94 @@ describe("MarketplaceSyncSettingsUseCase — the host still tracks another, unmi
     const roots = added.map((a) => a.projectRoot);
     expect(roots).toContain(PROJECT_ROOT);
     expect(roots).not.toContain("/gone-project");
+  });
+
+  function hostOnForeignCache(): {
+    fs: InMemoryFileAdapter;
+    hostReader: FakeHostMarketplaceRegistryReader;
+    registry: InMemoryMarketplaceRegistry;
+    manifest: Manifest;
+    activator: FakeNativePluginActivator;
+  } {
+    const foreignProjectCache = builtMarketplaceDir(
+      "/other-project",
+      FRAMEWORK_MARKETPLACE_NAME,
+      "claude"
+    );
+    const registry = new InMemoryMarketplaceRegistry();
+    registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        source: { kind: "local", path: "." },
+        scope: "user",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    const fs = new InMemoryFileAdapter({
+      [`${sharedBuiltDir()}/${CATALOG_RELATIVE}`]: JSON.stringify({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        version: CURRENT_VERSION,
+        plugins: [],
+      }),
+      [`${foreignProjectCache}/${CATALOG_RELATIVE}`]: JSON.stringify({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        version: "1.0.0",
+        plugins: [],
+      }),
+    });
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: "/home/.claude/plugins/known_marketplaces.json",
+      entries: new Map([[FRAMEWORK_MARKETPLACE_NAME, foreignProjectCache]]),
+    });
+    const activator = new FakeNativePluginActivator({ available: true, enablesPlugins: false });
+    return { fs, hostReader, registry, manifest, activator };
+  }
+
+  it("still repoints the host when this run has nowhere to record references at all", async () => {
+    const { fs, hostReader, registry, manifest, activator } = hostOnForeignCache();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifest),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace(() => sharedBuiltDir()),
+      new Map([["claude", hostReader]]),
+      () => USER_CACHE_ROOT
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(activator.addedMarketplaces).toStrictEqual([sharedBuiltDir()]);
+  });
+
+  it("still repoints the host, recording nothing, when the version to record under is unknown", async () => {
+    const { fs, hostReader, registry, manifest, activator } = hostOnForeignCache();
+    const added: Array<{ version: string; projectRoot: string }> = [];
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifest),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace(() => sharedBuiltDir()),
+      new Map([["claude", hostReader]]),
+      () => USER_CACHE_ROOT,
+      undefined,
+      noSourceReferences(added)
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(activator.addedMarketplaces).toStrictEqual([sharedBuiltDir()]);
+    expect(added).toStrictEqual([]);
   });
 });
 
@@ -653,6 +788,311 @@ describe("MarketplaceSyncSettingsUseCase — purging this project's own pre-migr
 
     expect(activator.cacheStillPresentAtAdd).toEqual([true]);
     expect(fs.has(OLD_CACHE_FILE)).toBe(false);
+  });
+
+  function registryWithSharedFramework(): InMemoryMarketplaceRegistry {
+    const registry = new InMemoryMarketplaceRegistry();
+    registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        source: { kind: "local", path: "." },
+        scope: "user",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    return registry;
+  }
+
+  function staleCacheAndCatalog(): InMemoryFileAdapter {
+    return new InMemoryFileAdapter({
+      [OLD_CACHE_FILE]: "stale content",
+      ...catalogFixture(CLAUDE_BUILT_DIR),
+    });
+  }
+
+  function recordingRegister(
+    calls: MarketplaceRegisterFrameworkOptions[]
+  ): MarketplaceRegisterFramework {
+    return {
+      execute: async (options) => {
+        calls.push(options);
+        return { registered: true, scope: "user" };
+      },
+    };
+  }
+
+  it("warns with the whole message when a requested tool's binary is off PATH", async () => {
+    const logger = new CapturingLogger();
+    const registry = projectWithMigratableEntry();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter({ [OLD_CACHE_FILE]: "stale content" }),
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registry,
+      new DeterministicHasher(),
+      logger,
+      new Map([["claude", new FakeNativePluginActivator({ available: false })]]),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR),
+      new Map(),
+      () => "",
+      new MarketplaceRegisterFrameworkUseCase(registry)
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, recreateFrameworkIfMissing: true });
+
+    expect(logger.warnMessages).toStrictEqual([
+      "claude CLI not found on PATH — skipping native plugin activation.",
+      "This project's own pre-migration framework cache kept: a requested tool's CLI was not on PATH this run, so its own registration may still point at it — run `aidd sync` again once every tool's CLI is on PATH.",
+    ]);
+  });
+
+  it("warns with the whole message when a requested tool's build failed", async () => {
+    const logger = new CapturingLogger();
+    const registry = projectWithMigratableEntry();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter({ [OLD_CACHE_FILE]: "stale content" }),
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registry,
+      new DeterministicHasher(),
+      logger,
+      new Map([["claude", new FakeNativePluginActivator({ available: true })]]),
+      {
+        execute: async () => {
+          throw new Error("translator refused the source");
+        },
+      },
+      new Map(),
+      () => "",
+      new MarketplaceRegisterFrameworkUseCase(registry)
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, recreateFrameworkIfMissing: true });
+
+    expect(logger.warnMessages).toStrictEqual([
+      "Native plugin activation — build 'aidd-framework' for claude skipped: translator refused the source",
+      "Native plugin activation — build 'aidd-framework' for claude skipped: translator refused the source",
+      "This project's own pre-migration framework cache kept: a requested tool's build failed this run, so its own registration may still point at it — fix the build warning above, then run `aidd sync` again.",
+    ]);
+  });
+
+  it("keeps the stale built tree when one of two requested tools' builds failed", async () => {
+    const registry = projectWithMigratableEntry();
+    const manifest = manifestWithClaude();
+    manifest.addTool("codex", "test", []);
+    const fs = staleCacheAndCatalog();
+    const activator = new FakeNativePluginActivator({ available: true, enablesPlugins: false });
+    const codexBuildFails: EnsureBuiltMarketplace = {
+      execute: async (options) => {
+        if (options.target === "codex") throw new Error("translator refused the source");
+        return { builtDir: CLAUDE_BUILT_DIR, version: "test", rebuilt: true };
+      },
+    };
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifest),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([
+        ["claude", activator],
+        ["codex", activator],
+      ]),
+      codexBuildFails,
+      new Map(),
+      () => "",
+      new MarketplaceRegisterFrameworkUseCase(registry)
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      recreateFrameworkIfMissing: true,
+    });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(fs.has(OLD_CACHE_FILE)).toBe(true);
+  });
+
+  it("names the candidate and the root it escaped when a symlink resolves it outside the project", async () => {
+    const logger = new CapturingLogger();
+    const registry = projectWithMigratableEntry();
+    const fs = new InMemoryFileAdapter({
+      "/etc/evil/still-here.txt": "not aidd's to delete",
+      ...catalogFixture(CLAUDE_BUILT_DIR),
+    });
+    fs.setSymlink(OLD_CACHE_DIR, "/etc/evil");
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registry,
+      new DeterministicHasher(),
+      logger,
+      new Map([
+        ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+      ]),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR),
+      new Map(),
+      () => "",
+      new MarketplaceRegisterFrameworkUseCase(registry)
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, recreateFrameworkIfMissing: true });
+
+    expect(logger.warnMessages).toStrictEqual([
+      `This project's own pre-migration framework cache does not resolve inside ${PROJECT_ROOT}; left in place: ${OLD_CACHE_DIR}`,
+    ]);
+  });
+
+  it("says which tree it purged", async () => {
+    const logger = new CapturingLogger();
+    const registry = projectWithMigratableEntry();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      staleCacheAndCatalog(),
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registry,
+      new DeterministicHasher(),
+      logger,
+      new Map([
+        ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+      ]),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR),
+      new Map(),
+      () => "",
+      new MarketplaceRegisterFrameworkUseCase(registry)
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, recreateFrameworkIfMissing: true });
+
+    expect(logger.infoMessages).toStrictEqual([
+      `This project's own pre-migration framework cache purged: ${OLD_CACHE_DIR}`,
+    ]);
+  });
+
+  it("leaves the stale built tree alone at user scope, where no project file is this run's to touch", async () => {
+    const fs = staleCacheAndCatalog();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registryWithSharedFramework(),
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([
+        ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+      ]),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR)
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      recreateFrameworkIfMissing: true,
+      scope: "user",
+    });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(fs.has(OLD_CACHE_FILE)).toBe(true);
+  });
+
+  it("leaves the stale built tree alone unless the caller asked to recreate the framework entry", async () => {
+    const fs = staleCacheAndCatalog();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registryWithSharedFramework(),
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([
+        ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+      ]),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR)
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(fs.has(OLD_CACHE_FILE)).toBe(true);
+  });
+
+  it("leaves the stale built tree alone while the framework entry is still at project scope", async () => {
+    const fs = staleCacheAndCatalog();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifestWithClaude()),
+      projectWithMigratableEntry(),
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([
+        ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+      ]),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR)
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      recreateFrameworkIfMissing: true,
+    });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(fs.has(OLD_CACHE_FILE)).toBe(true);
+  });
+
+  it("never re-registers the framework when it is already shared behind another project-scope marketplace", async () => {
+    const registry = registryWithSharedFramework();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "other-plugins",
+        source: { kind: "local", path: "/other/plugins" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const calls: MarketplaceRegisterFrameworkOptions[] = [];
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter(catalogFixture(CLAUDE_BUILT_DIR)),
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map(),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR),
+      new Map(),
+      () => "",
+      recordingRegister(calls)
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, recreateFrameworkIfMissing: true });
+
+    expect(calls).toStrictEqual([]);
+  });
+
+  it("neither registers nor fails when other marketplaces exist and no framework entry does", async () => {
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "other-plugins",
+        source: { kind: "local", path: "/other/plugins" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const calls: MarketplaceRegisterFrameworkOptions[] = [];
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter(catalogFixture(CLAUDE_BUILT_DIR)),
+      new InMemoryManifestRepository(manifestWithClaude()),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map(),
+      fakeEnsureBuiltMarketplace(() => CLAUDE_BUILT_DIR),
+      new Map(),
+      () => "",
+      recordingRegister(calls)
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, recreateFrameworkIfMissing: true });
+
+    expect(calls).toStrictEqual([]);
+    expect((await registry.list(PROJECT_ROOT)).map((m) => m.name)).toStrictEqual(["other-plugins"]);
   });
 });
 

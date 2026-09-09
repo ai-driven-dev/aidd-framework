@@ -1,5 +1,6 @@
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
@@ -8,6 +9,8 @@ import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framewor
 import type { EnsureBuiltMarketplace } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
+import { NativePluginCliError } from "../../../../../src/kernel/errors.js";
+import type { PluginSource } from "../../../../../src/kernel/source.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
@@ -43,6 +46,18 @@ interface SyncSetup {
   readonly crashOnAddMarketplace?: boolean;
   /** Refs that fail to enable — a recoverable, best-effort `NativePluginCliError`. */
   readonly failOnPlugins?: readonly string[];
+  readonly activator?: FakeNativePluginActivator;
+  readonly marketplaceSource?: (name: string) => PluginSource;
+}
+
+class ActivatorFailingAtUpgrade extends FakeNativePluginActivator {
+  constructor(private readonly failure: Error) {
+    super({ available: true });
+  }
+
+  override upgradeMarketplaces(): void {
+    throw this.failure;
+  }
 }
 
 /** A real build always leaves a catalog where `fakeEnsureBuiltMarketplace()` resolves
@@ -80,7 +95,7 @@ async function sync(setup: SyncSetup = {}) {
       PROJECT_ROOT,
       Marketplace.create({
         name,
-        source: { kind: "local", path: `/source/${name}` },
+        source: setup.marketplaceSource?.(name) ?? { kind: "local", path: `/source/${name}` },
         scope: "project",
         addedAt: "2026-01-01T00:00:00Z",
       })
@@ -88,12 +103,14 @@ async function sync(setup: SyncSetup = {}) {
   }
   if (setup.settings !== undefined) await fs.writeFile(SHARED_SETTINGS, setup.settings);
 
-  const activator = new FakeNativePluginActivator({
-    available: setup.available ?? true,
-    enablesPlugins: setup.enablesPlugins ?? false,
-    crashOnAddMarketplace: setup.crashOnAddMarketplace ?? false,
-    failOnPlugins: setup.failOnPlugins ?? [],
-  });
+  const activator =
+    setup.activator ??
+    new FakeNativePluginActivator({
+      available: setup.available ?? true,
+      enablesPlugins: setup.enablesPlugins ?? false,
+      crashOnAddMarketplace: setup.crashOnAddMarketplace ?? false,
+      failOnPlugins: setup.failOnPlugins ?? [],
+    });
   const useCase = new MarketplaceSyncSettingsUseCase(
     fs,
     manifestRepo,
@@ -331,5 +348,166 @@ describe("toolIds narrows which tool's CLI is driven", () => {
     expect(claudeActivator.addedMarketplaces).not.toEqual([]);
     expect(codexActivator.addedMarketplaces).toEqual([]);
     expect(result.activated).toEqual(["claude"]);
+  });
+
+  it("leaves the other tool's CLI alone even when that tool's own tree is ready to register", async () => {
+    const fs = seededBuiltCatalog();
+    fs.setFile(
+      "/built/codex/.agents/plugins/marketplace.json",
+      JSON.stringify({ name: "aidd-framework", version: "1.0.0", plugins: [] })
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    manifest.addTool("codex", "test", []);
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "aidd-framework",
+        source: { kind: "local", path: "/source/aidd-framework" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const claudeActivator = new FakeNativePluginActivator({ available: true });
+    const codexActivator = new FakeNativePluginActivator({ available: true });
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifest),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([
+        ["claude", claudeActivator],
+        ["codex", codexActivator],
+      ]),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT, toolIds: ["claude"] });
+
+    expect(claudeActivator.addedMarketplaces).toStrictEqual(["/built/claude"]);
+    expect(codexActivator.addedMarketplaces).toStrictEqual([]);
+    expect(result).toStrictEqual({
+      activated: ["claude"],
+      binaryMissing: [],
+      warnings: [],
+      errors: [],
+    });
+  });
+});
+
+describe("what a step that could not complete leaves in warnings and errors", () => {
+  it("names the binary in the warning when the CLI is not on PATH", async () => {
+    const { logger, result } = await sync({ available: false });
+
+    expect(logger.warnMessages).toStrictEqual([
+      "claude CLI not found on PATH — skipping native plugin activation.",
+    ]);
+    expect(result.warnings).toStrictEqual([]);
+  });
+
+  it("names the plugin ref and the CLI's own reason when enabling it fails", async () => {
+    const { result } = await sync({
+      enablesPlugins: true,
+      failOnPlugins: ["aidd-context@aidd-framework"],
+    });
+
+    expect(result.warnings).toStrictEqual([
+      "Native plugin activation — enable plugin 'aidd-context@aidd-framework' skipped: plugin `aidd-context@aidd-framework` was not found in marketplace",
+    ]);
+  });
+
+  it("warns about a refused marketplace upgrade and still enables the plugin", async () => {
+    const activator = new ActivatorFailingAtUpgrade(new NativePluginCliError("registry locked"));
+
+    const { result } = await sync({ activator });
+
+    expect(result.warnings).toStrictEqual([
+      "Native plugin activation — upgrade marketplaces skipped: registry locked",
+    ]);
+    expect(result.errors).toStrictEqual([]);
+    expect(activator.enabledPlugins).toStrictEqual(["aidd-context@aidd-framework"]);
+  });
+
+  it("reports an activator bug during the upgrade as an error, never as a warning", async () => {
+    const activator = new ActivatorFailingAtUpgrade(new Error("activator bug"));
+
+    const { result } = await sync({ activator });
+
+    expect(result.errors).toStrictEqual([{ scope: "claude", message: "activator bug" }]);
+    expect(result.warnings).toStrictEqual([]);
+  });
+});
+
+describe("what gets built, and how", () => {
+  it("asks for a marketplace-mode build of every registered tree even when the CLI is absent", async () => {
+    const requests: { name: string; mode: string }[] = [];
+    const recordingBuild: EnsureBuiltMarketplace = {
+      execute: async (options) => {
+        requests.push({ name: options.marketplace.name, mode: options.mode });
+        return { builtDir: `/built/${options.target}`, version: "test", rebuilt: true };
+      },
+    };
+
+    await sync({
+      marketplaceNames: ["aidd-framework", "unused"],
+      ensureBuilt: recordingBuild,
+      available: false,
+    });
+
+    expect(requests).toStrictEqual([
+      { name: "aidd-framework", mode: "marketplace" },
+      { name: "unused", mode: "marketplace" },
+    ]);
+  });
+});
+
+describe("a marketplace whose source the settings file cannot express", () => {
+  it("writes no enabled-plugins entry for it", async () => {
+    const { written, fs } = await sync({
+      marketplaceSource: (name) => ({ kind: "url", url: `https://example.com/${name}.git` }),
+    });
+
+    expect(written).toBeUndefined();
+    expect(fs.listUnder(resolve(PROJECT_ROOT))).toStrictEqual([]);
+  });
+});
+
+describe("a project whose manifest also lists a tool with no plugin system", () => {
+  it("syncs the other tools and reports only the one whose CLI ran", async () => {
+    const fs = seededBuiltCatalog();
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    manifest.addTool("vscode", "test", []);
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "aidd-framework",
+        source: { kind: "local", path: "/source/aidd-framework" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const activator = new FakeNativePluginActivator({ available: true, enablesPlugins: false });
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      new InMemoryManifestRepository(manifest),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result).toStrictEqual({
+      activated: ["claude"],
+      binaryMissing: [],
+      warnings: [],
+      errors: [],
+    });
   });
 });

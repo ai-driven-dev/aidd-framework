@@ -16,6 +16,7 @@ import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { FakeCurrentVersion } from "../../../../helpers/ports/fake-current-version.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
+import { FakeNativePluginActivator } from "../../../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
@@ -245,5 +246,70 @@ describe("the shared source's own reference, recorded by sync", () => {
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(await registry.list(PROJECT_ROOT)).toEqual([]);
+  });
+
+  it("stays a silent no-op when asked to recreate with nothing wired to do it", async () => {
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter({}, new DeterministicHasher()),
+      await manifestRepoWithClaudeInstalled(),
+      new InMemoryMarketplaceRegistry(),
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map(),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      recreateFrameworkIfMissing: true,
+    });
+
+    expect(result).toStrictEqual({ activated: [], binaryMissing: [], warnings: [], errors: [] });
+  });
+});
+
+class UnloadableManifestRepository extends InMemoryManifestRepository {
+  override async load(): Promise<Manifest | null> {
+    throw new Error("manifest.json is not valid JSON");
+  }
+}
+
+describe("a project with no manifest to sync", () => {
+  it("returns the empty result and drives no tool when there is no manifest", async () => {
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(PROJECT_ROOT, frameworkMarketplace());
+    const activator = new FakeNativePluginActivator({ available: true });
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter({}, new DeterministicHasher()),
+      new InMemoryManifestRepository(),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result).toStrictEqual({ activated: [], binaryMissing: [], warnings: [], errors: [] });
+    expect(activator.addedMarketplaces).toStrictEqual([]);
+  });
+
+  it("returns the empty result when the manifest cannot be loaded", async () => {
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(PROJECT_ROOT, frameworkMarketplace());
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      new InMemoryFileAdapter({}, new DeterministicHasher()),
+      new UnloadableManifestRepository(),
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([["claude", new FakeNativePluginActivator({ available: true })]]),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result).toStrictEqual({ activated: [], binaryMissing: [], warnings: [], errors: [] });
   });
 });

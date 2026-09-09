@@ -142,3 +142,107 @@ describe("MarketplaceCheckUseCase", () => {
     expect(result.skipped[0]?.error).toBeDefined();
   });
 });
+
+function fixtureMarketplace(name: string): Marketplace {
+  return Marketplace.create({
+    name,
+    source: { kind: "local", path: VALID_FIXTURE },
+    scope: "project",
+    addedAt: "2026-04-29T10:00:00.000Z",
+  });
+}
+
+function installedFrom(marketplace: string, name: string): InstalledPlugin {
+  return InstalledPlugin.fromJSON({
+    name,
+    source: { kind: "github", repo: `owner/${name}` },
+    version: "1.0.0",
+    strict: false,
+    files: {},
+    scope: "project",
+    marketplace,
+  });
+}
+
+async function manifestWith(
+  manifestRepo: InMemoryManifestRepository,
+  ...plugins: readonly InstalledPlugin[]
+): Promise<void> {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "1.0.0", []);
+  for (const plugin of plugins) manifest.addPlugin("claude", plugin);
+  await manifestRepo.save(manifest);
+}
+
+describe("the staleness window", () => {
+  it("honours a window narrower than the default", async () => {
+    const { useCase, registry } = await buildUseCase();
+    await registry.save(PROJECT_ROOT, fixtureMarketplace("recent"));
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    await registry.updateLastFetched(PROJECT_ROOT, "recent", "project", threeDaysAgo);
+
+    const narrowed = await useCase.execute({ projectRoot: PROJECT_ROOT, staleMaxDays: 1 });
+    const byDefault = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(narrowed.stale.map((m) => m.name)).toStrictEqual(["recent"]);
+    expect(byDefault.stale).toStrictEqual([]);
+  });
+});
+
+describe("what counts as removed upstream", () => {
+  it("reports nothing for a plugin the catalog still lists", async () => {
+    const { useCase, registry, manifestRepo } = await buildUseCase();
+    await manifestWith(manifestRepo, installedFrom("awesome", "dev"));
+    await registry.save(PROJECT_ROOT, fixtureMarketplace("awesome"));
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.upstreamRemoved).toStrictEqual([]);
+    expect(result.skipped).toStrictEqual([]);
+  });
+
+  it("reports exactly the plugin the catalog dropped", async () => {
+    const { useCase, registry, manifestRepo } = await buildUseCase();
+    await manifestWith(
+      manifestRepo,
+      installedFrom("awesome", "dev"),
+      installedFrom("awesome", "ghost")
+    );
+    await registry.save(PROJECT_ROOT, fixtureMarketplace("awesome"));
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.upstreamRemoved).toStrictEqual([
+      { marketplace: "awesome", plugin: "ghost", toolId: "claude" },
+    ]);
+  });
+
+  it("never diffs a plugin installed from another marketplace against this catalog", async () => {
+    const { useCase, registry, manifestRepo } = await buildUseCase();
+    await manifestWith(manifestRepo, installedFrom("elsewhere", "ghost"));
+    await registry.save(PROJECT_ROOT, fixtureMarketplace("awesome"));
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.upstreamRemoved).toStrictEqual([]);
+  });
+
+  it("reports nothing about installed plugins when the marketplace has no catalog to compare against", async () => {
+    const { useCase, registry, manifestRepo } = await buildUseCase();
+    await manifestWith(manifestRepo, installedFrom("empty", "ghost"));
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "empty",
+        source: { kind: "local", path: "/nonexistent-marketplace-dir" },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.upstreamRemoved).toStrictEqual([]);
+    expect(result.skipped).toStrictEqual([]);
+  });
+});

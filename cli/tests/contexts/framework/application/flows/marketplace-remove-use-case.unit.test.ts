@@ -17,9 +17,54 @@ import { DeterministicHasher } from "../../../../helpers/ports/deterministic-has
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
-import { KeepPrompter } from "../../../../helpers/ports/scripted-prompter.js";
+import { KeepPrompter, ScriptedPrompter } from "../../../../helpers/ports/scripted-prompter.js";
 
 const PROJECT_ROOT = "/test-project";
+
+class ConfirmRecordingPrompter extends ScriptedPrompter {
+  readonly confirmMessages: string[] = [];
+
+  override async confirm(message: string, defaultValue?: boolean): Promise<boolean> {
+    this.confirmMessages.push(message);
+    return super.confirm(message, defaultValue);
+  }
+}
+
+class SaveCountingManifestRepository extends InMemoryManifestRepository {
+  saves = 0;
+
+  override async save(manifest: Manifest): Promise<void> {
+    this.saves += 1;
+    return super.save(manifest);
+  }
+}
+
+function marketplaceNamed(name: string): Marketplace {
+  return Marketplace.create({
+    name,
+    source: { kind: "github", repo: `owner/${name}` },
+    scope: "project",
+    addedAt: "2026-04-29T10:00:00.000Z",
+  });
+}
+
+function pluginFrom(marketplace: string, name: string): InstalledPlugin {
+  return InstalledPlugin.fromMetadata(
+    name,
+    "1.0.0",
+    { kind: "github", repo: `owner/${name}` },
+    false,
+    "project",
+    marketplace
+  );
+}
+
+function manifestWithPlugins(...plugins: readonly InstalledPlugin[]): Manifest {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "1.0.0", []);
+  for (const plugin of plugins) manifest.addPlugin("claude", plugin);
+  return manifest;
+}
 
 /** Records every path `deleteFile` is called with, so a test can prove where a plugin's
  * file actually got deleted from without inspecting private use-case state. */
@@ -224,5 +269,149 @@ describe("MarketplaceRemoveUseCase", () => {
     const list = await registry.list(PROJECT_ROOT);
     expect(list).toHaveLength(1);
     expect(list[0]?.name).toBe(FRAMEWORK_MARKETPLACE_NAME);
+  });
+
+  it("refuses the reserved name with a message naming the command that does remove it", async () => {
+    const { useCase } = buildUseCase();
+
+    await expect(
+      useCase.execute({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        projectRoot: PROJECT_ROOT,
+        autoConfirm: true,
+      })
+    ).rejects.toThrow(
+      new InvalidMarketplaceNameError(
+        '"aidd-framework" is shared by every project on this machine and is not removed with `aidd marketplace remove` — it is removed with the framework itself, by `aidd clean`, once machine scope lands there.'
+      )
+    );
+  });
+});
+
+describe("which marketplace a removal takes out", () => {
+  it("removes the named marketplace, never the first one registered", async () => {
+    const { useCase, registry } = buildUseCase();
+    await registry.save(PROJECT_ROOT, marketplaceNamed("alpha"));
+    const awesome = marketplaceNamed("awesome");
+    await registry.save(PROJECT_ROOT, awesome);
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: true,
+    });
+
+    expect(result).toStrictEqual({ marketplace: awesome, removedPluginCount: 0, orphanCount: 0 });
+    expect((await registry.list(PROJECT_ROOT)).map((m) => m.name)).toStrictEqual(["alpha"]);
+  });
+
+  it("reports zero orphans when the project has no manifest at all", async () => {
+    const { useCase, registry } = buildUseCase();
+    const awesome = marketplaceNamed("awesome");
+    await registry.save(PROJECT_ROOT, awesome);
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: true,
+    });
+
+    expect(result).toStrictEqual({ marketplace: awesome, removedPluginCount: 0, orphanCount: 0 });
+  });
+});
+
+describe("which plugins a removal orphans", () => {
+  it("removes the marketplace's own plugins and leaves another marketplace's in place", async () => {
+    const { useCase, registry, manifestRepo } = buildUseCase();
+    await manifestRepo.save(
+      manifestWithPlugins(pluginFrom("awesome", "sample"), pluginFrom("elsewhere", "other"))
+    );
+    const awesome = marketplaceNamed("awesome");
+    await registry.save(PROJECT_ROOT, awesome);
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: true,
+    });
+
+    expect(result).toStrictEqual({ marketplace: awesome, removedPluginCount: 1, orphanCount: 1 });
+    expect((await manifestRepo.load())?.getPlugins("claude").map((p) => p.name)).toStrictEqual([
+      "other",
+    ]);
+  });
+
+  it("keeps every orphan when the person declines the cleanup, and still drops the marketplace", async () => {
+    const { registry, manifestRepo, fs } = buildUseCase();
+    const prompter = new ConfirmRecordingPrompter([ScriptedPrompter.answer.confirm(false)]);
+    const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, prompter);
+    await manifestRepo.save(manifestWithPlugins(pluginFrom("awesome", "sample")));
+    const awesome = marketplaceNamed("awesome");
+    await registry.save(PROJECT_ROOT, awesome);
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: false,
+    });
+
+    expect(result).toStrictEqual({ marketplace: awesome, removedPluginCount: 0, orphanCount: 1 });
+    expect((await manifestRepo.load())?.getPlugins("claude").map((p) => p.name)).toStrictEqual([
+      "sample",
+    ]);
+    expect(await registry.list(PROJECT_ROOT)).toStrictEqual([]);
+  });
+
+  it("asks once, naming how many plugins the cleanup would remove", async () => {
+    const { registry, manifestRepo, fs } = buildUseCase();
+    const prompter = new ConfirmRecordingPrompter([ScriptedPrompter.answer.confirm(true)]);
+    const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, prompter);
+    await manifestRepo.save(
+      manifestWithPlugins(pluginFrom("awesome", "sample"), pluginFrom("awesome", "second"))
+    );
+    await registry.save(PROJECT_ROOT, marketplaceNamed("awesome"));
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: false,
+    });
+
+    expect(prompter.confirmMessages).toStrictEqual([
+      "Remove 2 plugin(s) installed from this marketplace?",
+    ]);
+    expect(result.removedPluginCount).toBe(2);
+  });
+
+  it("neither asks nor rewrites the manifest when nothing was installed from the marketplace", async () => {
+    const { registry, fs } = buildUseCase();
+    const manifestRepo = new SaveCountingManifestRepository(
+      manifestWithPlugins(pluginFrom("elsewhere", "other"))
+    );
+    const prompter = new ConfirmRecordingPrompter([ScriptedPrompter.answer.confirm(true)]);
+    const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, prompter);
+    await registry.save(PROJECT_ROOT, marketplaceNamed("awesome"));
+
+    await useCase.execute({ name: "awesome", projectRoot: PROJECT_ROOT, autoConfirm: false });
+
+    expect(prompter.confirmMessages).toStrictEqual([]);
+    expect(manifestRepo.saves).toBe(0);
+  });
+
+  it("cleans up without asking when the caller auto-confirms", async () => {
+    const { registry, manifestRepo, fs } = buildUseCase();
+    const prompter = new ConfirmRecordingPrompter([ScriptedPrompter.answer.confirm(false)]);
+    const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, prompter);
+    await manifestRepo.save(manifestWithPlugins(pluginFrom("awesome", "sample")));
+    await registry.save(PROJECT_ROOT, marketplaceNamed("awesome"));
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: true,
+    });
+
+    expect(prompter.confirmMessages).toStrictEqual([]);
+    expect(result.removedPluginCount).toBe(1);
   });
 });
