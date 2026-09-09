@@ -5,9 +5,14 @@ export interface MutationScope {
 
 export interface MutationReport {
   readonly files?: Readonly<
-    Record<string, { readonly mutants: readonly { readonly status: string }[] }>
+    Record<
+      string,
+      { readonly mutants: readonly { readonly status: string; readonly static?: boolean }[] }
+    >
   >;
 }
+
+export function pruneIncremental<T extends MutationReport>(report: T): T;
 
 export function strykerArgs(
   scope: string,

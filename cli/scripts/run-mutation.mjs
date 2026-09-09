@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +48,22 @@ export function scoreOf(report) {
   return total === 0 ? 0 : (100 * detected) / total;
 }
 
+/** Stryker reuses an incremental result unless the mutant's file or a test that covered it
+ * changed, so a test written after the fact never reaches a mutant recorded as survived,
+ * uncovered or static: those rerun every time, and only a kill is carried forward. */
+export function pruneIncremental(report) {
+  const files = {};
+  for (const [name, file] of Object.entries(report.files ?? {})) {
+    files[name] = {
+      ...file,
+      mutants: file.mutants.filter(
+        (mutant) => !mutant.static && (mutant.status === "Killed" || mutant.status === "Timeout")
+      ),
+    };
+  }
+  return { ...report, files };
+}
+
 /** Below the declared floor is a failure the run itself raises; stryker's own `thresholds`
  * would need a config file per scope to say the same thing. */
 export function breakVerdict(score, declared) {
@@ -72,6 +88,13 @@ function main() {
 
   const scopeDir = join(REPORT_ROOT, scope);
   mkdirSync(scopeDir, { recursive: true });
+  const incremental = join(scopeDir, "incremental.json");
+  if (existsSync(incremental)) {
+    writeFileSync(
+      incremental,
+      JSON.stringify(pruneIncremental(JSON.parse(readFileSync(incremental, "utf8"))))
+    );
+  }
 
   const result = spawnSync(
     join(CLI_ROOT, "node_modules", ".bin", "stryker"),

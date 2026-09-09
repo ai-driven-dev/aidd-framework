@@ -7,7 +7,12 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { HARNESS, scopesToRun } from "../../scripts/mutation-scopes-to-run.mjs";
-import { breakVerdict, scoreOf, strykerArgs } from "../../scripts/run-mutation.mjs";
+import {
+  breakVerdict,
+  pruneIncremental,
+  scoreOf,
+  strykerArgs,
+} from "../../scripts/run-mutation.mjs";
 import { matchesGlob, REPO_ROOT, read, sourceFiles } from "./helpers.js";
 
 interface Scope {
@@ -199,6 +204,23 @@ describe("the guard itself", () => {
         `${file} is named in HARNESS but is not there`
       ).toBe(true);
     }
+  });
+
+  it("carries only a kill forward, so a test written later reaches what survived, went uncovered or is static", () => {
+    const pruned = pruneIncremental({
+      files: {
+        "a.ts": {
+          mutants: [
+            { status: "Killed" },
+            { status: "Timeout" },
+            { status: "Killed", static: true },
+            { status: "Survived" },
+            { status: "NoCoverage" },
+          ],
+        },
+      },
+    });
+    expect(pruned.files?.["a.ts"]?.mutants).toEqual([{ status: "Killed" }, { status: "Timeout" }]);
   });
 
   it("fails a score under the floor and passes one on it", () => {
