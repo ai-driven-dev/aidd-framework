@@ -189,7 +189,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {},
               "scope": "project",
               "marketplace": "aidd-framework"
@@ -226,7 +226,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {},
               "scope": "project",
               "marketplace": "aidd-framework"
@@ -267,7 +267,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {},
               "scope": "project",
               "marketplace": "aidd-framework"
@@ -292,7 +292,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {
                 "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
                 "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
@@ -335,7 +335,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {},
               "scope": "project",
               "marketplace": "aidd-framework"
@@ -360,7 +360,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {
                 "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
                 "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
@@ -403,7 +403,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {},
               "scope": "project",
               "marketplace": "aidd-framework"
@@ -428,7 +428,7 @@
                 "path": "<FRAMEWORK_FIXTURE>/plugins/aidd-test"
               },
               "version": "<VERSION>",
-              "strict": false,
+              "strict": true,
               "files": {
                 "aidd-test/.cursor-plugin/plugin.json": "af3965dc3bb38289cd5501b7244926fa",
                 "aidd-test/.mcp.json": "8d5f495dc98074770f3390b2271ddf4a",
