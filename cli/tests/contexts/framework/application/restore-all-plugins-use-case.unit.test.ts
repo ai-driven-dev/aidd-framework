@@ -124,3 +124,60 @@ describe("RestoreAllPluginsUseCase — native-activation tools", () => {
     expect(result.nativeOnlyToolIds).toEqual([]);
   });
 });
+
+function trackedPlugin(name: string): InstalledPlugin {
+  return InstalledPlugin.fromJSON({
+    name,
+    source: { kind: "local", path: "/some/path" },
+    version: "1.0.0",
+    strict: false,
+    files: { "a/one.md": "00000000000000000000000000000000" },
+    scope: "project",
+  });
+}
+
+describe("RestoreAllPluginsUseCase — restricting to one plugin", () => {
+  function claudeWithMixedPlugins(): Manifest {
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "1.0.0", []);
+    manifest.addPlugin("claude", nativePlugin({}));
+    manifest.addPlugin("claude", trackedPlugin("tracked-plugin"));
+    return manifest;
+  }
+
+  function useCase(): RestoreAllPluginsUseCase {
+    return new RestoreAllPluginsUseCase(noopFs, noopHasher, stubFetcher, emptyDistributionReader);
+  }
+
+  it("names the tool when the one plugin asked for tracks zero files, whatever its others track", async () => {
+    const result = await useCase().execute({
+      projectRoot: "/proj",
+      manifest: claudeWithMixedPlugins(),
+      fileFilter: null,
+      pluginName: "aidd-test",
+    });
+
+    expect(result.nativeOnlyToolIds).toStrictEqual(["claude"]);
+  });
+
+  it("does not name the tool when the plugin asked for tracks files", async () => {
+    const result = await useCase().execute({
+      projectRoot: "/proj",
+      manifest: claudeWithMixedPlugins(),
+      fileFilter: null,
+      pluginName: "tracked-plugin",
+    });
+
+    expect(result.nativeOnlyToolIds).toStrictEqual([]);
+  });
+
+  it("does not name the tool when any of its plugins tracks files", async () => {
+    const result = await useCase().execute({
+      projectRoot: "/proj",
+      manifest: claudeWithMixedPlugins(),
+      fileFilter: null,
+    });
+
+    expect(result.nativeOnlyToolIds).toStrictEqual([]);
+  });
+});

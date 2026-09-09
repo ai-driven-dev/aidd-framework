@@ -6,11 +6,15 @@ import { RestoreUseCase } from "../../../../src/contexts/framework/application/r
 import { DetectPluginDriftUseCase } from "../../../../src/contexts/framework/application/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../../src/contexts/framework/application/status-use-case.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+import { NoManifestError } from "../../../../src/kernel/errors.js";
+import type { Prompter } from "../../../../src/kernel/ports/prompter.js";
 import {
   buildUnitDeps,
   initAndInstall,
+  initProject,
   installTool,
 } from "../../../helpers/ports/build-unit-deps.js";
+import { CheckboxRecordingPrompter } from "../../../helpers/ports/checkbox-recording-prompter.js";
 import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { FakePlatform } from "../../../helpers/ports/fake-platform.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../../helpers/ports/scripted-prompter.js";
@@ -385,5 +389,191 @@ describe("RestoreAllUseCase — native-only tools", () => {
     ).execute(PROJECT_ROOT, true, false);
 
     expect(result.nativeOnlyToolIds).toEqual(["claude"]);
+  });
+});
+
+type RestoreOptions = Parameters<RestoreUseCase["execute"]>[0];
+type RestoreOutcome = Awaited<ReturnType<RestoreUseCase["execute"]>>;
+
+const NOTHING_RESTORED: RestoreOutcome = {
+  tools: [],
+  totalRestored: 0,
+  totalKept: 0,
+  totalPluginFilesRestored: 0,
+  restoredPluginNames: [],
+  unrestorable: [],
+  nativeOnlyToolIds: [],
+};
+
+function restoreAllDelegatingTo(
+  deps: Deps,
+  prompter: Prompter,
+  delegate: (options: RestoreOptions) => Promise<RestoreOutcome>
+): RestoreAllUseCase {
+  const statusUseCase = new StatusUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    deps.hasher,
+    new DetectPluginDriftUseCase(deps.fs)
+  );
+  const restoreUseCase = new RestoreUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    deps.hasher,
+    deps.logger,
+    new FakePlatform("linux"),
+    prompter
+  );
+  restoreUseCase.execute = delegate;
+  return new RestoreAllUseCase(deps.manifestRepo, prompter, statusUseCase, restoreUseCase);
+}
+
+function recordingDelegate(): {
+  asked: RestoreOptions[];
+  delegate: (o: RestoreOptions) => Promise<RestoreOutcome>;
+} {
+  const asked: RestoreOptions[] = [];
+  return {
+    asked,
+    delegate: async (options) => {
+      asked.push(options);
+      return NOTHING_RESTORED;
+    },
+  };
+}
+
+describe("RestoreAllUseCase — before delegating", () => {
+  it("refuses a project that has no manifest", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    const useCase = restoreAllDelegatingTo(
+      deps,
+      new OverwritePrompter(),
+      recordingDelegate().delegate
+    );
+
+    await expect(useCase.execute(PROJECT_ROOT, false, false)).rejects.toThrow(NoManifestError);
+  });
+
+  it("hands the restore the version of the first installed tool", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const { asked, delegate } = recordingDelegate();
+
+    await restoreAllDelegatingTo(deps, new OverwritePrompter(), delegate).execute(
+      PROJECT_ROOT,
+      false,
+      false
+    );
+
+    expect(asked.map((o) => o.version)).toStrictEqual(["test"]);
+  });
+
+  it("hands the restore an unknown version when no tool is installed", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    const { asked, delegate } = recordingDelegate();
+
+    await restoreAllDelegatingTo(deps, new OverwritePrompter(), delegate).execute(
+      PROJECT_ROOT,
+      false,
+      false
+    );
+
+    expect(asked.map((o) => o.version)).toStrictEqual(["unknown"]);
+  });
+
+  it("reports a failing restore as a config-restore error with nothing restored", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const useCase = restoreAllDelegatingTo(deps, new OverwritePrompter(), async () => {
+      throw new Error("disk on fire");
+    });
+
+    const result = await useCase.execute(PROJECT_ROOT, false, false);
+
+    expect(result).toStrictEqual({
+      totalRestored: 0,
+      totalKept: 0,
+      pluginNamesRestored: [],
+      errors: [{ scope: "config-restore", message: "disk on fire" }],
+      unrestorable: [],
+      nativeOnlyToolIds: [],
+    });
+  });
+});
+
+describe("RestoreAllUseCase — the interactive file picker", () => {
+  const KEYBINDINGS = ".vscode/keybindings.json";
+  const SETTINGS = ".vscode/settings.json";
+
+  async function vscodeProject(): Promise<Deps> {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "vscode");
+    return deps;
+  }
+
+  it("offers the modified and deleted tracked entries, never a file the user added", async () => {
+    const deps = await vscodeProject();
+    await deps.fs.writeFile(join(PROJECT_ROOT, KEYBINDINGS), "[]");
+    await deps.fs.deleteFile(join(PROJECT_ROOT, ".vscode/extensions.json"));
+    await deps.fs.writeFile(join(PROJECT_ROOT, ".vscode/user-added.json"), "{}");
+    const prompter = new CheckboxRecordingPrompter();
+
+    await restoreAllDelegatingTo(deps, prompter, recordingDelegate().delegate).execute(
+      PROJECT_ROOT,
+      false,
+      true
+    );
+
+    expect(prompter.asks).toStrictEqual([
+      {
+        message: "Select files to restore:",
+        offered: [
+          KEYBINDINGS,
+          ".vscode/extensions.json > recommendations",
+          ".vscode/extensions.json > unwantedRecommendations",
+        ],
+      },
+    ]);
+  });
+
+  it("forwards exactly the entries the user ticked", async () => {
+    const deps = await vscodeProject();
+    await deps.fs.writeFile(join(PROJECT_ROOT, KEYBINDINGS), "[]");
+    await deps.fs.deleteFile(join(PROJECT_ROOT, SETTINGS));
+    const { asked, delegate } = recordingDelegate();
+
+    await restoreAllDelegatingTo(
+      deps,
+      new CheckboxRecordingPrompter([KEYBINDINGS]),
+      delegate
+    ).execute(PROJECT_ROOT, false, true);
+
+    expect(asked.map((o) => o.files)).toStrictEqual([[KEYBINDINGS]]);
+  });
+
+  it("forwards an empty selection as no file at all", async () => {
+    const deps = await vscodeProject();
+    await deps.fs.writeFile(join(PROJECT_ROOT, KEYBINDINGS), "[]");
+    const { asked, delegate } = recordingDelegate();
+
+    await restoreAllDelegatingTo(deps, new CheckboxRecordingPrompter([]), delegate).execute(
+      PROJECT_ROOT,
+      false,
+      true
+    );
+
+    expect(asked.map((o) => o.files)).toStrictEqual([[]]);
+  });
+
+  it("asks nothing and selects nothing when no tracked entry drifted", async () => {
+    const deps = await vscodeProject();
+    const prompter = new CheckboxRecordingPrompter([KEYBINDINGS]);
+    const { asked, delegate } = recordingDelegate();
+
+    await restoreAllDelegatingTo(deps, prompter, delegate).execute(PROJECT_ROOT, false, true);
+
+    expect(prompter.asks).toStrictEqual([]);
+    expect(asked.map((o) => o.files)).toStrictEqual([[]]);
   });
 });

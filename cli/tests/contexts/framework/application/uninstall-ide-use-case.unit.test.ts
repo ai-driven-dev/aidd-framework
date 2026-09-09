@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { UninstallIdeUseCase } from "../../../../src/contexts/framework/application/uninstall/uninstall-ide-use-case.js";
 import { UninstallToolsUseCase } from "../../../../src/contexts/framework/application/uninstall/uninstall-tools-use-case.js";
+import { NoManifestError, ToolNotInstalledError } from "../../../../src/kernel/errors.js";
 import { buildUnitDeps, initProject, installTool } from "../../../helpers/ports/build-unit-deps.js";
 
 const PROJECT_ROOT = "/test-project";
@@ -76,5 +77,42 @@ describe("UninstallIdeUseCase — merge-file entries", () => {
 
     const manifest = await deps.manifestRepo.load();
     expect(manifest?.hasTool("vscode")).toBe(false);
+  });
+});
+
+describe("UninstallIdeUseCase — refusals and report", () => {
+  it("refuses a project that has no manifest", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+
+    await expect(
+      makeUseCase(deps).execute({ toolId: "vscode", projectRoot: PROJECT_ROOT })
+    ).rejects.toThrow(NoManifestError);
+  });
+
+  it("refuses a tool that is not installed", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+
+    await expect(
+      makeUseCase(deps).execute({ toolId: "vscode", projectRoot: PROJECT_ROOT })
+    ).rejects.toThrow(ToolNotInstalledError);
+  });
+
+  it("reports every file it removed", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await installTool(deps, PROJECT_ROOT, "vscode");
+
+    const result = await makeUseCase(deps).execute({ toolId: "vscode", projectRoot: PROJECT_ROOT });
+
+    expect(result).toStrictEqual({
+      toolId: "vscode",
+      fileCount: 3,
+      deletedFiles: [
+        ".vscode/keybindings.json",
+        ".vscode/extensions.json",
+        ".vscode/settings.json",
+      ],
+    });
   });
 });
