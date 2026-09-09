@@ -1,3 +1,4 @@
+import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { describe, expect, it } from "vitest";
 import {
   hostMarketplaceSourceConflict,
@@ -5,6 +6,10 @@ import {
 } from "../../../../../src/contexts/framework/application/shared/host-marketplace-source-conflict.js";
 import { userBuiltMarketplaceDir } from "../../../../../src/kernel/paths.js";
 import { FakeHostMarketplaceRegistryReader } from "../../../../helpers/ports/fake-host-marketplace-registry-reader.js";
+import {
+  errnoError,
+  FaultingFileAdapter,
+} from "../../../../helpers/ports/faulting-file-adapter.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 
 const NAME = "aidd-framework";
@@ -52,5 +57,69 @@ describe("hostMarketplaceSourceConflict — resolving every path through the sam
       registeredVersion: "2.0.0",
       requestedVersion: "1.0.0",
     });
+  });
+
+  it("still decides the drift when the registered source no longer resolves on disk", async () => {
+    const userCacheRoot = "/home/.config/aidd";
+    const requestedSource = userBuiltMarketplaceDir(userCacheRoot, "1.0.0", NAME, "claude");
+    const registeredSource = userBuiltMarketplaceDir(userCacheRoot, "2.0.0", NAME, "claude");
+    const fs = new FaultingFileAdapter();
+    fs.failOn("realpath", registeredSource, errnoError("ENOENT"));
+    const reader = new FakeHostMarketplaceRegistryReader({
+      location: LOCATION,
+      entries: new Map([[NAME, registeredSource]]),
+    });
+
+    const check = await hostMarketplaceSourceConflict(
+      fs,
+      "claude",
+      reader,
+      requestedSource,
+      { name: NAME, pluginNames: [] },
+      { userCacheRoot, projectRoot: "/project", marketplaceName: NAME, target: "claude" }
+    );
+
+    expect(check).toStrictEqual({
+      name: NAME,
+      registeredSource,
+      requestedSource,
+      location: LOCATION,
+      drift: { kind: "version-behind", registeredVersion: "2.0.0", requestedVersion: "1.0.0" },
+    });
+  });
+});
+
+describe("hostMarketplaceSourceConflict — without a drift context", () => {
+  it("reports the different catalog the host's registry points at", async () => {
+    const fs = new InMemoryFileAdapter({
+      "/registered/.claude-plugin/marketplace.json": JSON.stringify({
+        name: NAME,
+        plugins: [{ name: "aidd-dev" }],
+      }),
+    });
+    const reader = new FakeHostMarketplaceRegistryReader({
+      location: LOCATION,
+      entries: new Map([[NAME, "/registered"]]),
+    });
+
+    const check = await hostMarketplaceSourceConflict(fs, "claude", reader, "/requested", {
+      name: NAME,
+      pluginNames: ["aidd-dev", "aidd-vcs"],
+    });
+
+    expect(check).toStrictEqual({
+      name: NAME,
+      registeredSource: "/registered",
+      requestedSource: "/requested",
+      registeredIdentity: { name: NAME, pluginNames: ["aidd-dev"] },
+      requestedIdentity: { name: NAME, pluginNames: ["aidd-dev", "aidd-vcs"] },
+      location: LOCATION,
+    });
+  });
+});
+
+describe("isDriftFound", () => {
+  it("is false for no check at all", () => {
+    expect(isDriftFound(undefined)).toBe(false);
   });
 });

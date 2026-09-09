@@ -49,6 +49,23 @@ describe("ModeAMarketplaceTranslator", () => {
       expect(installed?.files.size).toBe(0);
       expect(installed?.marketplace).toBe("aidd-framework");
     });
+
+    it("reports nothing skipped, since nothing was translated", async () => {
+      const { adapter } = buildAdapter();
+      const manifest = Manifest.create();
+      manifest.addTool("claude", "test", []);
+
+      const result = await adapter.addPlugin(
+        buildDist("aidd-context"),
+        "claude",
+        { kind: "local", path: "/plugin-source" },
+        "/project",
+        manifest,
+        "aidd-framework"
+      );
+
+      expect(result).toStrictEqual({ skipped: [] });
+    });
   });
 
   describe("when adding a plugin without marketplace", () => {

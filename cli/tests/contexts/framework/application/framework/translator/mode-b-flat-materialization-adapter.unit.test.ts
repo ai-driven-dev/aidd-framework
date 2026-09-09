@@ -7,6 +7,10 @@ import { Manifest } from "../../../../../../src/contexts/framework/domain/manife
 import { PluginDistribution } from "../../../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../../../src/kernel/errors.js";
 import { DeterministicHasher } from "../../../../../helpers/ports/deterministic-hasher.js";
+import {
+  errnoError,
+  FaultingFileAdapter,
+} from "../../../../../helpers/ports/faulting-file-adapter.js";
 import { InMemoryFileAdapter } from "../../../../../helpers/ports/in-memory-file-adapter.js";
 
 const PROJECT_ROOT = "/test-project";
@@ -157,6 +161,68 @@ describe("ModeBFlatMaterializationTranslator", () => {
       expect(fs.listAll().length).toBe(0);
       const plugins = manifest.getPlugins("opencode");
       expect(plugins.find((p) => p.name === "mcp-plugin")).toBeUndefined();
+    });
+  });
+
+  describe("when the tool's MCP config merges the plugin's servers", () => {
+    function mcpDist(mcpServers: Record<string, unknown>): PluginDistribution {
+      const content = JSON.stringify({ mcpServers });
+      return new PluginDistribution({
+        manifest: { name: "mcp-plugin", version: "1.0.0" },
+        format: "claude",
+        files: [{ relativePath: ".mcp.json", content }],
+        components: {
+          commands: [],
+          agents: [],
+          rules: [],
+          skills: [],
+          hooks: [],
+          mcp: [{ relativePath: ".mcp.json", content }],
+        },
+      });
+    }
+
+    it("drops the servers a previous version contributed even when the new version contributes none", async () => {
+      const { adapter, fs } = buildAdapter();
+      const configPath = join(PROJECT_ROOT, "opencode.json");
+      fs.setFile(configPath, JSON.stringify({ mcp: { "old-tool": { type: "local" } } }));
+      const manifest = Manifest.create();
+      manifest.addTool("opencode", "test", []);
+
+      await adapter.addPlugin(
+        mcpDist({}),
+        "opencode",
+        { kind: "local", path: "/plugin-source" },
+        PROJECT_ROOT,
+        manifest,
+        undefined,
+        new Map([["old-tool", "digest-of-old-tool"]])
+      );
+
+      expect(JSON.parse(fs.getFile(configPath) ?? "null")).toStrictEqual({ mcp: {} });
+    });
+
+    it("propagates a failure to read the MCP config other than the file being absent", async () => {
+      const fs = new FaultingFileAdapter();
+      fs.failOn("readFile", join(PROJECT_ROOT, "opencode.json"), errnoError("EACCES"));
+      const adapter = new ModeBFlatMaterializationTranslator(
+        fs,
+        new DeterministicHasher(),
+        () => "/stub-home"
+      );
+      const manifest = Manifest.create();
+      manifest.addTool("opencode", "test", []);
+
+      await expect(
+        adapter.addPlugin(
+          mcpDist({ "local-tool": { command: "node", args: ["./server.js"] } }),
+          "opencode",
+          { kind: "local", path: "/plugin-source" },
+          PROJECT_ROOT,
+          manifest,
+          undefined
+        )
+      ).rejects.toThrow("EACCES: planted by the test");
     });
   });
 });
