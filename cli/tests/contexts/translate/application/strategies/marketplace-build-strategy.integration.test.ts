@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type {
   ArtifactContract,
@@ -16,8 +16,8 @@ import type { AssetProvider } from "../../../../../src/kernel/ports/asset-provid
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 
 const PLUGIN = "aidd-test";
-// resolve(), not the bare literal: on Windows a leading "/" is drive-relative.
-const OUT_DIR = resolve("/tmp/aidd-marketplace-stub-out");
+// resolve(): on Windows a leading "/" is drive-relative. Posix after: the adapter keys writes so.
+const OUT_DIR = resolve("/tmp/aidd-marketplace-stub-out").replaceAll("\\", "/");
 const PLUGIN_SRC = "/src/plugins/aidd-test";
 const PLUGIN_OUT = `${OUT_DIR}/plugins/${PLUGIN}`;
 // Avoid biome noTemplateCurlyInString: split literal for the placeholder.
@@ -373,7 +373,11 @@ describe("the catalog a marketplace layout writes once every plugin is built", (
       )
     ).toBe(1);
     expect(seen).toEqual([
-      { name: PLUGIN, pluginSrc: PLUGIN_OUT, srcEntry: { name: PLUGIN, version: "9.9.9" } },
+      {
+        name: PLUGIN,
+        pluginSrc: join(OUT_DIR, "plugins", PLUGIN),
+        srcEntry: { name: PLUGIN, version: "9.9.9" },
+      },
     ]);
     expect(writtenUnder(fs, OUT_DIR)).toEqual({
       [`${OUT_DIR}/.stub-plugin/marketplace.json`]:
@@ -391,7 +395,11 @@ describe("the catalog a marketplace layout writes once every plugin is built", (
       OUT_DIR
     );
     expect(seen).toEqual([
-      { name: "other-plugin", pluginSrc: `${OUT_DIR}/plugins/other-plugin`, srcEntry: undefined },
+      {
+        name: "other-plugin",
+        pluginSrc: join(OUT_DIR, "plugins", "other-plugin"),
+        srcEntry: undefined,
+      },
     ]);
   });
 

@@ -22,8 +22,7 @@ import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-ad
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
-// resolve(), not the bare literal: on Windows path.resolve prepends the current drive to a
-// leading "/", so production's own resolve(outDir) would key writes under a different name.
+// resolve(): on Windows a leading "/" gets the current drive, as production's resolve(outDir) does.
 const ABS_OUT = resolve("/tmp/aidd-flat-test");
 // FlatBuildStrategy embeds this into written JSON content ("/"-joined, forward-slash - see
 // resolveClaudeRootAbsolute), never ABS_OUT's own native separators.
@@ -405,7 +404,8 @@ describe("FlatOutputStrategy integration", () => {
 
 /** A layout stated in the test itself: the shipped contracts cover no artifact that declares
  * no transform, no extension and no merge, and those are the branches a flat build turns on. */
-const STUB_OUT = resolve("/tmp/aidd-flat-stub-test");
+// Posix on every platform: the adapter keys writes that way and expectations concatenate on it.
+const STUB_OUT = resolve("/tmp/aidd-flat-stub-test").replaceAll("\\", "/");
 const STUB_PLUGIN_SRC = "/src/plugins/aidd-test";
 
 function supportedArtifact(
