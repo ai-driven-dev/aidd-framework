@@ -176,4 +176,103 @@ describe("plugin remove guards a ref another project on this machine still needs
     expect(activator.uninstalledPlugins).toContain(REF);
     expect(logger.warnMessages).toEqual([]);
   });
+
+  describe("a ref outside the shared source", () => {
+    it("uninstalls a ref from a marketplace that is not the shared source, whatever other projects reference", async () => {
+      const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+      seedReferences(fs, [OTHER_PROJECT]);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const logger = new CapturingLogger();
+      const registry = seedSharedMarketplaceRegistry();
+      await registry.save(
+        PROJECT_ROOT,
+        Marketplace.create({
+          name: "other-mkt",
+          source: { kind: "local", path: "/other/built/path" },
+          scope: "user",
+          addedAt: "2026-01-01T00:00:00.000Z",
+        })
+      );
+      const { removeUseCase } = buildUseCase(
+        fs,
+        activator,
+        logger,
+        seedManifest("other-mkt"),
+        registry
+      );
+
+      await removeUseCase.execute({
+        pluginName: PLUGIN_NAME,
+        toolIds: ["codex"],
+        projectRoot: PROJECT_ROOT,
+      });
+
+      expect(activator.uninstalledPlugins).toStrictEqual([`${PLUGIN_NAME}@other-mkt`]);
+      expect(logger.warnMessages).toStrictEqual([]);
+    });
+
+    it("uninstalls a ref whose marketplace this project's registry no longer lists", async () => {
+      const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+      seedReferences(fs, [OTHER_PROJECT]);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const logger = new CapturingLogger();
+      const { removeUseCase } = buildUseCase(fs, activator, logger, seedManifest("gone-mkt"));
+
+      await removeUseCase.execute({
+        pluginName: PLUGIN_NAME,
+        toolIds: ["codex"],
+        projectRoot: PROJECT_ROOT,
+      });
+
+      expect(activator.uninstalledPlugins).toStrictEqual([`${PLUGIN_NAME}@gone-mkt`]);
+      expect(logger.warnMessages).toStrictEqual([]);
+    });
+  });
+
+  describe("without one of the guard's two registries", () => {
+    it("skips the guard when no references registry is wired, even for the shared source", async () => {
+      const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+      seedReferences(fs, [OTHER_PROJECT]);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const removeUseCase = new PluginRemoveUseCase(
+        fs,
+        new InMemoryManifestRepository(seedManifest(), PROJECT_ROOT),
+        new CapturingLogger(),
+        new Map([["codex", activator]]),
+        new Map(),
+        undefined,
+        seedSharedMarketplaceRegistry()
+      );
+
+      await removeUseCase.execute({
+        pluginName: PLUGIN_NAME,
+        toolIds: ["codex"],
+        projectRoot: PROJECT_ROOT,
+      });
+
+      expect(activator.uninstalledPlugins).toStrictEqual([REF]);
+    });
+
+    it("skips the guard when no marketplace registry is wired", async () => {
+      const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+      seedReferences(fs, [OTHER_PROJECT]);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const removeUseCase = new PluginRemoveUseCase(
+        fs,
+        new InMemoryManifestRepository(seedManifest(), PROJECT_ROOT),
+        new CapturingLogger(),
+        new Map([["codex", activator]]),
+        new Map(),
+        new UserSourceReferencesAdapter(fs, () => USER_CONFIG_DIR)
+      );
+
+      await removeUseCase.execute({
+        pluginName: PLUGIN_NAME,
+        toolIds: ["codex"],
+        projectRoot: PROJECT_ROOT,
+      });
+
+      expect(activator.uninstalledPlugins).toStrictEqual([REF]);
+    });
+  });
 });

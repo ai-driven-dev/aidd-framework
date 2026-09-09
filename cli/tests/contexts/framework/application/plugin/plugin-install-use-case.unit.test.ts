@@ -6,6 +6,7 @@ import type { MarketplaceTrustStore } from "../../../../../src/contexts/distribu
 import type { PluginAdd } from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
 import type { PluginInstallFromMarketplace } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-use-case.js";
+import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import {
   InteractiveOnlyError,
   InvalidPluginScopeError,
@@ -18,6 +19,21 @@ import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-
 
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
 const PROJECT_ROOT = "/test-project";
+
+class RecordingEnvironment extends InMemoryEnvironment {
+  readonly sets: Array<[string, string]> = [];
+
+  override set(name: string, value: string): void {
+    this.sets.push([name, value]);
+    super.set(name, value);
+  }
+}
+
+function manifestWith(toolId: "claude" | "cursor"): InMemoryManifestRepository {
+  const manifest = Manifest.create();
+  manifest.addTool(toolId, "1.0.0", []);
+  return new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+}
 
 function makeAlwaysTrustStore(): MarketplaceTrustStore {
   return {
@@ -44,6 +60,7 @@ function makeUseCases(overrides?: {
   trustStore?: MarketplaceTrustStore;
   prompter?: Prompter;
   environment?: InMemoryEnvironment;
+  manifestRepo?: InMemoryManifestRepository;
 }) {
   const pickExecute = overrides?.pickExecute ?? vi.fn();
   const addExecute = overrides?.addExecute ?? vi.fn();
@@ -53,7 +70,7 @@ function makeUseCases(overrides?: {
   const pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace = {
     execute: marketplaceExecute,
   };
-  const manifestRepo = new InMemoryManifestRepository();
+  const manifestRepo = overrides?.manifestRepo ?? new InMemoryManifestRepository();
   const trustStore = overrides?.trustStore ?? makeAlwaysTrustStore();
   const prompter = overrides?.prompter ?? makeSilentPrompter();
   const environment = overrides?.environment ?? new InMemoryEnvironment();
@@ -313,6 +330,243 @@ describe("PluginInstallUseCase", () => {
       });
 
       expect(environment.get("AIDD_TOKEN")).toBeUndefined();
+    });
+
+    it("leaves the environment untouched when no token is passed", async () => {
+      const environment = new RecordingEnvironment();
+      const marketplaceExecute = vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
+
+      await makeUseCase({ marketplaceExecute, environment }).execute({
+        pluginArg: "my-plugin",
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+      });
+
+      expect(environment.sets).toStrictEqual([]);
+    });
+  });
+
+  describe("scope validation against every targeted tool", () => {
+    const marketplaceExecute = () => vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
+
+    it("checks every AI tool when no manifest exists", async () => {
+      await expect(
+        makeUseCase({ marketplaceExecute: marketplaceExecute() }).execute({
+          pluginArg: "my-plugin",
+          toolIds: "all",
+          projectRoot: PROJECT_ROOT,
+          interactive: false,
+          scope: "project",
+        })
+      ).rejects.toBeInstanceOf(InvalidPluginScopeError);
+    });
+
+    it("checks only the installed tools when a manifest exists", async () => {
+      const result = await makeUseCase({
+        marketplaceExecute: marketplaceExecute(),
+        manifestRepo: manifestWith("claude"),
+      }).execute({
+        pluginArg: "my-plugin",
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        scope: "project",
+      });
+
+      expect(result.kind).toBe("marketplace");
+    });
+
+    it("rejects a scope an installed tool refuses", async () => {
+      await expect(
+        makeUseCase({
+          marketplaceExecute: marketplaceExecute(),
+          manifestRepo: manifestWith("claude"),
+        }).execute({
+          pluginArg: "my-plugin",
+          toolIds: "all",
+          projectRoot: PROJECT_ROOT,
+          interactive: false,
+          scope: "user",
+        })
+      ).rejects.toBeInstanceOf(InvalidPluginScopeError);
+    });
+  });
+
+  describe("source argument shapes", () => {
+    it("routes a URL argument to the local-source add", async () => {
+      const addExecute = vi.fn().mockResolvedValue(undefined);
+
+      const result = await makeUseCase({ addExecute }).execute({
+        pluginArg: "https://github.com/x/y.git",
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+      });
+
+      expect(result).toStrictEqual({ kind: "local", installed: [] });
+    });
+
+    it("routes a relative ./ path to the local-source add", async () => {
+      const addExecute = vi.fn().mockResolvedValue(undefined);
+
+      const result = await makeUseCase({ addExecute }).execute({
+        pluginArg: "./plugins/mine",
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+      });
+
+      expect(result).toStrictEqual({ kind: "local", installed: [] });
+    });
+  });
+
+  describe("what each delegate receives", () => {
+    it("names the action when refusing a non-interactive pick", async () => {
+      await expect(
+        makeUseCase().execute({
+          pluginArg: undefined,
+          toolIds: "all",
+          projectRoot: PROJECT_ROOT,
+          interactive: false,
+        })
+      ).rejects.toThrow("'plugin install' requires an interactive terminal.");
+    });
+
+    it("hands the pick its tools, project and an interactive flag", async () => {
+      const pickExecute = vi.fn().mockResolvedValue({ installed: [] });
+
+      await makeUseCase({ pickExecute }).execute({
+        pluginArg: undefined,
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: true,
+      });
+
+      expect(pickExecute).toHaveBeenCalledWith({
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: true,
+      });
+    });
+
+    it("hands the add the parsed source and the caller's options", async () => {
+      const addExecute = vi.fn().mockResolvedValue(undefined);
+
+      const result = await makeUseCase({ addExecute }).execute({
+        pluginArg: PLUGIN_FIXTURE,
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+      });
+
+      expect(addExecute).toHaveBeenCalledWith({
+        source: { kind: "local", path: PLUGIN_FIXTURE },
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+      });
+      expect(result).toStrictEqual({ kind: "local", installed: [] });
+    });
+
+    it("hands the marketplace install the parsed name, version and options", async () => {
+      const marketplaceExecute = vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
+
+      await makeUseCase({ marketplaceExecute }).execute({
+        pluginArg: "my-plugin@1.2.3",
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        fromMarketplace: "mkt",
+        yes: true,
+      });
+
+      expect(marketplaceExecute).toHaveBeenCalledWith({
+        pluginName: "my-plugin",
+        version: "1.2.3",
+        fromMarketplace: "mkt",
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        autoSelect: true,
+      });
+    });
+
+    it("defaults autoSelect to false when --yes is absent", async () => {
+      const marketplaceExecute = vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
+
+      await makeUseCase({ marketplaceExecute }).execute({
+        pluginArg: "my-plugin",
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+      });
+
+      expect(marketplaceExecute).toHaveBeenCalledWith({
+        pluginName: "my-plugin",
+        version: undefined,
+        fromMarketplace: undefined,
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        autoSelect: false,
+      });
+    });
+  });
+
+  describe("trusting a direct source", () => {
+    function untrustedStore(): MarketplaceTrustStore {
+      return {
+        isTrusted: vi.fn().mockResolvedValue(false),
+        trust: vi.fn().mockResolvedValue(undefined),
+      };
+    }
+
+    it("neither prompts nor records trust for a source already trusted", async () => {
+      const trustStore = makeAlwaysTrustStore();
+      const prompter = makeSilentPrompter();
+
+      await makeUseCase({ addExecute: vi.fn(), trustStore, prompter }).execute({
+        pluginArg: PLUGIN_FIXTURE,
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: true,
+      });
+
+      expect(prompter.confirm).not.toHaveBeenCalled();
+      expect(trustStore.trust).not.toHaveBeenCalled();
+    });
+
+    it("records trust without prompting when --yes is passed", async () => {
+      const trustStore = untrustedStore();
+      const prompter = makeSilentPrompter();
+
+      await makeUseCase({ addExecute: vi.fn(), trustStore, prompter }).execute({
+        pluginArg: PLUGIN_FIXTURE,
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        yes: true,
+      });
+
+      expect(prompter.confirm).not.toHaveBeenCalled();
+      expect(trustStore.trust).toHaveBeenCalledWith(PROJECT_ROOT, {
+        kind: "local",
+        path: PLUGIN_FIXTURE,
+      });
+    });
+
+    it("asks to trust the source by its description", async () => {
+      const prompter = makeSilentPrompter();
+
+      await makeUseCase({ addExecute: vi.fn(), trustStore: untrustedStore(), prompter }).execute({
+        pluginArg: PLUGIN_FIXTURE,
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: true,
+      });
+
+      expect(prompter.confirm).toHaveBeenCalledWith(`Trust plugin source '${PLUGIN_FIXTURE}'?`);
     });
   });
 });

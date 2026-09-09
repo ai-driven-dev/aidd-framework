@@ -145,6 +145,80 @@ describe("PluginSearchUseCase", () => {
     expect(result.hits[0]?.marketplace.name).toBe("mkt2");
   });
 
+  describe("what a query matches", () => {
+    async function registryWith(entry: Record<string, unknown>): Promise<{
+      fs: InMemoryFileAdapter;
+      registry: InMemoryMarketplaceRegistry;
+    }> {
+      const fs = new InMemoryFileAdapter();
+      seedMarketplace(fs, MKT1_PATH, [entry]);
+      const registry = new InMemoryMarketplaceRegistry();
+      await registry.save(
+        PROJECT_ROOT,
+        Marketplace.create({
+          name: "mkt1",
+          source: { kind: "local", path: MKT1_PATH },
+          scope: "project",
+          addedAt: "2026-04-29T10:00:00.000Z",
+        })
+      );
+      return { fs, registry };
+    }
+
+    it("matches nothing when neither name nor description contains the query", async () => {
+      const { fs, registry } = await registryWith({
+        name: "sample-plugin",
+        source: { kind: "github", repo: "x/y" },
+        description: "Hello world",
+      });
+
+      const result = await buildUseCase(fs, registry).execute({
+        query: "zzz",
+        recommendedOnly: false,
+        projectRoot: PROJECT_ROOT,
+      });
+
+      expect(result.hits).toStrictEqual([]);
+    });
+
+    it("does not match a description an entry lacks", async () => {
+      const { fs, registry } = await registryWith({
+        name: "sample-plugin",
+        source: { kind: "github", repo: "x/y" },
+      });
+
+      const result = await buildUseCase(fs, registry).execute({
+        query: "was here",
+        recommendedOnly: false,
+        projectRoot: PROJECT_ROOT,
+      });
+
+      expect(result.hits).toStrictEqual([]);
+    });
+  });
+
+  it("yields no hit for a marketplace without a catalog", async () => {
+    const fs = new InMemoryFileAdapter();
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "no-catalog",
+        source: { kind: "local", path: "/no-catalog" },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    const result = await buildUseCase(fs, registry).execute({
+      query: "",
+      recommendedOnly: false,
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(result.hits).toStrictEqual([]);
+  });
+
   it("returns empty when no marketplaces are registered", async () => {
     const fs = new InMemoryFileAdapter();
     const registry = new InMemoryMarketplaceRegistry();
