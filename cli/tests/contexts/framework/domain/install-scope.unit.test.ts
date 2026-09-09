@@ -3,14 +3,18 @@ import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
-import { describe, expect, it } from "vitest";
+import "../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   assertToolSupportsScope,
   getToolSupportedScope,
   isInstallScope,
   parseInstallScope,
 } from "../../../../src/contexts/framework/domain/install-scope.js";
+import { getToolConfig, registerTool } from "../../../../src/contexts/tools/domain/registry.js";
 import { InvalidPluginScopeError } from "../../../../src/kernel/errors.js";
+import type { AiToolId } from "../../../../src/kernel/tool.js";
+import { stubAiTool } from "../../../helpers/ports/stub-ai-tool.js";
 
 describe("install-scope value object", () => {
   describe("isInstallScope", () => {
@@ -51,6 +55,30 @@ describe("install-scope value object", () => {
       expect(getToolSupportedScope("codex")).toBe("project");
       expect(getToolSupportedScope("copilot")).toBe("project");
       expect(getToolSupportedScope("opencode")).toBe("project");
+    });
+
+    it("answers project for a tool that is not an AI tool", () => {
+      expect(getToolSupportedScope("vscode" as AiToolId)).toBe("project");
+    });
+
+    describe("an AI tool declaring no plugins capability", () => {
+      const original = getToolConfig("opencode");
+
+      afterEach(() => {
+        registerTool(original);
+      });
+
+      it("answers project", () => {
+        registerTool(stubAiTool("opencode", {}));
+
+        expect(getToolSupportedScope("opencode")).toBe("project");
+      });
+
+      it("answers project when the capability names no install scope", () => {
+        registerTool(stubAiTool("opencode", { plugins: {} }));
+
+        expect(getToolSupportedScope("opencode")).toBe("project");
+      });
     });
   });
 

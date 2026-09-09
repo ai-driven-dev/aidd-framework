@@ -96,6 +96,34 @@ describe("marketplaceSourceDrift — deciding purely from the path's own segment
     ).toBeUndefined();
   });
 
+  it("is undefined when the requested path names another marketplace than this run's", () => {
+    const requested = userBuiltMarketplaceDir(
+      DRIFT_CONTEXT.userCacheRoot,
+      "1.0.0",
+      "other-mkt",
+      "claude"
+    );
+
+    expect(marketplaceSourceDrift(sharedPath("2.0.0"), requested, DRIFT_CONTEXT)).toBeUndefined();
+  });
+
+  it("is undefined when the requested path names another tool than this run's", () => {
+    const requested = userBuiltMarketplaceDir(
+      DRIFT_CONTEXT.userCacheRoot,
+      "1.0.0",
+      "aidd-framework",
+      "codex"
+    );
+
+    expect(marketplaceSourceDrift(sharedPath("2.0.0"), requested, DRIFT_CONTEXT)).toBeUndefined();
+  });
+
+  it("is undefined when the requested version segment is not semver", () => {
+    expect(
+      marketplaceSourceDrift(sharedPath("2.0.0"), sharedPath("not-a-version"), DRIFT_CONTEXT)
+    ).toBeUndefined();
+  });
+
   it("is undefined when the registered path names a different marketplace or tool under the shared cache root", () => {
     const registered = userBuiltMarketplaceDir(
       DRIFT_CONTEXT.userCacheRoot,

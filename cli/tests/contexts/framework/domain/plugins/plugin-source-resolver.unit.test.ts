@@ -134,6 +134,32 @@ describe("resolvePluginSourceFromMarketplace", () => {
       });
     });
 
+    it("returns source unchanged when the absolute path is the marketplace dir itself", () => {
+      const entrySource: PluginSource = { kind: "local", path: MARKETPLACE_LOCAL_PATH };
+      const marketplace = makeGithubMarketplace("org/repo", "main");
+
+      const result = resolvePluginSourceFromMarketplace(
+        entrySource,
+        marketplace,
+        MARKETPLACE_LOCAL_PATH
+      );
+
+      expect(result).toBe(entrySource);
+    });
+
+    it("returns source unchanged when the relative path is only ./", () => {
+      const entrySource: PluginSource = { kind: "local", path: "./" };
+      const marketplace = makeGithubMarketplace("org/repo", "main");
+
+      const result = resolvePluginSourceFromMarketplace(
+        entrySource,
+        marketplace,
+        MARKETPLACE_LOCAL_PATH
+      );
+
+      expect(result).toBe(entrySource);
+    });
+
     it("returns source unchanged when absolute path is outside marketplace dir", () => {
       const entrySource: PluginSource = { kind: "local", path: "/some/other/absolute/path" };
       const marketplace = makeGithubMarketplace("org/repo", "main");

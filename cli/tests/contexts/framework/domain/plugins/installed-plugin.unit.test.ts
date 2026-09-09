@@ -4,12 +4,22 @@ import {
   InstalledPlugin,
   type McpDigestMap,
   type PluginEntryData,
+  parsePluginSpec,
 } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
+import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
 import {
   InvalidPluginNameError,
   InvalidPluginVersionError,
   MalformedPluginScopeError,
 } from "../../../../../src/kernel/errors.js";
+
+const makeDistribution = (strict?: boolean): PluginDistribution =>
+  new PluginDistribution({
+    manifest: { name: "my-plugin", version: "1.0.0", ...(strict === undefined ? {} : { strict }) },
+    format: "claude",
+    files: [],
+    components: { skills: [], commands: [], agents: [], rules: [], hooks: [], mcp: [] },
+  });
 
 const makePluginData = (overrides: Partial<PluginEntryData> = {}): PluginEntryData => ({
   name: "my-plugin",
@@ -156,6 +166,60 @@ describe("InstalledPlugin", () => {
     });
   });
 
+  describe("fromJSON() on a name that starts well and ends badly", () => {
+    it("throws InvalidPluginNameError for a name whose tail is not a segment", () => {
+      expect(() => InstalledPlugin.fromJSON(makePluginData({ name: "my-plugin_" }))).toThrow(
+        InvalidPluginNameError
+      );
+    });
+  });
+
+  describe("toJSON() for a plugin installed from no marketplace", () => {
+    it("writes no marketplace key at all", () => {
+      const data = makePluginData();
+
+      expect(InstalledPlugin.fromJSON(data).toJSON()).toStrictEqual(data);
+    });
+  });
+
+  describe("fromDistribution()", () => {
+    const source = { kind: "github", repo: "owner/my-plugin" } as const;
+
+    it("is strict only where the distribution's manifest says so", () => {
+      expect(
+        InstalledPlugin.fromDistribution(makeDistribution(true), source, [], "project").strict
+      ).toBe(true);
+    });
+
+    it("is lenient where the distribution's manifest says nothing", () => {
+      expect(
+        InstalledPlugin.fromDistribution(makeDistribution(), source, [], "project").strict
+      ).toBe(false);
+    });
+
+    it("keeps each installed path's component path", () => {
+      const componentPaths = new Map([[".claude/rules/naming.md", "rules/naming.md"]]);
+
+      const plugin = InstalledPlugin.fromDistribution(
+        makeDistribution(),
+        source,
+        [],
+        "project",
+        componentPaths
+      );
+
+      expect([...plugin.componentPaths]).toStrictEqual([
+        [".claude/rules/naming.md", "rules/naming.md"],
+      ]);
+    });
+
+    it("keeps no component path when handed none", () => {
+      const plugin = InstalledPlugin.fromDistribution(makeDistribution(), source, [], "project");
+
+      expect([...plugin.componentPaths]).toStrictEqual([]);
+    });
+  });
+
   describe("the three maps cannot be swapped", () => {
     it("fails to compile when one map's field is passed where another is expected", () => {
       const plugin = InstalledPlugin.fromJSON(makePluginData());
@@ -171,6 +235,30 @@ describe("InstalledPlugin", () => {
 
       // The types are branded, but the underlying maps are still plain ReadonlyMaps at runtime.
       expect(plugin.files).toBeInstanceOf(Map);
+    });
+  });
+});
+
+describe("parsePluginSpec — a plugin argument as typed on the command line", () => {
+  it("reads the version after the last @", () => {
+    expect(parsePluginSpec("aidd-context@1.2.3")).toStrictEqual({
+      name: "aidd-context",
+      version: "1.2.3",
+    });
+  });
+
+  it("reads a bare name as the name alone, requesting no version", () => {
+    expect(parsePluginSpec("aidd-context")).toStrictEqual({ name: "aidd-context" });
+  });
+
+  it("keeps a leading @ as part of a scoped name", () => {
+    expect(parsePluginSpec("@scope/plugin")).toStrictEqual({ name: "@scope/plugin" });
+  });
+
+  it("splits a scoped name from its version at the last @", () => {
+    expect(parsePluginSpec("@scope/plugin@2.0.0")).toStrictEqual({
+      name: "@scope/plugin",
+      version: "2.0.0",
     });
   });
 });
