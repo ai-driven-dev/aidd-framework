@@ -117,3 +117,60 @@ describe("Claude Code's own known_marketplaces.json", () => {
     expect(reading.unreadable).toBeDefined();
   });
 });
+
+describe("which hosts declare a marketplace registry to read", () => {
+  it("is claude alone, read off the profiles rather than a list", () => {
+    expect([...hostMarketplaceRegistryReaders(home).keys()]).toStrictEqual(["claude"]);
+  });
+});
+
+describe("Claude Code's known_marketplaces.json, at the edges of its shape", () => {
+  it("reads a document that is not an object as unreadable, and says so", async () => {
+    for (const content of ["[]", "null", '"x"']) {
+      await write(content);
+
+      const reading = await reader().read();
+
+      expect(reading.entries).toBeUndefined();
+      expect(reading.unreadable).toBe("not a JSON object");
+    }
+  });
+
+  it("names the parse failure of malformed JSON rather than calling it a wrong shape", async () => {
+    await write("{ not json");
+
+    const reading = await reader().read();
+
+    expect(reading.unreadable).toMatch(/JSON/);
+    expect(reading.unreadable).not.toBe("not a JSON object");
+  });
+
+  it("skips an entry that names no install location, whatever else it carries", async () => {
+    const target = join(home, "srcA");
+    await mkdir(target, { recursive: true });
+    await write(
+      JSON.stringify({
+        "null-entry": null,
+        "string-entry": "x",
+        "no-location": { source: { path: target } },
+        "wrong-type": { installLocation: 5 },
+        real: { installLocation: target },
+      })
+    );
+
+    const reading = await reader().read();
+
+    expect([...(reading.entries ?? [])]).toStrictEqual([["real", target]]);
+  });
+});
+
+describe("Claude Code's known_marketplaces.json, a registration whose source is gone", () => {
+  it("keeps the dead path as written rather than dropping the entry or failing the read", async () => {
+    const gone = join(home, "deleted-src");
+    await write(JSON.stringify({ dead: { installLocation: gone } }));
+
+    const reading = await reader().read();
+
+    expect([...(reading.entries ?? [])]).toStrictEqual([["dead", gone]]);
+  });
+});

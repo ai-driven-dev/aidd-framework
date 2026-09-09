@@ -311,3 +311,131 @@ describe("Copilot's own settings.json", () => {
     expect((await readerFor("copilot").read(PROJECT)).unreadable).toBe("ENOENT");
   });
 });
+
+describe("Claude Code's registry, at the edges of its shape", () => {
+  const PATH = ".claude/plugins/installed_plugins.json";
+
+  it("reads a plugins field that is not an object as unreadable, naming what was expected", async () => {
+    await write(PATH, JSON.stringify({ version: 1, plugins: 5 }));
+
+    const reading = await readerFor("claude").read(PROJECT);
+
+    expect(reading.refs).toBeUndefined();
+    expect(reading.unreadable).toBe("no `plugins` object");
+  });
+
+  it("ignores a ref whose entries are not a list", async () => {
+    await write(PATH, JSON.stringify({ version: 1, plugins: { "a@m": { scope: "user" } } }));
+
+    const reading = await readerFor("claude").read(PROJECT);
+
+    expect(reading.refs?.size).toBe(0);
+  });
+
+  it("answers user scope when one entry is user-scoped, whatever the others say", async () => {
+    await write(
+      PATH,
+      JSON.stringify({
+        version: 1,
+        plugins: {
+          "a@m": [{ scope: "project", projectPath: "/repo/other" }, { scope: "user" }],
+        },
+      })
+    );
+
+    const reading = await readerFor("claude").read(PROJECT);
+
+    expect(reading.refs?.get("a@m")).toStrictEqual({ enabled: true, scope: "user" });
+  });
+});
+
+describe("Codex's config.toml, at the edges of its shape", () => {
+  const PATH = ".codex/config.toml";
+
+  it("reads a plugin table whose header is indented", async () => {
+    await write(PATH, '  [plugins."a@m"]\n  enabled = false\n');
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect(reading.refs?.get("a@m")).toStrictEqual({ enabled: false });
+  });
+
+  it("reads no table off a line that only contains a header, or carries text after one", async () => {
+    await write(PATH, 'x[plugins."a@m"]\n[plugins."b@m"] junk\n');
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect(reading.refs?.size).toBe(0);
+  });
+
+  it("reads an enabled line however the spaces around its equals sign fall", async () => {
+    await write(
+      PATH,
+      '[plugins."a@m"]\nenabled=false\n[plugins."b@m"]\nenabled  =  false\n[plugins."c@m"]\nenabled =false # off\n'
+    );
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect([...(reading.refs ?? [])]).toStrictEqual([
+      ["a@m", { enabled: false }],
+      ["b@m", { enabled: false }],
+      ["c@m", { enabled: false }],
+    ]);
+  });
+
+  it("reads a value that is not a bare boolean as no answer, so the default stands", async () => {
+    await write(PATH, '[plugins."a@m"]\nenabled = falsey\n');
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect(reading.refs?.get("a@m")).toStrictEqual({ enabled: true });
+  });
+
+  it("does not mistake a bracket inside a value for the next table", async () => {
+    await write(PATH, '[plugins."a@m"]\nargs = ["x"]\nenabled = false\n');
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect(reading.refs?.get("a@m")).toStrictEqual({ enabled: false });
+  });
+
+  it("reads past a multi-line string inside the table body, and a header spelled inside it", async () => {
+    await write(
+      PATH,
+      '[plugins."a@m"]\nnote = """\n[plugins."fake@m"]\nenabled = true\n"""\nenabled = false\n'
+    );
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect([...(reading.refs ?? [])]).toStrictEqual([["a@m", { enabled: false }]]);
+  });
+
+  it("treats the last table in the file as enabled when it declares nothing", async () => {
+    await write(PATH, '[projects."/x"]\ntrust = "trusted"\n[plugins."a@m"]\n');
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect(reading.refs?.get("a@m")).toStrictEqual({ enabled: true });
+  });
+});
+
+describe("Copilot's settings.json, at the edges of its shape", () => {
+  it("reads malformed JSON as unreadable, never as carrying no plugins", async () => {
+    await write(".copilot/settings.json", "// comment\n{ not json");
+
+    const reading = await readerFor("copilot").read(PROJECT);
+
+    expect(reading.refs).toBeUndefined();
+    expect(reading.unreadable).toBeDefined();
+  });
+});
+
+describe("Codex's config.toml, keys that merely end in enabled", () => {
+  it("does not read another key ending in enabled as the plugin's own flag", async () => {
+    await write(".codex/config.toml", '[plugins."a@m"]\nauto_enabled = false\n');
+
+    const reading = await readerFor("codex").read(PROJECT);
+
+    expect(reading.refs?.get("a@m")).toStrictEqual({ enabled: true });
+  });
+});
