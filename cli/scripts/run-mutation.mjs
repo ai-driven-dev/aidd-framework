@@ -73,6 +73,18 @@ export function breakVerdict(score, declared) {
   return null;
 }
 
+/** Reads first rather than checking first: a file that vanishes in between is simply absent. */
+function pruneIncrementalFile(path) {
+  let raw;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  writeFileSync(path, JSON.stringify(pruneIncremental(JSON.parse(raw))));
+}
+
 function usage(problem, scopes) {
   console.error(`${problem}\n\nUsage: node scripts/run-mutation.mjs <scope> [--force]`);
   console.error(`Scopes: ${Object.keys(scopes).join(", ")}`);
@@ -88,13 +100,7 @@ function main() {
 
   const scopeDir = join(REPORT_ROOT, scope);
   mkdirSync(scopeDir, { recursive: true });
-  const incremental = join(scopeDir, "incremental.json");
-  if (existsSync(incremental)) {
-    writeFileSync(
-      incremental,
-      JSON.stringify(pruneIncremental(JSON.parse(readFileSync(incremental, "utf8"))))
-    );
-  }
+  pruneIncrementalFile(join(scopeDir, "incremental.json"));
 
   const result = spawnSync(
     join(CLI_ROOT, "node_modules", ".bin", "stryker"),
