@@ -142,7 +142,7 @@ describe("claude", () => {
 
     it("declares where claude's own user-scope settings file lives, for --scope user", () => {
       const activation = claude.capabilities.plugins.nativeActivation;
-      expect(activation?.userSettingsPath?.("/home/tester")).toBe(
+      expect(activation?.userSettingsPath?.("/home/tester", () => undefined)).toBe(
         join("/home/tester", ".claude", "settings.json")
       );
     });

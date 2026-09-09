@@ -14,7 +14,11 @@ import {
   type ToolId,
 } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
-import type { NativeActivation, PluginsCapability } from "./capabilities/plugins-capability.js";
+import type {
+  EnvironmentReader,
+  NativeActivation,
+  PluginsCapability,
+} from "./capabilities/plugins-capability.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
 
 /** Output layout: a marketplace dist versus a flat workspace inject. Declared here, not by
@@ -148,8 +152,12 @@ export function buildContractFor(
 /** A tool's own user-scope settings file, absolute under `homedir` — never written by aidd,
  * only named by a diagnostic. Empty for a tool whose profile declares no
  * `NativeActivation.userSettingsPath`. */
-export function userMachineLocalFilesOf(toolId: ToolId, homedir: string): readonly string[] {
-  const path = nativeActivationOf(toolId)?.userSettingsPath?.(homedir);
+export function userMachineLocalFilesOf(
+  toolId: ToolId,
+  homedir: string,
+  env: EnvironmentReader
+): readonly string[] {
+  const path = nativeActivationOf(toolId)?.userSettingsPath?.(homedir, env);
   return path === undefined ? [] : [path];
 }
 

@@ -55,8 +55,11 @@ export interface NativeActivation {
   pluginCacheDir?: (homedir: string) => string;
   /** This tool's own user-scope settings file, never written by aidd and read by a
    * diagnostic alone. Declared only for a tool that also declares `NativeActivation`. */
-  userSettingsPath?: (homedir: string) => string;
+  userSettingsPath?: (homedir: string, env: EnvironmentReader) => string;
 }
+
+/** One variable, as the caller reads it: a profile is a declaration and reaches no global. */
+export type EnvironmentReader = (name: string) => string | undefined;
 
 export interface NativePluginsParams {
   mode: "native";

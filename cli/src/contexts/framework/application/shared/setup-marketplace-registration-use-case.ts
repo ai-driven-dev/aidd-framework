@@ -12,6 +12,7 @@ import type {
 } from "../../../distribution/application/marketplace-register-framework-use-case.js";
 import { FRAMEWORK_MARKETPLACE_NAME } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceSourceMode } from "../../../distribution/domain/marketplace-source-mode.js";
+import type { Environment } from "../../domain/ports/environment.js";
 import type { UserSourceReferences } from "../../domain/ports/user-source-references.js";
 import type { SetupFlow } from "../../domain/setup-flow.js";
 import type { SetupMarketplaceSourceUseCase } from "../setup/setup-marketplace-source-use-case.js";
@@ -33,6 +34,7 @@ export class SetupMarketplaceRegistrationUseCase {
     private readonly marketplaceRefreshUseCase: MarketplaceRefresh,
     private readonly currentVersionProvider: VersionReader,
     private readonly logger: Logger,
+    private readonly environment: Environment,
     private readonly tokenProvider?: TokenProvider,
     private readonly releaseResolver?: LatestReleaseResolver,
     /** The registry of projects referencing the shared machine-scope source. Absent skips
@@ -115,7 +117,7 @@ export class SetupMarketplaceRegistrationUseCase {
   }
 
   private async refreshCatalog(flow: SetupFlow): Promise<void> {
-    if (process.env.AIDD_SKIP_MARKETPLACE_REFRESH === "1") return;
+    if (this.environment.get("AIDD_SKIP_MARKETPLACE_REFRESH") === "1") return;
     await this.marketplaceRefreshUseCase.execute({ projectRoot: flow.projectRoot });
   }
 }

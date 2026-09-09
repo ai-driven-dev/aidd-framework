@@ -57,8 +57,10 @@ import { StatusUseCase } from "../../contexts/framework/application/status-use-c
 import { UninstallIdeUseCase } from "../../contexts/framework/application/uninstall/uninstall-ide-use-case.js";
 import { UninstallToolsUseCase } from "../../contexts/framework/application/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../../contexts/framework/application/uninstall/uninstall-use-case.js";
+import type { Environment } from "../../contexts/framework/domain/ports/environment.js";
 import type { ManifestRepository } from "../../contexts/framework/domain/ports/manifest-repository.js";
 import type { UserSourceReferences } from "../../contexts/framework/domain/ports/user-source-references.js";
+import { EnvironmentAdapter } from "../../contexts/framework/infrastructure/environment-adapter.js";
 import { ManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
 import { UserManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/user-manifest-repository-adapter.js";
@@ -114,6 +116,7 @@ interface Deps extends TelemetryDeps {
   /** The one home-directory resolver presentation calls, never `os.homedir()` directly, so a
    * test can point it elsewhere. */
   homedir: () => string;
+  environment: Environment;
   logger: Logger;
   currentVersionProvider: VersionReader;
   prompter: Prompter;
@@ -206,6 +209,7 @@ export async function createDeps(
   const currentVersionProvider = new CurrentVersionAdapter();
   const selfUpdateUseCase = new SelfUpdateUseCase(cliUpdater, currentVersionProvider);
   const platform = new PlatformAdapter();
+  const environment = new EnvironmentAdapter();
   const prompter = process.stdout.isTTY
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
@@ -354,7 +358,8 @@ export async function createDeps(
     pluginInstallFromMarketplaceUseCase,
     manifestRepo,
     marketplaceTrustStore,
-    prompter
+    prompter,
+    environment
   );
   const installAiToolUseCase = new InstallAiToolUseCase(
     installRuntimeConfigUseCase,
@@ -415,6 +420,7 @@ export async function createDeps(
     marketplaceRefreshUseCase,
     currentVersionProvider,
     logger,
+    environment,
     authReader,
     releaseResolver,
     userSourceReferences
@@ -522,6 +528,7 @@ export async function createDeps(
     manifestRepo,
     userManifestRepo,
     homedir,
+    environment,
     logger,
     currentVersionProvider,
     prompter,

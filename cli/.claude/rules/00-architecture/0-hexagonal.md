@@ -18,6 +18,7 @@ Which context owns a concept is `0-contexts.md`.
 - Never branch on the targeted tool; read its capability class.
 - `infrastructure/`: port implementations and every piece of I/O.
 - Dependencies point inward; `biome.json` holds one `noRestrictedImports` override per layer.
+- `biome.json`'s `noRestrictedGlobals` refuses `process` in `domain/` and `application/`; take a port.
 - `import-rules-bite.arch.test.ts` fails a pattern naming a vanished directory.
 
 ## Ports and adapters

@@ -124,8 +124,8 @@ export function wireTelemetry(shared: TelemetryWiringShared): TelemetryDeps {
       personIdentity,
       telemetryEvidence,
       new TaskBacklogAdapter(projectRoot),
-      readLocalCostUseCase,
-      logger
+      logger,
+      readLocalCostUseCase
     ),
     forgetTelemetryUseCase: new ForgetTelemetryUseCase(
       telemetrySink,

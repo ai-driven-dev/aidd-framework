@@ -360,13 +360,12 @@ export class ReportCostUseCase {
     private readonly personIdentityStore: PersonIdentityStore,
     private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
     private readonly taskBacklogReader: TaskBacklogReader,
+    /** Where `warnAboutFailures` says what a reader could not answer. */
+    private readonly logger: Logger,
     /** Reads the sessions the sink has not caught up with yet, before the report is built.
      * Optional so a caller exercising the report's own rules need not wire it; absent, this
      * reports exactly what the sink already holds. */
-    private readonly readLocalCost?: ReadLocalCostUseCase,
-    /** Only `warnAboutFailures` writes here. Optional for the same reason `readLocalCost`
-     * is: a caller asking about the report's own rules wires neither. */
-    private readonly logger?: Logger
+    private readonly readLocalCost?: ReadLocalCostUseCase
   ) {}
 
   /** Whether the project switch is on right now - independent of the sink and the journal,
@@ -436,11 +435,7 @@ export class ReportCostUseCase {
    * output: a period where every reader threw would otherwise print what a period with no spend
    * prints. Warnings go to stderr, so a `--json` caller's stdout stays one parseable object. */
   private warnAboutFailures(sessionId: string, result: ReadLocalCostResult): void {
-    // A missing logger must not swallow the failures this exists to surface: a caller wiring
-    // none gets the same sentences on stderr, since a report that drops unreadable sessions
-    // quietly reads as low spend.
-    const say =
-      this.logger?.warn.bind(this.logger) ?? ((line: string) => process.stderr.write(`${line}\n`));
+    const say = this.logger.warn.bind(this.logger);
     for (const report of result.toolReports) {
       if (report.status !== "unreadable") continue;
       say(

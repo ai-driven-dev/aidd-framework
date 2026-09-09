@@ -364,13 +364,13 @@ describe("machineLocalFilesOf()", () => {
 
 describe("userMachineLocalFilesOf()", () => {
   it("returns claude's user-scope settings file, absolute under the given homedir", () => {
-    expect(userMachineLocalFilesOf("claude", "/home/tester")).toEqual([
+    expect(userMachineLocalFilesOf("claude", "/home/tester", () => undefined)).toEqual([
       join("/home/tester", ".claude", "settings.json"),
     ]);
   });
 
   it("returns nothing for a tool whose profile declares no userSettingsPath", () => {
-    expect(userMachineLocalFilesOf("cursor", "/home/tester")).toEqual([]);
+    expect(userMachineLocalFilesOf("cursor", "/home/tester", () => undefined)).toEqual([]);
   });
 });
 

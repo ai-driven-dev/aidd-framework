@@ -202,10 +202,9 @@ export const codex: AiTool<
         // reread — which is why `clean` proves this leftover safe to remove by its own
         // emptiness instead.
         pluginCacheDir: (h) => join(h, ".codex", "plugins", "cache"),
-        // `$CODEX_HOME/config.toml` when set — a real codex binary reads there regardless of a
-        // relocated `HOME` — falling back to `~/.codex/config.toml` otherwise. Never written by
-        // aidd; named here for a diagnostic alone.
-        userSettingsPath: (h) => join(process.env.CODEX_HOME || join(h, ".codex"), "config.toml"),
+        // `$CODEX_HOME/config.toml` when set — a real codex binary reads there whatever `HOME`
+        // says — else `~/.codex/config.toml`. Never written by aidd; named for a diagnostic alone.
+        userSettingsPath: (h, env) => join(env("CODEX_HOME") || join(h, ".codex"), "config.toml"),
       },
     }),
   },

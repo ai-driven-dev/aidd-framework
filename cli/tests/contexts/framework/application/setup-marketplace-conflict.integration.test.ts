@@ -18,6 +18,7 @@ import { buildUnitDeps } from "../../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { FakeHostMarketplaceRegistryReader } from "../../../helpers/ports/fake-host-marketplace-registry-reader.js";
 import { FakeNativePluginActivator } from "../../../helpers/ports/fake-native-plugin-activator.js";
+import { InMemoryEnvironment } from "../../../helpers/ports/in-memory-environment.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { OverwritePrompter } from "../../../helpers/ports/scripted-prompter.js";
 
@@ -106,7 +107,8 @@ async function buildUseCaseWithConflict() {
     makeNoOpMarketplaceRegisterFramework(),
     makeNoOpMarketplaceRefresh(),
     deps.currentVersionProvider,
-    deps.logger
+    deps.logger,
+    new InMemoryEnvironment()
   );
   const useCase = new SetupUseCase(
     deps.fs,

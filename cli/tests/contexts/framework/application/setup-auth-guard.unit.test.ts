@@ -20,6 +20,7 @@ import { SetupPluginsPromptUseCase } from "../../../../src/presentation/prompts/
 import type { TokenProvider } from "../../../../src/runtime/auth/ports/token-provider.js";
 import type { LatestReleaseResolver } from "../../../../src/runtime/self-update/latest-release-resolver.js";
 import { buildUnitDeps } from "../../../helpers/ports/build-unit-deps.js";
+import { InMemoryEnvironment } from "../../../helpers/ports/in-memory-environment.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { OverwritePrompter } from "../../../helpers/ports/scripted-prompter.js";
 
@@ -111,6 +112,7 @@ async function buildSetupUseCase(tokenProvider: TokenProvider, isRepoPublic = fa
     makeNoOpRefresh(),
     deps.currentVersionProvider,
     deps.logger,
+    new InMemoryEnvironment(),
     tokenProvider,
     makeReleaseResolver(isRepoPublic)
   );

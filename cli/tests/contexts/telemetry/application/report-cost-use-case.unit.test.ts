@@ -15,6 +15,7 @@ import { taskFolderPathFromIdentity } from "../../../../src/contexts/telemetry/d
 import type { TelemetrySinkRecord } from "../../../../src/contexts/telemetry/domain/telemetry-sink-record.js";
 import { UnreadableIdentityFileError } from "../../../../src/kernel/errors.js";
 import { AI_TOOL_IDS } from "../../../../src/kernel/tool.js";
+import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { NULL_PERSON_IDENTITY_READER } from "../../../helpers/ports/in-memory-person-identity-reader.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
@@ -57,7 +58,14 @@ describe("ReportCostUseCase", () => {
     identity = new InMemoryPersonIdentityStore();
     evidence = new StubTelemetryEvidenceReader();
     taskBacklog = new InMemoryTaskBacklogReader();
-    useCase = new ReportCostUseCase(sink, journals, identity, evidence, taskBacklog);
+    useCase = new ReportCostUseCase(
+      sink,
+      journals,
+      identity,
+      evidence,
+      taskBacklog,
+      new CapturingLogger()
+    );
   });
 
   async function store(...records: readonly TelemetrySinkRecord[]): Promise<void> {
@@ -210,7 +218,8 @@ describe("ReportCostUseCase", () => {
       journals,
       identity,
       evidence,
-      new InMemoryTaskBacklogReader()
+      new InMemoryTaskBacklogReader(),
+      new CapturingLogger()
     );
     await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
 
@@ -442,6 +451,7 @@ describe("a report that catches the sink up first", () => {
       new InMemoryPersonIdentityStore(),
       evidence,
       new InMemoryTaskBacklogReader(),
+      new CapturingLogger(),
       read
     );
   }
@@ -825,8 +835,8 @@ describe("a report that catches the sink up first", () => {
       new InMemoryPersonIdentityStore(),
       evidence,
       new InMemoryTaskBacklogReader(),
-      throwing,
-      { debug: () => {}, info: () => {}, warn: (m: string) => warnings.push(m) }
+      { debug: () => {}, info: () => {}, warn: (m: string) => warnings.push(m) },
+      throwing
     );
 
     const built = await report.execute({ ...BASE_OPTIONS, period: PERIOD });

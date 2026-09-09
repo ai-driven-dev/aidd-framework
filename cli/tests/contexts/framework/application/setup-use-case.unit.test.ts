@@ -33,6 +33,7 @@ import {
   initProject,
 } from "../../../helpers/ports/build-unit-deps.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
+import { InMemoryEnvironment } from "../../../helpers/ports/in-memory-environment.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
@@ -156,6 +157,7 @@ async function buildUseCase(
     marketplaceRefresh,
     deps.currentVersionProvider,
     logger ?? deps.logger,
+    new InMemoryEnvironment(),
     undefined,
     undefined,
     userSourceReferences

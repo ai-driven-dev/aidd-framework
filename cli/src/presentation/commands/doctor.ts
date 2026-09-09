@@ -124,7 +124,9 @@ async function runUserScopeDoctor(
   printUserScopeTools(
     output,
     toolIds.map((id) => {
-      const settingsPaths = userMachineLocalFilesOf(id, deps.homedir());
+      const settingsPaths = userMachineLocalFilesOf(id, deps.homedir(), (name) =>
+        deps.environment.get(name)
+      );
       return {
         toolId: id,
         version: manifest.getToolVersion(id) ?? "unknown",
