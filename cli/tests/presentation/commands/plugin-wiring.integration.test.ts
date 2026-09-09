@@ -169,7 +169,6 @@ describe("aidd plugin install", () => {
       projectRoot: PROJECT_ROOT,
       interactive: false,
       fromMarketplace: undefined,
-      token: undefined,
       yes: undefined,
       scope: undefined,
     });
@@ -177,6 +176,17 @@ describe("aidd plugin install", () => {
       projectRoot: PROJECT_ROOT,
       marketplaceNames: undefined,
     });
+  });
+
+  it("hands --token to the composition root, where every fetcher reads it, and to nothing else", async () => {
+    await run("install", "aidd-dev", "--token", "ghp_x");
+
+    expect(vi.mocked(createDeps)).toHaveBeenCalledWith(
+      PROJECT_ROOT,
+      { verbose: false, token: "ghp_x" },
+      expect.anything()
+    );
+    expect(pluginInstall.mock.calls[0][0]).not.toHaveProperty("token");
   });
 
   it("narrows activation to the marketplace the install was told to use", async () => {
@@ -191,7 +201,7 @@ describe("aidd plugin install", () => {
     });
   });
 
-  it("carries the scope, the token and the auto-answer a scripted run gave", async () => {
+  it("carries the scope and the auto-answer a scripted run gave", async () => {
     await run(
       "install",
       "aidd-dev",
@@ -205,7 +215,7 @@ describe("aidd plugin install", () => {
     );
 
     expect(pluginInstall).toHaveBeenCalledWith(
-      expect.objectContaining({ scope: "user", token: "ghp_x", yes: true, toolIds: ["claude"] })
+      expect.objectContaining({ scope: "user", yes: true, toolIds: ["claude"] })
     );
   });
 

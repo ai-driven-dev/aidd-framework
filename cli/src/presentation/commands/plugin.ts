@@ -98,14 +98,13 @@ export function registerPluginCommand(program: Command): void {
         try {
           assertValidAiToolId(cmdOptions.tool);
           const scope = parseInstallScope(cmdOptions.scope);
-          const deps = await createDeps(projectRoot, { verbose }, output);
+          const deps = await createDeps(projectRoot, { verbose, token: cmdOptions.token }, output);
           const result = await deps.pluginInstallUseCase.execute({
             pluginArg,
             toolIds: parseToolOption(cmdOptions.tool),
             projectRoot,
             interactive: process.stdout.isTTY,
             fromMarketplace: cmdOptions.from,
-            token: cmdOptions.token,
             yes: cmdOptions.yes,
             scope,
           });

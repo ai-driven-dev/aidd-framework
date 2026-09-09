@@ -56,7 +56,7 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
   { path: "src/contexts/telemetry/application/read-local-cost-use-case.ts", injected: 7 },
   { path: "src/contexts/telemetry/application/report-cost-use-case.ts", injected: 7 },
   { path: "src/contexts/framework/application/install/install-ide-tool-use-case.ts", injected: 6 },
-  { path: "src/contexts/framework/application/plugin/plugin-install-use-case.ts", injected: 7 },
+  { path: "src/contexts/framework/application/plugin/plugin-install-use-case.ts", injected: 6 },
   { path: "src/contexts/framework/application/plugin/plugin-update-use-case.ts", injected: 6 },
   {
     path: "src/contexts/framework/application/restore/restore-all-plugins-use-case.ts",
