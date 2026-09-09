@@ -5,6 +5,7 @@ import {
   mergeClaudeSettingsHooks,
   mergeCodexFrameworkHooksJson,
   mergeCursorFlatHooks,
+  renameCodexHookEvents,
 } from "../../../../../src/contexts/tools/domain/formats/flat-hooks-merge.js";
 
 describe("mergeClaudeSettingsHooks", () => {
@@ -408,5 +409,184 @@ describe("hookCommandsForEvent", () => {
       []
     );
     expect(hookCommandsForEvent(JSON.stringify({ hooks: [] }), "SessionStart")).toEqual([]);
+  });
+});
+
+describe("renameCodexHookEvents", () => {
+  it("returns a document without hooks byte for byte", () => {
+    expect(renameCodexHookEvents('{"x":1}')).toBe('{"x":1}');
+  });
+
+  it("renames Stop to SessionEnd and leaves the other events under their own names", () => {
+    const renamed = renameCodexHookEvents(
+      JSON.stringify({
+        hooks: {
+          Stop: [{ hooks: [{ type: "command", command: "a" }] }],
+          PreToolUse: [{ hooks: [] }],
+        },
+      })
+    );
+
+    expect(renamed).toBe(
+      `${JSON.stringify(
+        {
+          hooks: {
+            SessionEnd: [{ hooks: [{ type: "command", command: "a" }] }],
+            PreToolUse: [{ hooks: [] }],
+          },
+        },
+        null,
+        2
+      )}\n`
+    );
+  });
+});
+
+describe("flattenCopilotHooksShape, entry by entry", () => {
+  it("omits an event whose groups hold no runnable entry", () => {
+    const flat = flattenCopilotHooksShape(
+      JSON.stringify({ hooks: { PreToolUse: [{ hooks: [] }, { hooks: [{ type: "command" }] }] } })
+    );
+
+    expect(JSON.parse(flat)).toStrictEqual({ version: 1 });
+  });
+
+  it("defaults a missing type to command, keeps a declared one, and carries timeout only when set", () => {
+    const flat = flattenCopilotHooksShape(
+      JSON.stringify({
+        hooks: {
+          Stop: [{ hooks: [{ command: "a" }, { type: "prompt", command: "b", timeout: 5 }] }],
+        },
+      })
+    );
+
+    expect(JSON.parse(flat)).toStrictEqual({
+      version: 1,
+      hooks: {
+        Stop: [
+          { type: "command", command: "a" },
+          { type: "prompt", command: "b", timeout: 5 },
+        ],
+      },
+    });
+  });
+});
+
+describe("mergeCursorFlatHooks, entry by entry", () => {
+  it("keeps only the entries that carry a command string", () => {
+    const { content } = mergeCursorFlatHooks(
+      null,
+      JSON.stringify({
+        hooks: { Stop: [{ hooks: [{ type: "command" }, { command: "a" }, { command: 5 }] }] },
+      })
+    );
+
+    expect(JSON.parse(content)).toStrictEqual({
+      version: 1,
+      hooks: { stop: [{ command: "a" }], sessionEnd: [{ command: "a" }] },
+    });
+  });
+});
+
+describe("mergeCodexFrameworkHooksJson, entry by entry", () => {
+  it("writes a matcher only when the group declares one, and drops an item without a command", () => {
+    const { content } = mergeCodexFrameworkHooksJson(
+      null,
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            { matcher: "Bash", hooks: [{ command: "a" }, { type: "command" }] },
+            { hooks: [{ type: "prompt", command: "b" }] },
+          ],
+        },
+      })
+    );
+
+    expect(JSON.parse(content)).toStrictEqual({
+      hooks: {
+        PreToolUse: [
+          { matcher: "Bash", hooks: [{ type: "command", command: "a" }] },
+          { hooks: [{ type: "prompt", command: "b" }] },
+        ],
+      },
+    });
+  });
+
+  it("carries timeout and statusMessage only when each is declared in its own type", () => {
+    const { content } = mergeCodexFrameworkHooksJson(
+      null,
+      JSON.stringify({
+        hooks: {
+          Stop: [
+            {
+              hooks: [
+                { command: "a", timeout: 5, statusMessage: "working" },
+                { command: "b", timeout: "5", statusMessage: 7 },
+              ],
+            },
+          ],
+        },
+      })
+    );
+
+    expect(JSON.parse(content)).toStrictEqual({
+      hooks: {
+        SessionEnd: [
+          {
+            hooks: [
+              { type: "command", command: "a", timeout: 5, statusMessage: "working" },
+              { type: "command", command: "b" },
+            ],
+          },
+        ],
+      },
+    });
+  });
+});
+
+describe("hookCommandsForEvent, on content that is not a hooks file", () => {
+  it("answers nothing for a document that is not an object", () => {
+    expect(hookCommandsForEvent("[]", "Stop")).toStrictEqual([]);
+    expect(hookCommandsForEvent("5", "Stop")).toStrictEqual([]);
+  });
+
+  it("skips an entry that is not an object, and a command that is not a string", () => {
+    const content = JSON.stringify({
+      hooks: {
+        Stop: [null, "x", { command: 5 }, { command: "c" }, { hooks: [{ command: "d" }, 3] }],
+      },
+    });
+
+    expect(hookCommandsForEvent(content, "Stop")).toStrictEqual(["c", "d"]);
+  });
+});
+
+describe("a matcher group that declares no hooks list", () => {
+  const groupless = JSON.stringify({
+    hooks: { Stop: [{ matcher: "x" }, { hooks: [{ command: "a" }] }] },
+  });
+
+  it("is skipped by the Copilot flattening", () => {
+    expect(JSON.parse(flattenCopilotHooksShape(groupless))).toStrictEqual({
+      version: 1,
+      hooks: { Stop: [{ type: "command", command: "a" }] },
+    });
+  });
+
+  it("is skipped by the Cursor merge", () => {
+    expect(JSON.parse(mergeCursorFlatHooks(null, groupless).content)).toStrictEqual({
+      version: 1,
+      hooks: { stop: [{ command: "a" }], sessionEnd: [{ command: "a" }] },
+    });
+  });
+});
+
+describe("hookCommandsForEvent, for an event Cursor never renames", () => {
+  it("reads the event under its own name alone", () => {
+    const content = JSON.stringify({
+      hooks: { PreCompact: [{ command: "a" }], preCompact: [{ command: "b" }] },
+    });
+
+    expect(hookCommandsForEvent(content, "PreCompact")).toStrictEqual(["a"]);
   });
 });

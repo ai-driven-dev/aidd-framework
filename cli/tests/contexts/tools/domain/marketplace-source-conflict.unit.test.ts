@@ -121,3 +121,40 @@ describe("pluginSetDifference / describePluginDiff", () => {
     expect(describePluginDiff(diff)).toBe("match, but the declared name differs");
   });
 });
+
+describe("marketplaceSourceConflict, at the edges", () => {
+  it("is not a conflict when the name is absent, even with a registered identity in hand", () => {
+    const reading = { location: LOCATION, entries: new Map([["other", "/src"]]) };
+
+    expect(
+      marketplaceSourceConflict(reading, "probe-mkt", "/req", IDENTITY_B, IDENTITY_A)
+    ).toBeUndefined();
+  });
+
+  it("is a conflict when the requested plugin set merely extends the registered one", () => {
+    const reading = { location: LOCATION, entries: new Map([["probe-mkt", "/src"]]) };
+    const wider = { name: "probe-mkt", pluginNames: ["sample-plugin", "zeta-plugin"] };
+
+    expect(
+      marketplaceSourceConflict(reading, "probe-mkt", "/req", IDENTITY_A, wider)
+    ).toBeDefined();
+  });
+
+  it("compares plugin sets whichever side lists them out of order", () => {
+    const reading = { location: LOCATION, entries: new Map([["probe-mkt", "/src"]]) };
+    const unordered = { name: "probe-mkt", pluginNames: ["b", "a"] };
+    const ordered = { name: "probe-mkt", pluginNames: ["a", "b"] };
+
+    expect(
+      marketplaceSourceConflict(reading, "probe-mkt", "/req", unordered, ordered)
+    ).toBeUndefined();
+  });
+});
+
+describe("describePluginDiff, with several names on each side", () => {
+  it("lists every added and removed name, comma separated", () => {
+    expect(describePluginDiff({ added: ["a", "b"], removed: ["c", "d"] })).toBe(
+      "differ (+a, b, -c, d)"
+    );
+  });
+});

@@ -81,3 +81,36 @@ describe("cursorProjectHooksScriptDir", () => {
     expect(cursorProjectHooksScriptDir("aidd-telemetry")).toBe(".cursor/hooks/aidd-telemetry/");
   });
 });
+
+describe("rewriting a plugin's root token for the project hooks file", () => {
+  it("relocates a command under hooks/ to the plugin's own script directory", () => {
+    const { content } = mergeCursorProjectHooksJson(null, PLUGIN_A_HOOKS, "plugin-a");
+
+    expect(JSON.parse(content)).toStrictEqual({
+      version: 1,
+      hooks: { postToolUse: [{ command: "node ./.cursor/hooks/plugin-a/journal.cjs" }] },
+    });
+  });
+
+  it("leaves a plugin-relative path outside hooks/ where it was", () => {
+    const { content } = mergeCursorProjectHooksJson(
+      null,
+      hooksJson(`node ${PLUGIN_ROOT_VAR}/scripts/run.cjs`),
+      "plugin-a"
+    );
+
+    expect(JSON.parse(content)).toStrictEqual({
+      version: 1,
+      hooks: { postToolUse: [{ command: "node scripts/run.cjs" }] },
+    });
+  });
+
+  it("names where a hook script lands, with or without its hooks/ prefix", () => {
+    expect(cursorProjectHooksScriptPath("plugin-a", "hooks/journal.cjs")).toBe(
+      ".cursor/hooks/plugin-a/journal.cjs"
+    );
+    expect(cursorProjectHooksScriptPath("plugin-a", "lib/x.cjs")).toBe(
+      ".cursor/hooks/plugin-a/lib/x.cjs"
+    );
+  });
+});

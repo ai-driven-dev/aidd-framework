@@ -2,9 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { PluginPresence } from "../../../../src/contexts/tools/domain/build-contract.js";
 import {
   buildClaudeStyleCatalogEntry,
+  buildClaudeStyleEntry,
   buildClaudeStyleMarketplace,
+  buildCodexMarketplace,
+  buildCodexMarketplaceEntry,
+  resolveDescription,
+  resolveVersion,
   synthesizeClaudeStyleManifest,
 } from "../../../../src/contexts/tools/domain/marketplace-catalog.js";
+import { InvalidSourceMarketplaceError } from "../../../../src/kernel/errors.js";
+import { InMemoryFileAdapter } from "../../../helpers/ports/index.js";
 
 const EMPTY_PRESENCE: PluginPresence = {
   hasAgents: false,
@@ -259,5 +266,137 @@ describe("buildClaudeStyleCatalogEntry", () => {
   it("only includes strict when it is boolean (not string/number)", () => {
     const entry = buildClaudeStyleCatalogEntry("aidd-dev", "desc", "1.0.0", { strict: true });
     expect(typeof entry.strict).toBe("boolean");
+  });
+});
+
+describe("synthesizeClaudeStyleManifest, field by field", () => {
+  const opts = { agentsField: true, hooksField: true };
+
+  it("writes no key at all for a source declaring nothing", () => {
+    expect(synthesizeClaudeStyleManifest({}, EMPTY_PRESENCE, opts)).toStrictEqual({});
+  });
+
+  it("keeps an author given as an object or a string, and drops one of any other type", () => {
+    expect(
+      synthesizeClaudeStyleManifest({ author: { name: "B" } }, EMPTY_PRESENCE, opts)
+    ).toStrictEqual({ author: { name: "B" } });
+    expect(synthesizeClaudeStyleManifest({ author: "B" }, EMPTY_PRESENCE, opts)).toStrictEqual({
+      author: "B",
+    });
+    expect(synthesizeClaudeStyleManifest({ author: 7 }, EMPTY_PRESENCE, opts)).toStrictEqual({});
+  });
+
+  it("drops a name, description or version that is not a string", () => {
+    expect(
+      synthesizeClaudeStyleManifest({ name: 1, description: 2, version: 3 }, EMPTY_PRESENCE, opts)
+    ).toStrictEqual({});
+  });
+});
+
+describe("buildClaudeStyleMarketplace, field by field", () => {
+  it("writes only the name and the plugins for a source declaring nothing else", () => {
+    expect(buildClaudeStyleMarketplace({ name: "m" }, [])).toStrictEqual({
+      name: "m",
+      plugins: [],
+    });
+  });
+});
+
+describe("resolving a catalog entry's version and description", () => {
+  const MANIFEST = "/out/plugins/p/.claude-plugin/plugin.json";
+
+  it("takes the marketplace entry's own version and description without opening the manifest", async () => {
+    const fs = new InMemoryFileAdapter();
+
+    expect(
+      await resolveVersion(fs, "p", { version: "9.9.9" }, "/out", ".claude-plugin/plugin.json")
+    ).toBe("9.9.9");
+    expect(
+      await resolveDescription(
+        fs,
+        "p",
+        { description: "from entry" },
+        "/out",
+        ".claude-plugin/plugin.json"
+      )
+    ).toBe("from entry");
+  });
+
+  it("falls back to the built manifest, and names what is missing when neither side has it", async () => {
+    const fs = new InMemoryFileAdapter({
+      [MANIFEST]: JSON.stringify({ version: "1.0.0", description: "" }),
+    });
+
+    expect(await resolveVersion(fs, "p", undefined, "/out", ".claude-plugin/plugin.json")).toBe(
+      "1.0.0"
+    );
+    await expect(
+      resolveDescription(fs, "p", {}, "/out", ".claude-plugin/plugin.json")
+    ).rejects.toThrow(
+      new InvalidSourceMarketplaceError(
+        "plugin 'p' has no description in marketplace entry or plugin.json"
+      )
+    );
+    await expect(
+      resolveVersion(
+        new InMemoryFileAdapter({ [MANIFEST]: "{}" }),
+        "p",
+        {},
+        "/out",
+        ".claude-plugin/plugin.json"
+      )
+    ).rejects.toThrow(
+      new InvalidSourceMarketplaceError(
+        "plugin 'p' has no version in marketplace entry or plugin.json"
+      )
+    );
+  });
+
+  it("shapes the whole entry from both resolutions", async () => {
+    const fs = new InMemoryFileAdapter({
+      [MANIFEST]: JSON.stringify({ version: "1.0.0", description: "built" }),
+    });
+
+    expect(
+      await buildClaudeStyleEntry("p", "/out", { strict: true }, ".claude-plugin/plugin.json", fs)
+    ).toStrictEqual({
+      name: "p",
+      source: "./plugins/p",
+      description: "built",
+      version: "1.0.0",
+      strict: true,
+    });
+  });
+});
+
+describe("a Codex marketplace catalog", () => {
+  it("falls back to the marketplace name as its display name", () => {
+    expect(buildCodexMarketplace({ name: "m" }, [])).toStrictEqual({
+      name: "m",
+      interface: { displayName: "m" },
+      plugins: [],
+    });
+    expect(buildCodexMarketplace({ name: "m", displayName: "Mine" }, []).interface).toStrictEqual({
+      displayName: "Mine",
+    });
+  });
+
+  it("defaults an entry's authentication and category, and takes a string override for each", () => {
+    expect(buildCodexMarketplaceEntry("p", undefined)).toStrictEqual({
+      name: "p",
+      source: { source: "local", path: "./plugins/p" },
+      policy: { installation: "AVAILABLE", authentication: "ON_USE" },
+      category: "Developer Tools",
+    });
+    expect(
+      buildCodexMarketplaceEntry("p", { authentication: "NEVER", category: "Testing" })
+    ).toMatchObject({
+      policy: { installation: "AVAILABLE", authentication: "NEVER" },
+      category: "Testing",
+    });
+    expect(buildCodexMarketplaceEntry("p", { authentication: 1, category: null })).toMatchObject({
+      policy: { authentication: "ON_USE" },
+      category: "Developer Tools",
+    });
   });
 });

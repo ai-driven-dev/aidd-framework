@@ -49,3 +49,21 @@ describe("CommandsCapability", () => {
     });
   });
 });
+
+describe("CommandsCapability file acceptance", () => {
+  const cap = new CommandsCapability({
+    directory: ".claude/",
+    toolSuffix: ".claude.md",
+    buildInstallPath: (fileName) => fileName,
+    convertFrontmatter: (fm) => fm,
+  });
+
+  it("accepts its own suffix and a suffix belonging to no tool", () => {
+    expect(cap.acceptsFileName("01-plan/plan.claude.md")).toBe(true);
+    expect(cap.acceptsFileName("01-plan/plan.md")).toBe(true);
+  });
+
+  it("refuses another tool's suffix wherever the file sits", () => {
+    expect(cap.acceptsFileName("a/b/plan.cursor.md")).toBe(false);
+  });
+});

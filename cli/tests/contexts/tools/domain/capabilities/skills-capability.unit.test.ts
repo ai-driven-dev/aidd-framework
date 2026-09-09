@@ -100,3 +100,57 @@ describe("SkillsCapability", () => {
     });
   });
 });
+
+describe("SkillsCapability without a tool suffix", () => {
+  it("names the skill file by its bare name", () => {
+    const cap = new SkillsCapability({
+      directory: ".claude/",
+      buildInstallPath: (fileName) => fileName,
+      convertFrontmatter: (fm) => fm,
+    });
+
+    expect(cap.buildOutputPath("planning")).toBe(".claude/skills/planning");
+  });
+
+  it("names what a capability lacking both prefix and directory is missing", () => {
+    expect(
+      () =>
+        new SkillsCapability({
+          buildInstallPath: (fileName) => fileName,
+          convertFrontmatter: (fm) => fm,
+        })
+    ).toThrow("SkillsCapability requires either prefix or directory");
+  });
+});
+
+describe("SkillsCapability file acceptance", () => {
+  const cap = () =>
+    new SkillsCapability({
+      directory: ".claude/",
+      toolSuffix: ".claude.md",
+      buildInstallPath: (fileName) => fileName,
+      convertFrontmatter: (fm) => fm,
+    });
+
+  it("accepts its own suffix and a suffix belonging to no tool", () => {
+    expect(cap().acceptsFileName("skills/a.claude.md")).toBe(true);
+    expect(cap().acceptsFileName("skills/a/SKILL.md")).toBe(true);
+  });
+
+  it("refuses another tool's suffix wherever the file sits", () => {
+    expect(cap().acceptsFileName("a/b/c.cursor.md")).toBe(false);
+  });
+
+  it("differs from a capability with another tool suffix", () => {
+    expect(
+      cap().equals(
+        new SkillsCapability({
+          directory: ".claude/",
+          toolSuffix: ".x.md",
+          buildInstallPath: (fileName) => fileName,
+          convertFrontmatter: (fm) => fm,
+        })
+      )
+    ).toBe(false);
+  });
+});

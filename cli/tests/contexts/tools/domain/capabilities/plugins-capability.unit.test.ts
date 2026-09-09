@@ -247,3 +247,90 @@ describe("PluginsCapability", () => {
     });
   });
 });
+
+describe("PluginsCapability base directory resolution", () => {
+  const native = {
+    mode: "native" as const,
+    acceptsHooks: true as const,
+    pluginsDir: ".x/plugins/",
+    pluginManifestRelativePath: null,
+  };
+
+  it("stays in the project when the scope is project, even with a user directory declared", () => {
+    const cap = new PluginsCapability({
+      ...native,
+      userPluginsDir: (home) => `${home}/.x/plugins`,
+    });
+
+    expect(cap.resolvePluginsBaseDir("/repo", "/home/me")).toBe("/repo");
+    expect(cap.userPluginsBaseDir("/home/me")).toBe("/home/me/.x/plugins");
+  });
+
+  it("stays in the project for a capability declaring no user directory at all", () => {
+    const cap = new PluginsCapability(native);
+
+    expect(cap.resolvePluginsBaseDir("/repo", "/home/me")).toBe("/repo");
+    expect(cap.userPluginsBaseDir("/home/me")).toBeNull();
+  });
+
+  it("names a plugin's own directory under the plugins directory in native mode only", () => {
+    expect(new PluginsCapability(native).pluginOutputDir("p")).toBe(".x/plugins/p/");
+    expect(
+      new PluginsCapability({
+        mode: "flat",
+        acceptsHooks: true,
+        flatHooksDir: ".x/hooks/",
+        flatNamespacePrefix: "aidd-",
+      }).pluginOutputDir("p")
+    ).toBeNull();
+  });
+
+  it("refuses a project hooks destination that names no project hooks file", () => {
+    expect(() => new PluginsCapability({ ...native, hooksDestination: "project" })).toThrow(
+      "hooksDestination 'project' requires a projectHooksRelativePath."
+    );
+  });
+});
+
+describe("PluginsCapability defaults each mode falls back to", () => {
+  it("delivers no mcp, lands hooks in the plugin, and reads matcher-shaped hooks unless a native tool says otherwise", () => {
+    const cap = new PluginsCapability({
+      mode: "native",
+      acceptsHooks: true,
+      pluginsDir: ".x/plugins/",
+      pluginManifestRelativePath: null,
+    });
+
+    expect([cap.acceptsMcp, cap.hooksDestination, cap.hooksContentFormat]).toStrictEqual([
+      false,
+      "plugin",
+      "matchers",
+    ]);
+  });
+
+  it("fixes the same three answers for a flat tool", () => {
+    const cap = new PluginsCapability({
+      mode: "flat",
+      acceptsHooks: true,
+      flatHooksDir: ".x/hooks/",
+      flatNamespacePrefix: "aidd-",
+    });
+
+    expect([cap.acceptsMcp, cap.hooksDestination, cap.hooksContentFormat]).toStrictEqual([
+      false,
+      "plugin",
+      "matchers",
+    ]);
+  });
+
+  it("accepts neither hooks nor mcp for a tool hosting no plugin at all", () => {
+    const cap = new PluginsCapability({ mode: "unsupported", hooksUnsupportedReason: "none" });
+
+    expect([
+      cap.acceptsHooks,
+      cap.acceptsMcp,
+      cap.hooksDestination,
+      cap.hooksContentFormat,
+    ]).toStrictEqual([false, false, "plugin", "matchers"]);
+  });
+});

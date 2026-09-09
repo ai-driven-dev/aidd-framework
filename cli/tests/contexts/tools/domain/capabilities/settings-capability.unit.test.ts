@@ -146,3 +146,40 @@ describe("SettingsCapability", () => {
     });
   });
 });
+
+describe("SettingsCapability path acceptance", () => {
+  it("accepts exactly its own output path", () => {
+    const cap = new SettingsCapability({
+      outputPath: ".vscode/settings.json",
+      mergeStrategy: "none",
+    });
+
+    expect(cap.accepts(".vscode/settings.json")).toBe(true);
+    expect(cap.accepts(".vscode/extensions.json")).toBe(false);
+    expect(cap.accepts("x/.vscode/settings.json")).toBe(false);
+  });
+});
+
+describe("SettingsCapability equality", () => {
+  const base = { outputPath: ".vscode/settings.json", mergeStrategy: "none" as const };
+
+  it("is equal on the same output path and merge strategy", () => {
+    expect(new SettingsCapability(base).equals(new SettingsCapability({ ...base }))).toBe(true);
+  });
+
+  it("differs on the output path", () => {
+    expect(
+      new SettingsCapability(base).equals(
+        new SettingsCapability({ ...base, outputPath: ".vscode/extensions.json" })
+      )
+    ).toBe(false);
+  });
+
+  it("differs on the merge strategy", () => {
+    expect(
+      new SettingsCapability(base).equals(
+        new SettingsCapability({ ...base, mergeStrategy: "user-prime" })
+      )
+    ).toBe(false);
+  });
+});
